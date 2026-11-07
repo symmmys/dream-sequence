@@ -1,0 +1,51 @@
+SOMNIUM — INDIVIDUAL SOURCE FILE INDEX
+================================================================
+
+Source file: src/game/dnd-mode.js
+Source directory: src/
+Generated: 2026-11-07T06:14:04
+Total source lines: 2113
+Maximum chunk size: 300 lines
+Number of parts: 8
+
+SOURCE PARTS
+----------------------------------------------------------------
+Part: PART-001.txt
+Original lines: 1-300
+Lines in part: 300
+
+Part: PART-002.txt
+Original lines: 301-600
+Lines in part: 300
+
+Part: PART-003.txt
+Original lines: 601-900
+Lines in part: 300
+
+Part: PART-004.txt
+Original lines: 901-1200
+Lines in part: 300
+
+Part: PART-005.txt
+Original lines: 1201-1500
+Lines in part: 300
+
+Part: PART-006.txt
+Original lines: 1501-1800
+Lines in part: 300
+
+Part: PART-007.txt
+Original lines: 1801-2100
+Lines in part: 300
+
+Part: PART-008.txt
+Original lines: 2101-2113
+Lines in part: 13
+
+READING INSTRUCTIONS
+----------------------------------------------------------------
+- Read parts in ascending numerical order.
+- Concatenate parts without adding separator lines.
+- Part contents are original UTF-8 source text.
+- Original source line numbering is preserved.
+- No source lines are intentionally omitted.

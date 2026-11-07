@@ -1,0 +1,154 @@
+            "lightDirection",
+            options.lightDirection ??
+                new BABYLON.Vector3(-0.5, -1, -0.3).normalize()
+        );
+
+        material.setFloat(
+            "ambientStrength",
+            options.ambientStrength ?? 0.3
+        );
+
+        material.backFaceCulling =
+            options.backFaceCulling ?? true;
+
+material.onBindObservable.add(mesh => {
+
+    const camera = this.scene.activeCamera;
+
+    if (!camera) return;
+
+    const world = mesh.getWorldMatrix();
+
+    const viewProjection =
+        camera.getViewMatrix().multiply(
+            camera.getProjectionMatrix()
+        );
+
+    material.setMatrix("world", world);
+
+    material.setMatrix(
+        "viewProjection",
+        viewProjection
+    );
+});
+        this.materials.add(material);
+
+        return material;
+    }
+
+    // -----------------------------------------
+    // APPLY TO MESH
+    // -----------------------------------------
+
+    apply(mesh, options = {}) {
+
+        if (!this.enabled || !mesh) {
+            return false;
+        }
+
+        if (
+            mesh.metadata?.spatiallyTransformed
+        ) {
+            throw new Error(
+                "Cannot apply GPU projection to a CPU-projected mesh."
+            );
+        }
+
+        if (
+            mesh.metadata?.geometryShaderApplied
+        ) {
+            return false;
+        }
+
+        if (!this.originalMaterials.has(mesh)) {
+
+            this.originalMaterials.set(
+                mesh,
+                mesh.material
+            );
+        }
+
+        const material =
+            this.createMaterial(
+                options.name ??
+                    `poincare-${mesh.name}`,
+                options
+            );
+
+        mesh.material = material;
+
+        mesh.metadata = {
+            ...(mesh.metadata || {}),
+            geometryShaderApplied: true
+        };
+
+        return true;
+    }
+
+    // -----------------------------------------
+    // RESTORE ORIGINAL MATERIAL
+    // -----------------------------------------
+
+    restore(mesh) {
+
+        if (!mesh) return false;
+
+        if (!this.originalMaterials.has(mesh)) {
+            return false;
+        }
+
+        mesh.material =
+            this.originalMaterials.get(mesh);
+
+        this.originalMaterials.delete(mesh);
+
+        if (mesh.metadata) {
+            delete mesh.metadata.geometryShaderApplied;
+        }
+
+        return true;
+    }
+
+    // -----------------------------------------
+    // CONFIGURATION
+    // -----------------------------------------
+
+    setEnabled(enabled) {
+
+        this.enabled = !!enabled;
+    }
+
+    // -----------------------------------------
+    // DIAGNOSTICS
+    // -----------------------------------------
+
+    getStats() {
+
+        return {
+            enabled: this.enabled,
+            geometry: this.transform.geometryName,
+            activeMaterials: this.materials.size,
+            renderScale: this.renderScale
+        };
+    }
+
+    // -----------------------------------------
+    // DISPOSAL
+    // -----------------------------------------
+
+    dispose() {
+
+        for (const material of this.materials) {
+            material.dispose();
+        }
+
+        this.materials.clear();
+
+        console.log(
+            "[GeometryShaderManager] Disposed."
+        );
+    }
+}
+
+export { GeometryShaderManager };
+

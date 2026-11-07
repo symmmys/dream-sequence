@@ -1,0 +1,1811 @@
+SOMNIUM — DIRECTORY SOURCE DUMP
+========================================================================
+
+Directory: src/geology/
+Generated: 2026-11-07T06:14:04
+
+This file contains recursively collected UTF-8 text files.
+Binary files and excluded directories are omitted.
+File paths are relative to the project root.
+
+
+========================================================================
+FILE: src/geology/geological-field.js
+========================================================================
+
+
+import { fractalNoise2D } from "../core/noise.js";
+
+const MATERIALS = {
+    granite: {
+        density: 2.70,
+        hardness: 0.98,
+        cohesion: 0.95,
+        porosity: 0.02,
+        moistureCapacity: 0.12,
+        infiltration: 0.08,
+        drainage: 0.95,
+        fertility: 0.08,
+        roughness: 0.94,
+        color: [0.39, 0.37, 0.34]
+    },
+
+    basalt: {
+        density: 2.95,
+        hardness: 0.96,
+        cohesion: 0.94,
+        porosity: 0.06,
+        moistureCapacity: 0.18,
+        infiltration: 0.15,
+        drainage: 0.85,
+        fertility: 0.15,
+        roughness: 0.92,
+        color: [0.24, 0.23, 0.22]
+    },
+
+    limestone: {
+        density: 2.50,
+        hardness: 0.65,
+        cohesion: 0.65,
+        porosity: 0.12,
+        moistureCapacity: 0.45,
+        infiltration: 0.55,
+        drainage: 0.65,
+        fertility: 0.40,
+        roughness: 0.82,
+        color: [0.63, 0.60, 0.51]
+    },
+
+    sandstone: {
+        density: 2.20,
+        hardness: 0.45,
+        cohesion: 0.40,
+        porosity: 0.28,
+        moistureCapacity: 0.40,
+        infiltration: 0.72,
+        drainage: 0.85,
+        fertility: 0.22,
+        roughness: 0.90,
+        color: [0.65, 0.43, 0.29]
+    },
+
+    scree: {
+        density: 1.75,
+        hardness: 0.15,
+        cohesion: 0.10,
+        porosity: 0.42,
+        moistureCapacity: 0.12,
+        infiltration: 0.90,
+        drainage: 0.98,
+        fertility: 0.04,
+        roughness: 0.98,
+        color: [0.43, 0.41, 0.37]
+    },
+
+    sand: {
+        density: 1.60,
+        hardness: 0.08,
+        cohesion: 0.12,
+        porosity: 0.40,
+        moistureCapacity: 0.25,
+        infiltration: 0.95,
+        drainage: 0.98,
+        fertility: 0.12,
+        roughness: 0.65,
+        color: [0.76, 0.66, 0.46]
+    },
+
+    silt: {
+        density: 1.45,
+        hardness: 0.10,
+        cohesion: 0.25,
+        porosity: 0.48,
+        moistureCapacity: 0.72,
+        infiltration: 0.60,
+        drainage: 0.45,
+        fertility: 0.75,
+        roughness: 0.75,
+        color: [0.52, 0.40, 0.29]
+    },
+
+    loam: {
+        density: 1.35,
+        hardness: 0.12,
+        cohesion: 0.30,
+        porosity: 0.50,
+        moistureCapacity: 0.78,
+        infiltration: 0.72,
+        drainage: 0.65,
+        fertility: 0.92,
+        roughness: 0.82,
+        color: [0.35, 0.25, 0.16]
+    },
+
+    clay: {
+        density: 1.80,
+        hardness: 0.28,
+        cohesion: 0.45,
+        porosity: 0.35,
+        moistureCapacity: 0.95,
+        infiltration: 0.18,
+        drainage: 0.12,
+        fertility: 0.58,
+        roughness: 0.80,
+        color: [0.48, 0.29, 0.21]
+    },
+
+    organic: {
+        density: 0.85,
+        hardness: 0.03,
+        cohesion: 0.12,
+        porosity: 0.72,
+        moistureCapacity: 1.0,
+        infiltration: 0.80,
+        drainage: 0.38,
+        fertility: 1.0,
+        roughness: 0.98,
+        color: [0.19, 0.13, 0.085]
+    },
+
+    fertileSoil: {
+        density: 1.30,
+        hardness: 0.05,
+        cohesion: 0.15,
+        porosity: 0.55,
+        moistureCapacity: 0.90,
+        infiltration: 0.72,
+        drainage: 0.55,
+        fertility: 0.95,
+        roughness: 0.92,
+        color: [0.27, 0.19, 0.12]
+    },
+
+    coal: {
+        density: 1.40,
+        hardness: 0.35,
+        cohesion: 0.55,
+        porosity: 0.10,
+        moistureCapacity: 0.20,
+        infiltration: 0.12,
+        drainage: 0.65,
+        fertility: 0.05,
+        roughness: 0.90,
+        color: [0.075, 0.065, 0.055]
+    },
+
+    anomaly: {
+        density: 1.0,
+        hardness: 0.85,
+        cohesion: 0.35,
+        porosity: 0.20,
+        moistureCapacity: 0.50,
+        infiltration: 0.35,
+        drainage: 0.45,
+        fertility: 0.40,
+        roughness: 0.95,
+        color: [0.22, 0.12, 0.48]
+    }
+};
+
+const clamp = (value, min = 0, max = 1) =>
+    Math.max(min, Math.min(max, value));
+
+class GeologicalField {
+    constructor(terrain, seed = 91827) {
+        this.terrain = terrain;
+        this.seed = seed;
+
+        this.regionFrequency = 0.0025;
+        this.detailFrequency = 0.009;
+        this.slopeSamplingDistance = 4;
+    }
+
+    noise(x, z, salt, frequency, octaves = 3) {
+        return fractalNoise2D(
+            x * frequency,
+            z * frequency,
+            this.seed + salt,
+            octaves
+        );
+    }
+
+    sample(x, z) {
+        const profile = this.terrain.sampleProfileAt(
+            x,
+            z,
+            this.slopeSamplingDistance
+        );
+
+        if (!profile) return null;
+
+        const elevation = profile.elevation;
+        const slope = profile.slopeDegrees;
+
+        const moistureNoise = this.noise(
+            x, z, 1000, this.regionFrequency
+        );
+
+        const geologyNoise = this.noise(
+            x, z, 2000, this.regionFrequency * 1.5
+        );
+
+        const detail = this.noise(
+            x, z, 3000, this.detailFrequency
+        );
+
+        const strata = this.noise(
+            x, z, 4000, 0.004, 4
+        );
+
+        const surfaceVariation = this.noise(
+            x, z, 5000, 0.025
+        );
+
+        const anomalyNoise = this.noise(
+            x, z, 6000, 0.0015
+        );
+
+        const moisture = clamp(
+            moistureNoise * 0.7 + detail * 0.3
+        );
+
+        // Determine the underlying geological formation.
+        let bedrockType;
+
+        if (anomalyNoise > 0.985) {
+            bedrockType = "anomaly";
+        } else if (geologyNoise < 0.28) {
+            bedrockType = "limestone";
+        } else if (geologyNoise < 0.48) {
+            bedrockType = "sandstone";
+        } else if (geologyNoise > 0.84) {
+            bedrockType = "basalt";
+        } else {
+            bedrockType = "granite";
+        }
+
+        if (elevation > 0.70 && geologyNoise > 0.65) {
+            bedrockType = "granite";
+        }
+
+        // Bedrock exposure increases on steep slopes.
+        const exposure = clamp(
+            slope / 42 * 0.78 +
+            elevation * 0.12 +
+            (1 - moisture) * 0.10
+        );
+
+	// -----------------------------------------
+// TOPOGRAPHIC SOIL DISTRIBUTION
+// -----------------------------------------
+
+const mapValue = this.terrain.sampleMapValue(x, z);
+
+let surfaceSoil;
+
+if (mapValue === null) {
+    surfaceSoil = "loam";
+} else if (mapValue < 0.18) {
+    surfaceSoil = "clay";
+} else if (mapValue < 0.38) {
+    surfaceSoil = "sand";
+} else if (mapValue < 0.58) {
+    surfaceSoil = "fertileSoil";
+} else if (mapValue < 0.76) {
+    surfaceSoil = "loam";
+} else if (mapValue < 0.90) {
+    surfaceSoil = "organic";
+} else {
+    surfaceSoil = "scree";
+}
+
+// Local geology still controls exposed bedrock.
+if (exposure > 0.88 || (slope > 32 && exposure > 0.65)) {
+    surfaceSoil = "scree";
+}
+
+        const surface = MATERIALS[surfaceSoil];
+        const bedrock = MATERIALS[bedrockType];
+
+        // Variable soil-horizon depths.
+        const soilDepth = Math.max(
+            0.08,
+            (1 - exposure) *
+            (0.8 + moisture * 2.2) *
+            (0.75 + surfaceVariation * 0.5)
+        );
+
+        const organicThickness = soilDepth *
+            (surfaceSoil === "organic" ? 0.22 : 0.06);
+
+        const topsoilThickness = soilDepth * 0.42;
+        const subsoilThickness = soilDepth * 0.34;
+        const parentThickness = soilDepth -
+            organicThickness -
+            topsoilThickness -
+            subsoilThickness;
+
+        const horizons = {
+            O: {
+                material: "organic",
+                thickness: organicThickness
+            },
+            A: {
+                material: surfaceSoil,
+                thickness: topsoilThickness
+            },
+            B: {
+                material: geologyNoise > 0.58 ? "clay" : "silt",
+                thickness: subsoilThickness
+            },
+            C: {
+                material: bedrockType,
+                thickness: parentThickness
+            }
+        };
+
+        const weathering = clamp(
+            moisture * 0.45 +
+            surfaceVariation * 0.25 +
+            (1 - bedrock.hardness) * 0.30
+        );
+
+        return {
+            position: profile.position,
+            normal: profile.normal,
+            elevation,
+            slope,
+            slopeDegrees: slope,
+
+            speciesName: exposure > 0.82
+                ? bedrockType
+                : surfaceSoil,
+
+            bedrockType,
+            surfaceSoil,
+            horizons,
+
+            soilDepth,
+            exposure,
+            weathering,
+            moisture,
+            geology: geologyNoise,
+            strata,
+            surfaceVariation,
+
+            density: surface.density,
+            hardness: surface.hardness,
+            cohesion: surface.cohesion,
+            porosity: surface.porosity,
+            moistureCapacity: surface.moistureCapacity,
+            infiltration: surface.infiltration,
+            drainage: surface.drainage,
+            fertility: surface.fertility,
+            roughness: surface.roughness,
+
+            bedrockProperties: { ...bedrock },
+            soilProperties: { ...surface },
+            material: { ...surface },
+            color: surface.color
+        };
+    }
+
+    getMaterialAt(x, z) {
+        return this.sample(x, z);
+    }
+
+    getSoilProfileAt(x, z) {
+        const sample = this.sample(x, z);
+
+        if (!sample) return null;
+
+        return {
+            horizons: sample.horizons,
+            soilDepth: sample.soilDepth,
+            surfaceSoil: sample.surfaceSoil,
+            bedrockType: sample.bedrockType,
+            fertility: sample.fertility,
+            moistureCapacity: sample.moistureCapacity,
+            infiltration: sample.infiltration,
+            drainage: sample.drainage,
+            exposure: sample.exposure
+        };
+    }
+
+    getMaterialProperties(x, z) {
+        const sample = this.sample(x, z);
+
+        if (!sample) return null;
+
+        return {
+            density: sample.density,
+            hardness: sample.hardness,
+            cohesion: sample.cohesion,
+            porosity: sample.porosity,
+            moistureCapacity: sample.moistureCapacity,
+            infiltration: sample.infiltration,
+            drainage: sample.drainage,
+            fertility: sample.fertility,
+            roughness: sample.roughness
+        };
+    }
+}
+
+export { GeologicalField, MATERIALS };
+
+
+========================================================================
+FILE: src/geology/geological-manager.js
+========================================================================
+
+import { GeologicalField } from "./geological-field.js";
+import { SurfaceDepositSystem } from "./surface-deposit-system.js";
+import { RockSpecies } from "./rock-species.js";
+import { ThinInstanceRenderer } from "../rendering/thin-instance-renderer.js";
+import { CreateSeededRandom } from "../core/random.js";
+import { RockGenerator } from "../geology/rock-generator.js";
+
+let nextFormationId = 0;
+
+class GeologicalManager {
+
+    constructor(scene, terrain, shadowGenerator) {
+
+        this.scene = scene;
+
+        this.terrain = terrain;
+
+        this.shadowGenerator = shadowGenerator;
+
+        this.regionSize = 250;
+
+        this.seed = 91827;
+
+        this.field = new GeologicalField(
+            terrain,
+            this.seed
+        );
+
+	this.surfaceDeposits =
+    new SurfaceDepositSystem(
+        scene,
+        terrain,
+        this.field
+    );
+
+        this.regions = new Map();
+
+        this.formations = [];
+
+        this.maxFormations = 15000;
+
+        this.minFragmentScale = 0.35;
+
+        this.maxFragmentDepth = 2;
+
+        this.renderDirty = true;
+
+        this.simulationSteps = 0;
+
+        this.renderEverySteps = 5;
+
+        this.renderers = {};
+
+
+        // One independent rendering batch per material.
+        for (const speciesName in RockSpecies) {
+
+            const config = RockSpecies[speciesName];
+
+            const mesh = BABYLON.MeshBuilder.CreateSphere(
+                "geology_" + speciesName,
+                {
+                    diameter: 1,
+                    segments: 2
+                },
+                scene
+            );
+
+            const material = new BABYLON.StandardMaterial(
+                "geologyMaterial_" + speciesName,
+                scene
+            );
+
+            material.diffuseColor =
+                config.color.clone();
+
+            material.specularColor =
+                new BABYLON.Color3(
+                    0.06,
+                    0.06,
+                    0.06
+                );
+
+            if (speciesName === "anomaly") {
+
+                material.emissiveColor =
+                    config.color.scale(0.35);
+
+            }
+
+            mesh.material = material;
+
+            this.renderers[speciesName] =
+                new ThinInstanceRenderer(
+                    scene,
+                    "geology_" + speciesName,
+                    mesh,
+                    shadowGenerator
+                );
+
+        }
+
+    }
+
+
+    getRegionKey(x, z) {
+
+        return `${x},${z}`;
+
+    }
+
+
+    createFormation(
+        speciesName,
+        position,
+        scale,
+        seed,
+        fragmentDepth = 0
+    ) {
+
+        if (
+            !position ||
+            this.formations.length >= this.maxFormations
+        ) {
+            return null;
+        }
+
+        const formation = {
+
+            id: nextFormationId++,
+
+            speciesName,
+
+            position: position.clone(),
+
+            scale,
+
+            age: 0,
+
+            integrity: 1.0,
+
+            erosionProgress: 0,
+
+            erosionEvents: 0,
+
+            fragmentDepth,
+
+            seed: seed >>> 0,
+
+            alive: true
+
+        };
+
+        this.formations.push(formation);
+
+        return formation;
+
+    }
+
+
+    createRegion(regionX, regionZ) {
+
+        const key = this.getRegionKey(
+            regionX,
+            regionZ
+        );
+
+        if (this.regions.has(key)) {
+
+            return this.regions.get(key);
+
+        }
+
+        const seed = (
+            Math.imul(regionX, 73856093) ^
+            Math.imul(regionZ, 19349663) ^
+            this.seed
+        ) >>> 0;
+
+        const centerX =
+            (regionX + 0.5) * this.regionSize;
+
+        const centerZ =
+            (regionZ + 0.5) * this.regionSize;
+
+        const centerSample =
+            this.field.sample(centerX, centerZ);
+
+        const region = {
+
+            x: regionX,
+
+            z: regionZ,
+
+            seed,
+
+            dominantSpecies:
+                centerSample
+                    ? centerSample.speciesName
+                    : "granite",
+
+            generated: false,
+
+            formationIds: []
+
+        };
+
+        this.regions.set(key, region);
+
+        return region;
+
+    }
+
+
+    generateRegion(regionX, regionZ) {
+
+        const region = this.createRegion(
+            regionX,
+            regionZ
+        );
+
+        if (region.generated) return;
+
+        const random =
+            CreateSeededRandom(region.seed);
+
+        const originX =
+            regionX * this.regionSize;
+
+        const originZ =
+            regionZ * this.regionSize;
+
+
+        const samplePosition = () => {
+
+            const x = originX +
+                random() * this.regionSize;
+
+            const z = originZ +
+                random() * this.regionSize;
+
+            return this.field.sample(x, z);
+
+        };
+
+
+        const addFormation = (
+            sample,
+            scale,
+            depth,
+            salt
+        ) => {
+
+            if (!sample) return;
+		// These materials have their own surface renderer.
+    if (
+        sample.speciesName === "sand" ||
+        sample.speciesName === "clay" ||
+        sample.speciesName === "fertileSoil"
+    ) {
+        return;
+    }
+
+            const speciesName =
+                sample.speciesName;
+
+            const config =
+                RockSpecies[speciesName];
+
+            // Small local variations.
+            const variation =
+                0.8 + random() * 0.4;
+
+            const formation = this.createFormation(
+
+                speciesName,
+
+                sample.position,
+
+                scale * variation,
+
+                region.seed ^ salt,
+
+                depth
+
+            );
+
+            if (formation) {
+
+                region.formationIds.push(
+                    formation.id
+                );
+
+            }
+
+        };
+
+
+        // PRIMARY GEOLOGICAL FORMATIONS
+        // Large formations establish the region.
+
+        const primaryCount = 7;
+
+        for (let i = 0; i < primaryCount; i++) {
+
+            const sample = samplePosition();
+
+            if (!sample) continue;
+
+            const config =
+                RockSpecies[sample.speciesName];
+
+            addFormation(
+
+                sample,
+
+                config.scale * 4.0,
+
+                Math.min(2, config.recursionDepth),
+
+                i + 1000
+
+            );
+
+        }
+
+
+        // SECONDARY FORMATIONS
+        // Medium-scale geological structures.
+
+        const secondaryCount = 7;
+
+        for (let i = 0; i < secondaryCount; i++) {
+
+            const sample = samplePosition();
+
+            if (!sample) continue;
+
+            const config =
+                RockSpecies[sample.speciesName];
+
+            addFormation(
+
+                sample,
+
+                config.scale * 1.7,
+
+                Math.min(2, config.recursionDepth),
+
+                i + 2000
+
+            );
+
+        }
+
+
+        // FINE GEOLOGICAL DETAIL
+
+        const detailCount = 32;
+
+        for (let i = 0; i < detailCount; i++) {
+
+            const sample = samplePosition();
+
+            if (!sample) continue;
+
+            const config =
+                RockSpecies[sample.speciesName];
+
+            addFormation(
+
+                sample,
+
+                config.scale * (
+                    0.35 + random() * 0.4
+                ),
+
+                Math.min(1, config.recursionDepth),
+
+                i + 3000
+
+            );
+
+        }
+
+
+        region.generated = true;
+
+        this.renderDirty = true;
+
+    }
+
+
+    generateAll() {
+
+        const minX = Math.floor(
+            this.terrain.min.x / this.regionSize
+        );
+
+        const maxX = Math.floor(
+            this.terrain.max.x / this.regionSize
+        );
+
+        const minZ = Math.floor(
+            this.terrain.min.z / this.regionSize
+        );
+
+        const maxZ = Math.floor(
+            this.terrain.max.z / this.regionSize
+        );
+
+        for (let x = minX; x <= maxX; x++) {
+
+            for (let z = minZ; z <= maxZ; z++) {
+
+                this.generateRegion(x, z);
+
+            }
+
+        }
+
+	this.surfaceDeposits.generate();
+
+this.rebuildRendering();
+
+
+    }
+
+
+    // ---------------------------------
+    // GEOLOGICAL EROSION
+    // ---------------------------------
+
+    erodeFormation(formation, deltaYears) {
+
+        if (!formation.alive) return false;
+
+        const config =
+            RockSpecies[formation.speciesName];
+
+        formation.age += deltaYears;
+
+        // Hardness and cohesion both resist erosion.
+        const resistance =
+            0.5 + config.hardness * 0.5;
+
+        const cohesionResistance =
+            0.5 + config.cohesion * 0.5;
+
+        const erosion =
+            config.erosionRate *
+            deltaYears /
+            (resistance * cohesionResistance);
+
+        formation.erosionProgress += erosion;
+
+        if (formation.erosionProgress < 1.0) {
+
+            return false;
+
+        }
+
+        formation.erosionProgress -= 1.0;
+
+        this.fragmentFormation(formation);
+
+        return true;
+
+    }
+
+
+    fragmentFormation(parent) {
+
+        const config =
+            RockSpecies[parent.speciesName];
+
+        parent.erosionEvents++;
+
+        // Smaller parent after fracturing.
+        parent.scale *= 0.72;
+
+        parent.integrity = 1.0;
+
+        const canFragment =
+
+            parent.fragmentDepth <
+                this.maxFragmentDepth &&
+
+            parent.scale >
+                this.minFragmentScale &&
+
+            parent.erosionEvents <= 3 &&
+
+            this.formations.length <
+                this.maxFormations;
+
+
+        if (!canFragment) {
+
+            if (
+                parent.erosionEvents >= 3 ||
+                parent.scale <= this.minFragmentScale
+            ) {
+
+                parent.alive = false;
+
+            }
+
+            return;
+
+        }
+
+
+        const random = CreateSeededRandom(
+            parent.seed ^
+            Math.imul(parent.erosionEvents, 7919)
+        );
+
+
+        const fragmentCount = Math.max(
+
+            2,
+
+            Math.round(
+                2 + config.fragmentation * 3
+            )
+
+        );
+
+
+        for (
+            let i = 0;
+            i < fragmentCount;
+            i++
+        ) {
+
+            const angle =
+                random() * Math.PI * 2;
+
+            const distance =
+                parent.scale *
+                (1.0 + random() * 2.0) *
+                config.fragmentation;
+
+            const x =
+                parent.position.x +
+                Math.cos(angle) * distance;
+
+            const z =
+                parent.position.z +
+                Math.sin(angle) * distance;
+
+            const position =
+                this.terrain.sampleAt(x, z);
+
+            if (!position) continue;
+
+
+            const fragmentScale =
+                parent.scale *
+                (0.25 + random() * 0.18);
+
+
+            const fragmentSeed =
+                (
+                    parent.seed ^
+                    Math.imul(i + 1, 2654435761) ^
+                    parent.erosionEvents
+                ) >>> 0;
+
+
+            this.createFormation(
+
+                parent.speciesName,
+
+                position,
+
+                fragmentScale,
+
+                fragmentSeed,
+
+                parent.fragmentDepth + 1
+
+            );
+
+        }
+
+
+        // Fine sediment is gradually incorporated
+        // into the surrounding ground.
+        if (
+            parent.fragmentDepth >=
+                this.maxFragmentDepth ||
+            parent.scale < this.minFragmentScale * 2
+        ) {
+
+            parent.alive = false;
+
+        }
+
+    }
+
+
+    advance(deltaYears) {
+
+        let changed = false;
+
+        // Only process formations that existed
+        // at the beginning of this simulation step.
+        const initialCount =
+            this.formations.length;
+
+        for (
+            let i = 0;
+            i < initialCount;
+            i++
+        ) {
+
+            const formation =
+                this.formations[i];
+
+            if (!formation.alive) continue;
+
+            if (
+                this.erodeFormation(
+                    formation,
+                    deltaYears
+                )
+            ) {
+
+                changed = true;
+
+            }
+
+        }
+
+
+        if (changed) {
+
+            this.renderDirty = true;
+
+        }
+
+
+        this.simulationSteps++;
+
+        if (
+            this.renderDirty ||
+            this.simulationSteps >=
+                this.renderEverySteps
+        ) {
+
+            this.rebuildRendering();
+
+            this.simulationSteps = 0;
+
+        }
+
+    }
+
+
+    // ---------------------------------
+    // RENDERING
+    // ---------------------------------
+
+    rebuildRendering() {
+
+        for (const speciesName in this.renderers) {
+
+            this.renderers[speciesName].clear();
+
+        }
+
+
+        for (const formation of this.formations) {
+
+            if (!formation.alive) continue;
+
+            const config =
+                RockSpecies[formation.speciesName];
+
+            const generator =
+                new RockGenerator(
+                    config,
+                    formation.seed
+                );
+
+            const matrices = generator.generate(
+
+                formation.position,
+
+                formation.scale,
+
+                formation.fragmentDepth === 0
+                    ? config.recursionDepth
+                    : Math.max(
+                        0,
+                        config.recursionDepth -
+                        formation.fragmentDepth
+                    )
+
+            );
+
+
+            this.renderers[
+                formation.speciesName
+            ].addMatrices(matrices);
+
+        }
+
+
+        for (const speciesName in this.renderers) {
+
+            this.renderers[speciesName].update();
+
+        }
+
+        this.renderDirty = false;
+
+    }
+
+
+    getLivingFormationCount() {
+
+        return this.formations.reduce(
+
+            (count, formation) =>
+
+                count + (formation.alive ? 1 : 0),
+
+            0
+
+        );
+
+    }
+
+	getMaterialAt(position) {
+
+    return this.field.sample(
+        position.x,
+        position.z
+    );
+
+}
+
+
+getSoilQualityAt(position) {
+
+    const sample = this.getMaterialAt(position);
+
+    if (!sample) return 0.5;
+
+    const quality = {
+
+        fertileSoil: 1.0,
+
+        clay: 0.55,
+
+        limestone: 0.45,
+
+        granite: 0.20,
+
+        sand: 0.12,
+
+        anomaly: 0.65
+
+    };
+
+    return quality[sample.speciesName] ?? 0.5;
+
+}
+
+}
+export { GeologicalManager }
+
+
+========================================================================
+FILE: src/geology/rock-generator.js
+========================================================================
+
+
+import { CreateSeededRandom } from "../core/random.js";
+
+class RecursiveObjectGenerator {
+    constructor(config) {
+        this.config = config;
+        this.matrices = [];
+    }
+
+    generate(position, scale, depth) {
+        this.matrices = [];
+
+        this.generateRecursive(
+            position,
+            scale,
+            depth,
+            0
+        );
+
+        return this.matrices;
+    }
+
+    generateRecursive() {
+        throw new Error(
+            "generateRecursive must be implemented"
+        );
+    }
+}
+
+class RockGenerator extends RecursiveObjectGenerator {
+    constructor(config, seed = 1) {
+        super(config);
+        this.random = CreateSeededRandom(seed);
+    }
+
+    generateRecursive(
+        position,
+        scale,
+        maxDepth,
+        currentDepth
+    ) {
+        const c = this.config;
+        const random = this.random;
+
+        const irregularity = c.irregularity ?? 0.5;
+
+        // Angular, asymmetric rock body.
+        const sx = scale * (
+            0.75 + random() * irregularity
+        );
+
+        const sy = scale * (
+            0.65 + random() * irregularity
+        ) * (c.verticalScale ?? 1);
+
+        const sz = scale * (
+            0.75 + random() * irregularity
+        );
+
+        // Fractured formations tend to have tilted faces.
+        const rotation =
+            BABYLON.Quaternion.RotationYawPitchRoll(
+                random() * Math.PI * 2,
+                (random() - 0.5) * 0.8,
+                (random() - 0.5) * 0.8
+            );
+
+        const buriedFraction = currentDepth === 0
+            ? 0.30
+            : 0.05;
+
+        const center = position.add(
+            new BABYLON.Vector3(
+                0,
+                sy * (0.5 - buriedFraction),
+                0
+            )
+        );
+
+        this.matrices.push(
+            BABYLON.Matrix.Compose(
+                new BABYLON.Vector3(sx, sy, sz),
+                rotation,
+                center
+            )
+        );
+
+        if (currentDepth >= maxDepth) {
+            return;
+        }
+
+        const count = Math.max(
+            2,
+            Math.round(
+                c.branchCount *
+                (1 - currentDepth * 0.10)
+            )
+        );
+
+        for (let i = 0; i < count; i++) {
+            const phi = random() * Math.PI * 2;
+
+            // Bias protrusions toward the upper surface.
+            const vertical = random() * 1.4 - 0.15;
+
+            const radial = Math.sqrt(
+                Math.max(0, 1 - vertical * vertical)
+            );
+
+            const direction = new BABYLON.Vector3(
+                Math.cos(phi) * radial,
+                vertical,
+                Math.sin(phi) * radial
+            ).normalize();
+
+            const displacement =
+                (c.displacement ?? 0.8) *
+                (0.65 + random() * 0.55);
+
+            const childPosition = position.add(
+                direction.scale(scale * displacement)
+            );
+
+            const childScale = scale *
+                (c.scaleDecay ?? 0.6) *
+                (0.75 + random() * 0.35);
+
+            this.generateRecursive(
+                childPosition,
+                childScale,
+                maxDepth,
+                currentDepth + 1
+            );
+        }
+    }
+}
+
+export {
+    RockGenerator,
+    RecursiveObjectGenerator
+};
+
+
+========================================================================
+FILE: src/geology/rock-species.js
+========================================================================
+
+const RockSpecies = {
+
+    granite: {
+        scale: 3.0,
+        recursionDepth: 3,
+        branchCount: 4,
+        scaleDecay: 0.58,
+        displacement: 0.75,
+        irregularity: 0.55,
+
+        // Geological properties
+        hardness: 0.98,
+        cohesion: 0.95,
+        erosionRate: 0.001,
+        fragmentation: 0.15,
+        soilContribution: 0.15,
+
+        verticalScale: 1.0,
+
+        color: new BABYLON.Color3(0.38, 0.36, 0.32)
+    },
+
+    limestone: {
+        scale: 4.0,
+        recursionDepth: 3,
+        branchCount: 5,
+        scaleDecay: 0.62,
+        displacement: 0.8,
+        irregularity: 0.65,
+
+        hardness: 0.65,
+        cohesion: 0.65,
+        erosionRate: 0.008,
+        fragmentation: 0.45,
+        soilContribution: 0.35,
+
+        verticalScale: 0.9,
+
+        color: new BABYLON.Color3(0.62, 0.59, 0.49)
+    },
+
+    sand: {
+        scale: 2.0,
+        recursionDepth: 2,
+        branchCount: 5,
+        scaleDecay: 0.55,
+        displacement: 0.65,
+        irregularity: 0.25,
+
+        hardness: 0.08,
+        cohesion: 0.12,
+        erosionRate: 0.035,
+        fragmentation: 0.8,
+        soilContribution: 0.05,
+
+        verticalScale: 0.22,
+
+        color: new BABYLON.Color3(0.76, 0.65, 0.43)
+    },
+
+    clay: {
+        scale: 2.5,
+        recursionDepth: 2,
+        branchCount: 4,
+        scaleDecay: 0.60,
+        displacement: 0.55,
+        irregularity: 0.30,
+
+        hardness: 0.28,
+        cohesion: 0.45,
+        erosionRate: 0.018,
+        fragmentation: 0.55,
+        soilContribution: 0.5,
+
+        verticalScale: 0.35,
+
+        color: new BABYLON.Color3(0.48, 0.25, 0.17)
+    },
+
+    fertileSoil: {
+        scale: 2.0,
+        recursionDepth: 2,
+        branchCount: 5,
+        scaleDecay: 0.52,
+        displacement: 0.45,
+        irregularity: 0.35,
+
+        hardness: 0.05,
+        cohesion: 0.15,
+        erosionRate: 0.04,
+        fragmentation: 0.9,
+        soilContribution: 1.0,
+
+        verticalScale: 0.18,
+
+        color: new BABYLON.Color3(0.22, 0.16, 0.10)
+    },
+
+    anomaly: {
+        scale: 3.0,
+        recursionDepth: 4,
+        branchCount: 3,
+        scaleDecay: 0.72,
+        displacement: 1.15,
+        irregularity: 1.0,
+
+        hardness: 0.85,
+        cohesion: 0.35,
+        erosionRate: 0.004,
+        fragmentation: 0.95,
+        soilContribution: 0.0,
+
+        verticalScale: 1.4,
+
+        color: new BABYLON.Color3(0.22, 0.12, 0.48)
+    },
+
+basalt: {
+    scale: 3.4,
+    recursionDepth: 3,
+    branchCount: 4,
+    scaleDecay: 0.58,
+    displacement: 0.78,
+    irregularity: 0.70,
+    hardness: 0.96,
+    cohesion: 0.94,
+    erosionRate: 0.0015,
+    fragmentation: 0.20,
+    soilContribution: 0.15,
+    verticalScale: 1.25,
+    color: new BABYLON.Color3(0.24, 0.23, 0.22)
+},
+
+sandstone: {
+    scale: 3.2,
+    recursionDepth: 3,
+    branchCount: 4,
+    scaleDecay: 0.62,
+    displacement: 0.72,
+    irregularity: 0.60,
+    hardness: 0.45,
+    cohesion: 0.40,
+    erosionRate: 0.009,
+    fragmentation: 0.50,
+    soilContribution: 0.35,
+    verticalScale: 0.85,
+    color: new BABYLON.Color3(0.65, 0.43, 0.29)
+},
+
+coal: {
+    scale: 3.0,
+    recursionDepth: 3,
+    branchCount: 4,
+    scaleDecay: 0.58,
+    displacement: 0.65,
+    irregularity: 0.35,
+
+    hardness: 0.35,
+    cohesion: 0.55,
+    erosionRate: 0.012,
+    fragmentation: 0.4,
+    soilContribution: 0.2,
+
+    verticalScale: 0.8,
+
+    color: new BABYLON.Color3(
+        0.075,
+        0.065,
+        0.055
+    )
+}
+
+
+};
+export { RockSpecies }
+
+
+========================================================================
+FILE: src/geology/surface-deposit-system.js
+========================================================================
+
+import { SurfaceDepositRenderer } from "../rendering/surface-deposit-renderer.js"
+import { CreateSeededRandom } from "../core/random.js";
+
+class SurfaceDepositSystem {
+
+    constructor(scene, terrain, geologicalField) {
+
+        this.scene = scene;
+
+        this.terrain = terrain;
+
+        this.field = geologicalField;
+
+        this.spacing = 28;
+
+        this.seed = 48391;
+
+        this.renderers = {
+
+            sand: new SurfaceDepositRenderer(
+                scene,
+                "sand",
+                new BABYLON.Color3(
+                    0.76,
+                    0.65,
+                    0.43
+                )
+            ),
+
+            clay: new SurfaceDepositRenderer(
+                scene,
+                "clay",
+                new BABYLON.Color3(
+                    0.48,
+                    0.25,
+                    0.17
+                )
+            ),
+
+            fertileSoil: new SurfaceDepositRenderer(
+                scene,
+                "fertileSoil",
+                new BABYLON.Color3(
+                    0.22,
+                    0.16,
+                    0.10
+                )
+            )
+
+        };
+
+        this.generated = false;
+
+    }
+
+
+    generate() {
+
+        if (this.generated) return;
+
+        for (const speciesName in this.renderers) {
+
+            this.renderers[speciesName].clear();
+
+        }
+
+
+        const minX = this.terrain.min.x;
+        const maxX = this.terrain.max.x;
+
+        const minZ = this.terrain.min.z;
+        const maxZ = this.terrain.max.z;
+
+
+        const startX =
+            Math.floor(minX / this.spacing) *
+            this.spacing;
+
+        const startZ =
+            Math.floor(minZ / this.spacing) *
+            this.spacing;
+
+
+        for (
+            let x = startX;
+            x <= maxX;
+            x += this.spacing
+        ) {
+
+            for (
+                let z = startZ;
+                z <= maxZ;
+                z += this.spacing
+            ) {
+
+                const cellX = Math.floor(
+                    x / this.spacing
+                );
+
+                const cellZ = Math.floor(
+                    z / this.spacing
+                );
+
+                const seed = (
+
+                    this.seed ^
+
+                    Math.imul(cellX, 73856093) ^
+
+                    Math.imul(cellZ, 19349663)
+
+                ) >>> 0;
+
+                const random =
+                    CreateSeededRandom(seed);
+
+
+                // Small deterministic displacement.
+                const sampleX =
+                    x + (random() - 0.5) *
+                    this.spacing * 0.5;
+
+                const sampleZ =
+                    z + (random() - 0.5) *
+                    this.spacing * 0.5;
+
+
+                const sample = this.field.sample(
+                    sampleX,
+                    sampleZ
+                );
+
+                if (!sample) continue;
+
+
+                const speciesName =
+                    sample.speciesName;
+
+const renderer =
+    this.renderers[speciesName];
+
+if (!renderer) continue;
+
+// Surface deposits should not cover steep terrain.
+if (sample.slopeDegrees > 12) {
+    continue;
+}
+
+// Avoid large deposits at high elevations.
+if (
+    sample.elevation > 0.72 &&
+    speciesName !== "clay"
+) {
+    continue;
+}
+
+const baseRadius =
+    this.spacing *
+    (0.85 + random() * 0.45);
+
+                // Slightly flatten and vary each deposit.
+                const radiusX =
+                    baseRadius *
+                    (0.85 + random() * 0.35);
+
+                const radiusZ =
+                    baseRadius *
+                    (0.85 + random() * 0.35);
+
+                const rotation =
+                    random() * Math.PI * 2;
+
+
+                renderer.addPatch(
+
+                    sample.position,
+
+                    radiusX,
+
+                    radiusZ,
+
+                    rotation,
+
+                    0.025 + random() * 0.025,
+			sample.normal
+
+                );
+
+
+                // Secondary overlapping patches
+                // create less regular boundaries.
+                if (random() > 0.35) {
+
+                    const offsetX =
+                        (random() - 0.5) *
+                        this.spacing * 0.65;
+
+                    const offsetZ =
+                        (random() - 0.5) *
+                        this.spacing * 0.65;
+
+                    const secondaryPosition =
+                        this.terrain.sampleAt(
+                            sampleX + offsetX,
+                            sampleZ + offsetZ
+                        );
+
+			const secondaryProfile =
+    this.terrain.sampleProfileAt(
+        sampleX + offsetX,
+        sampleZ + offsetZ
+    );
+
+if (
+    secondaryProfile &&
+    secondaryProfile.slopeDegrees < 12
+) {
+
+    renderer.addPatch(
+        secondaryProfile.position,
+        radiusX * 0.5,
+        radiusZ * 0.5,
+        random() * Math.PI * 2,
+        0.02,
+        secondaryProfile.normal
+    );
+
+}
+
+                }
+
+            }
+
+        }
+
+
+        this.update();
+
+        this.generated = true;
+
+    }
+
+
+    update() {
+
+        for (const speciesName in this.renderers) {
+
+            this.renderers[speciesName].update();
+
+        }
+
+    }
+
+
+}
+export { SurfaceDepositSystem }
+
+
+========================================================================
+END OF DIRECTORY SOURCE DUMP
+Files included: 5
+Binary/unreadable files skipped: 0
+========================================================================

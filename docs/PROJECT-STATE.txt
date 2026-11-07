@@ -1,0 +1,675 @@
+## D&D Tactical Movement — Interactive Selection and Grid Configuration
+
+Implementation prepared: 2026-11-06
+
+### Movement Interface
+
+Replacing immediate coordinate-based movement with
+interactive battlefield selection.
+
+Features prepared:
+
+- Explicit movement-selection mode.
+- Normal movement range visualization.
+- Extended Dash range visualization.
+- Third target-cell highlight.
+- Mouse-hover destination selection.
+- Mouse-click movement confirmation.
+- Escape cancellation.
+- Movement range recalculation after movement.
+- Movement-mode cleanup when initiative advances.
+- Invalid destination rejection.
+
+### Movement Colors
+
+- Normal movement: configurable green.
+- Extended movement: configurable amber.
+- Current target: configurable blue.
+
+### Grid Configuration
+
+New independent grid dimensions:
+
+- Configurable rows.
+- Configurable columns.
+- Configurable physical cell size.
+- Grid resizing validation.
+- Terrain perimeter validation.
+- Character boundary validation.
+- Grid reconstruction after successful resizing.
+- Dimension persistence through localStorage.
+
+### Architectural Changes
+
+Updated module:
+
+src/game/dnd-mode.js
+
+Updated interface:
+
+src/game/dnd-tactical-ui.js
+
+Existing Babylon.js tactical camera retained.
+
+Existing terrain sampling and SpatialTransform retained.
+
+Battle resource accounting remains authoritative.
+
+Movement selection does not directly modify character state.
+Confirmed movement continues through the battle domain model.
+
+### Outstanding Verification
+
+1. Verify movement overlays render correctly.
+2. Verify mouse picking identifies the intended cell.
+3. Verify the third target highlight tracks the cursor.
+4. Verify normal movement limits.
+5. Verify Dash movement limits and action consumption.
+6. Verify repeated movement within one turn.
+7. Verify movement cancellation.
+8. Verify rectangular battlefield dimensions.
+9. Verify resizing cannot exclude existing characters.
+10. Verify terrain sampling over the entire grid.
+11. Verify grid settings survive reload.
+12. Verify overlays are disposed when leaving D&D mode.
+
+### Deployment Status
+
+Implementation prepared for manual integration.
+
+Runtime verification pending.
+
+Do not mark as deployed until tested in the running application.
+
+D&D Tactical Mode — Interactive Movement and Camera Stability
+
+Implementation prepared: 2026-11-06
+
+Status: Proposed targeted source modifications. Deployment: Pending. Runtime verification: Pending.
+
+Movement Interface Improvements
+
+Updated module:
+
+src/game/dnd-mode.js
+
+Prepared improvements:
+
+Pickable movement-region cells.
+Mouse-hover destination highlighting.
+Distinct blue target-cell visualization.
+Mouse-click movement confirmation.
+Normal movement and Dash coloration retained.
+Movement continues through the authoritative DnDBattle model.
+Existing character movement accounting retained.
+Tactical Camera Stability
+
+Updated module:
+
+src/game/dnd-mode.js
+
+Prepared improvement:
+
+Preserve camera position relative to its target when the battlefield grid is translated.
+Preserve viewing angle and zoom distance.
+Avoid unintended camera displacement during grid repositioning.
+Retain ordinary camera recentering during character movement.
+Architectural Preservation
+DnDBattle remains authoritative for movement resources.
+DnDMode coordinates tactical interaction.
+Babylon.js remains responsible for rendering and picking.
+SpatialTransform remains responsible for world-to-render conversion.
+Terrain remains authoritative for elevation.
+Existing character and battle persistence remain unchanged.
+Outstanding Verification
+Verify movement overlays render correctly.
+Verify mouse picking identifies the intended destination.
+Verify blue highlighting follows the cursor.
+Verify movement limits and Dash accounting.
+Verify movement selection cancellation.
+Verify grid repositioning preserves camera distance.
+Verify camera zoom remains functional.
+Verify rendering and resource cleanup.
+Verify no regressions in character selection or initiative.
+Deployment Status
+
+Targeted source changes prepared for manual integration.
+
+Deployment and runtime verification pending.
+
+Do not mark this milestone as deployed or verified until tested in the running Babylon.js application.
+
+D&D Tactical Mode — Movement Picking, Grid Configuration,
+and Camera Improvements
+
+Implementation prepared: 2026-11-06
+
+Status: Source modifications prepared.
+Integration: Pending.
+Runtime verification: Pending.
+Deployment: Pending.
+
+MOVEMENT INTERACTION
+
+Updated module:
+src/game/dnd-mode.js
+
+Improvements:
+
+- Explicit Babylon.js scene picking for movement cells.
+- Dedicated pointer-move destination detection.
+- Movement-cell filtering during hover picking.
+- Blue target-cell highlighting.
+- Target highlight rendering priority.
+- Reduced movement preview opacity.
+- Improved hover cleanup when leaving the movement region.
+- Existing battle-domain movement validation retained.
+- Existing movement and Dash accounting retained.
+
+GRID CONFIGURATION
+
+Updated modules:
+src/game/dnd-mode.js
+src/game/dnd-tactical-ui.js
+
+New capabilities:
+
+- Adjustable square grid dimensions.
+- Configurable cell size in world units.
+- Grid dimension validation.
+- Cell size validation.
+- Terrain perimeter validation.
+- Existing character boundary validation.
+- Grid reconstruction following successful resizing.
+- Character render-position synchronization.
+- Persistent grid dimensions and cell size.
+- Grid information displayed in the tactical interface.
+
+Grid configuration limits:
+
+- Grid dimensions: 2–100 cells.
+- Cell size: 1–1000 world units.
+
+CAMERA IMPROVEMENTS
+
+Updated module:
+src/game/dnd-mode.js
+
+New capabilities:
+
+- Preserve ArcRotateCamera radius when translating the grid.
+- Preserve camera alpha and beta during grid translation.
+- Recenter camera target on the active or selected character.
+- Add dedicated zoomToGrid() operation.
+- Fixed tactical zoom radius of 20 units.
+- Clear pending camera inertia during fixed-distance zoom.
+
+ARCHITECTURAL PRESERVATION
+
+DnDBattle remains authoritative for movement resources.
+
+DnDMode remains responsible for tactical interaction.
+
+Babylon.js remains responsible for rendering, scene
+picking, and camera behavior.
+
+SpatialTransform remains responsible for world-to-render
+coordinate conversion.
+
+Terrain remains authoritative for elevation.
+
+Existing character and battle persistence remain intact.
+
+VERIFICATION REQUIRED
+
+1. Verify movement-cell hover highlighting.
+2. Verify blue target highlighting across the entire
+   movement region.
+3. Verify highlighting disappears outside valid cells.
+4. Verify mouse-click movement confirmation.
+5. Verify movement and Dash boundaries.
+6. Verify movement preview transparency.
+7. Verify grid resizing.
+8. Verify cell-size changes affect world-space movement.
+9. Verify terrain boundary rejection.
+10. Verify character boundary rejection.
+11. Verify grid settings survive application reload.
+12. Verify grid translation preserves camera radius.
+13. Verify grid translation preserves camera orientation.
+14. Verify zoom-to-grid centers on the correct character.
+15. Verify camera controls remain functional afterward.
+16. Verify overlay disposal and resource cleanup.
+17. Verify initiative and battle-state regressions.
+
+DEPLOYMENT STATUS
+
+Source modifications prepared for manual integration.
+
+Runtime verification remains outstanding.
+
+Do not classify these changes as deployed or verified
+until tested in the running Babylon.js application.
+
+D&D Tactical Grid — Geometry Synchronization and Configuration
+
+Implementation prepared: 2026-11-06
+
+STATUS
+Source modifications prepared.
+Integration pending.
+Runtime verification pending.
+
+MOVEMENT VISUALIZATION
+
+Updated module:
+src/game/dnd-mode.js
+
+Improvements:
+
+- Shared projected-cell geometry generation.
+- Movement overlays constructed from projected cell corners.
+- Blue destination highlight constructed from identical geometry.
+- Removal of assumed Babylon-space cell dimensions.
+- Exact world-space grid-cell boundary alignment.
+- Movement overlay generation constrained to grid bounds.
+- Existing movement and Dash resource calculations retained.
+
+GRID CONFIGURATION
+
+Updated modules:
+src/game/dnd-mode.js
+src/game/dnd-tactical-ui.js
+
+Capabilities:
+
+- Editable square grid dimensions.
+- Editable cell size in world units.
+- Terrain vertex validation.
+- Character boundary validation.
+- Grid reconstruction after configuration changes.
+- Character mesh synchronization.
+- Persistent grid configuration.
+- Grid information displayed in the tactical menu.
+
+Configuration limits:
+
+Grid dimensions: 2–100 cells per side.
+Cell size: 0.5–1000 world units.
+
+ARCHITECTURAL NOTES
+
+SpatialTransform remains responsible for
+world-to-render conversion.
+
+Grid visualization and movement visualization must
+use the same projected grid geometry.
+
+Movement meshes are derived visual representations.
+They do not own authoritative character positions.
+
+DnDBattle remains authoritative for movement accounting.
+
+VERIFICATION REQUIRED
+
+1. Verify blue target matches the underlying grid cell.
+2. Verify movement preview matches grid cell boundaries.
+3. Verify projected overlays follow nonlinear geometry.
+4. Verify movement overlays never extend beyond grid edges.
+5. Verify movement and Dash ranges.
+6. Verify grid dimensions can be changed.
+7. Verify cell size can be changed.
+8. Verify terrain validation rejects invalid configurations.
+9. Verify characters cannot be excluded by resizing.
+10. Verify settings persist after reload.
+11. Verify camera positioning after resizing.
+12. Verify rendering cleanup after repeated configuration changes.
+
+DEPLOYMENT
+
+Manual integration required.
+
+Runtime verification pending.
+
+Do not mark as deployed or verified until tested
+in the running application.
+
+D&D Tactical Interface — Visibility and Initialization Debugging
+
+Implementation prepared: 2026-11-06
+
+Problem
+
+The D&D tactical menu does not reliably appear when entering the tactical interface or toggling its visibility.
+
+The issue has been traced to the initialization and DOM visibility synchronization of DnDTacticalUI.
+
+Updated Module
+
+src/game/dnd-tactical-ui.js
+
+Proposed Improvements
+Initialize tactical menu visibility explicitly.
+Synchronize initial visibility with the DOM.
+Establish deterministic menu opening and closing behavior.
+Increase tactical interface stacking priority.
+Explicitly enable pointer interaction on the tactical panel.
+Preserve keyboard menu controls.
+Preserve existing tab navigation and interface functionality.
+Expected Behavior
+Entering D&D mode initializes the tactical menu in its closed state.
+Clicking D&D MENU opens the tactical panel.
+Clicking HIDE MENU closes the tactical panel.
+Pressing M toggles visibility.
+Pressing Escape closes the menu.
+Menu visibility and button labeling remain synchronized.
+Architectural Preservation
+
+DnDTacticalUI remains responsible for interface presentation.
+
+DnDMode remains responsible for tactical interaction and orchestration.
+
+DnDBattle remains authoritative for battle state and resource accounting.
+
+DnDCharacter remains responsible for character state.
+
+Babylon.js remains responsible for tactical rendering and picking.
+
+No battle-domain or character-persistence modifications are required for this interface correction.
+
+Verification Required
+Verify initial menu visibility when entering D&D mode.
+Verify the menu opens on the first button click.
+Verify the menu closes on the subsequent click.
+Verify the M keyboard shortcut.
+Verify Escape behavior.
+Verify panel positioning and stacking above the main application interface.
+Verify pointer interaction with every tactical tab.
+Verify menu operation at different viewport dimensions.
+Verify repeated D&D mode entry and exit.
+Verify interface disposal when leaving D&D mode.
+Deployment Status
+
+Targeted source modifications prepared.
+
+Manual integration required.
+
+Runtime verification pending.
+
+Do not mark as deployed or verified until tested in the running application.
+
+D&D Tactical UI — Missing Battle Tab and Duplicate
+Battlefield Tab Definitions
+
+Investigation date: 2026-11-06
+
+STATUS
+
+Root cause identified.
+Source repair prepared.
+Integration pending.
+Runtime verification pending.
+
+AFFECTED MODULE
+
+src/game/dnd-tactical-ui.js
+
+PROBLEMS IDENTIFIED
+
+1. DnDTacticalUI.createInterface() invokes
+   buildBattleTab(), but the class does not implement
+   that method.
+
+2. DnDTacticalUI contains duplicate
+   buildBattlefieldTab() implementations.
+
+3. The later battlefield implementation overrides
+   the earlier implementation containing newer grid
+   configuration controls.
+
+ROOT CAUSE
+
+Tactical interface initialization fails when
+buildBattleTab() is invoked.
+
+The hamburger button is created and appended before
+the failure occurs.
+
+The tactical panel is appended afterward and therefore
+never becomes available.
+
+REPAIR PREPARED
+
+1. Add buildBattleTab() to DnDTacticalUI.
+
+2. Restore the Battle tab's encounter management UI.
+
+3. Restore initiative display.
+
+4. Restore movement preview controls.
+
+5. Restore action and bonus-action controls.
+
+6. Restore character speech recording.
+
+7. Restore battle history display.
+
+8. Remove the obsolete duplicate
+   buildBattlefieldTab() implementation.
+
+ARCHITECTURAL PRESERVATION
+
+DnDTacticalUI remains responsible for presentation
+and user interaction.
+
+DnDMode remains responsible for battle orchestration.
+
+DnDBattle remains authoritative for initiative,
+movement accounting, and action economy.
+
+Existing character management, battlefield geometry,
+movement visualization, and persistence systems
+remain unchanged.
+
+VERIFICATION REQUIRED
+
+1. Verify D&D tactical UI initializes without errors.
+
+2. Verify hamburger opens and closes the menu.
+
+3. Verify all four tabs render correctly.
+
+4. Verify Battle tab encounter controls.
+
+5. Verify initiative ordering and advancement.
+
+6. Verify action and bonus-action accounting.
+
+7. Verify movement preview activation and deactivation.
+
+8. Verify character speech recording.
+
+9. Verify battle history updates.
+
+10. Verify battlefield grid configuration controls.
+
+11. Verify grid settings persist after reload.
+
+12. Verify tactical UI disposal and reinitialization.
+
+DEPLOYMENT STATUS
+
+Repair prepared for manual integration.
+
+Runtime verification pending.
+
+Do not mark this repair as deployed or verified
+until tested in the running Babylon.js application.
+
+
+============================================================
+DEVELOPMENT WORKFLOW: CONSOLIDATED CLIPBOARD DIAGNOSTICS
+============================================================
+
+Purpose:
+Provide complete, reproducible shell commands that collect
+relevant source code and diagnostic information into the
+system clipboard using wl-copy.
+
+Convention:
+
+When requesting code sections for debugging, ChatGPT should
+prefer providing one complete shell command that:
+
+1. Runs from the project root.
+2. Locates relevant source files automatically where practical.
+3. Collects all requested methods and supporting context.
+4. Includes useful cross-system references when relevant.
+5. Labels each section clearly.
+6. Sends the complete report to wl-copy.
+7. Confirms successful clipboard copying.
+
+Benefits:
+
+- Reduces manual terminal operations.
+- Avoids fragmented code submissions.
+- Preserves method boundaries and surrounding context.
+- Makes multi-file debugging easier.
+- Creates reproducible diagnostic workflows.
+
+Clipboard utility:
+wl-copy (Wayland)
+
+If a requested diagnostic command becomes too large or
+complex, use a small shell script or temporary report file
+rather than omitting relevant source sections.
+
+Future debugging sessions should follow this convention
+whenever practical.
+============================================================
+
+
+
+D&D TACTICAL EDITOR — CAMERA AND RECTANGULAR GRID FOLLOW-UP
+
+Implementation date: November 6, 2026
+
+STATUS
+
+Source modifications completed.
+JavaScript syntax verification passed across src/.
+Focused behavior checks passed with mocked terrain/render dependencies.
+Browser runtime verification remains pending.
+
+CAMERA
+
+- Startup camera distance scales with configured cell size and is capped at 30 world units.
+- Added a map-level FOCUS ACTIVE control that remains visible while the tactical panel is closed.
+- Focus centers the camera on the active battle character, falling back to the selected character
+  when no battle is active.
+- Focus zoom is derived from cell size and clamped to a safe range.
+- Camera inertia is cleared before applying the focus zoom.
+
+RECTANGULAR GRID CONFIGURATION
+
+- Independent rows and columns, each from 2 through 300.
+- Independently editable square-cell size from 0.5 through 1000 world units.
+- Grid width is columns × cell size; grid depth is rows × cell size.
+- Terrain coverage is checked at every grid vertex before applying a new configuration.
+- Existing characters prevent a resize that would exclude their logical grid coordinates.
+- Grid geometry and character render positions are rebuilt/synchronized after applying changes.
+- Settings persist as version 2 with rows, columns, and cell size.
+- Existing saved `gridSize` settings migrate to equal rows and columns.
+- Former two-argument configuration calls remain supported as square-grid calls.
+- The `gridSize` compatibility accessor is read-only and returns null for rectangular grids.
+- Very large grids use reduced grid-line subdivision to limit terrain sampling work.
+
+UPDATED SOURCE FILES
+
+- src/game/dnd-mode.js
+- src/game/dnd-tactical-ui.js
+
+NEW MAINTENANCE DOCUMENT
+
+- docs/STYLE-CONFORMANCE.md records style-guide review scores, evidence, and refactoring
+  priorities for each source file inspected. Update it whenever another source file is reviewed.
+
+VERIFICATION COMPLETED
+
+- Node.js syntax check passed for every JavaScript file under src/.
+- Focused mode-level tests passed for rectangular dimensions, 300 × 300 maximum,
+  out-of-range rejection, invalid cell-size rejection, legacy two-argument calls,
+  terrain validation rollback, read-only gridSize compatibility, and camera focus zoom.
+
+RUNTIME VERIFICATION STILL REQUIRED
+
+1. Enter D&D mode and confirm the initial camera framing is appropriately close.
+2. Use FOCUS ACTIVE from multiple locations and confirm the active character is centered.
+3. Repeat with no active battle and confirm the selected character is focused.
+4. Apply independent row and column values, including 300 × 300.
+5. Change cell size and verify grid geometry, character positions, movement distances,
+   and overlays remain aligned.
+6. Confirm invalid terrain and character-excluding sizes are rejected without partial changes.
+7. Reload the application and verify all grid settings persist.
+8. Confirm the focus button and tactical interface are disposed when leaving D&D mode.
+
+Do not mark the editor as runtime-verified until these browser checks pass.
+
+
+============================================================
+D&D GRID REFINEMENT — CELL FORMATION, DASH, AND FLIGHT
+============================================================
+Implementation updated: November 6, 2026
+
+CHARACTER PLACEMENT
+-------------------
+- Grid coordinates now resolve to cell centres, rather than grid-line intersections.
+- A single character is placed at the exact centre of its cell.
+- Characters sharing a cell are placed in a centered circular formation.
+- Character models are scaled down as occupancy increases to keep horizontal model
+  footprints separated and contained within the cell.
+
+MOVEMENT AND ACTION ECONOMY
+---------------------------
+- Movement remains an independent per-turn resource.
+- Normal movement does not consume an action or bonus action.
+- Selecting a destination in the amber secondary movement region consumes the Dash
+  action before movement is recorded.
+- The Dash action doubles the movement allowance for that turn.
+- Selecting Dash directly from the Action control also enables the doubled allowance.
+- Spending a non-Dash action prevents later Dash movement for that turn.
+- The preview refreshes after movement and after action use.
+
+FLIGHT AND ALTITUDE
+-------------------
+- Character position records include `altitude`, measured above locally sampled terrain.
+- Altitude is retained when a character moves between cells and is included in character
+  serialization. Older saves without altitude default to zero.
+- The tactical UI exposes altitude when creating a character and when editing a selected one.
+- Rendered character roots are positioned at sampled terrain elevation plus altitude, through
+  the existing SpatialTransform conversion.
+
+STYLE REVIEW
+------------
+- Updated `docs/STYLE-CONFORMANCE.md` for every inspected/modified game source file and
+  the new tactical regression test file.
+- Removed anonymous callback expressions from the reviewed D&D mode, tactical UI, battle,
+  and character modules.
+- Decomposed movement, Dash validation, movement-preview range calculation, cell occupancy,
+  grid-origin rollback, battle restoration, replay orchestration, constructor initialization,
+  and character-mesh construction into named methods.
+- Remaining long constructors, renderer algorithms, lifecycle methods, and DOM primitives
+  remain recorded as future refactoring work rather than being broadly rewritten.
+
+AUTOMATED VERIFICATION
+----------------------
+- Eight focused tactical regression tests pass under Node's built-in test runner.
+- Full source JavaScript syntax validation passed after the final source edits (88 files).
+- Browser/Babylon.js verification remains outstanding for actual terrain projection, mesh
+  overlap at different viewing angles, pointer picking on amber cells, altitude rendering,
+  and save/reload behavior.
+
+DEPLOYMENT STATUS
+-----------------
+Source changes and automated tests are prepared. Do not mark browser runtime verification
+as complete until tested in the running application.
+============================================================

@@ -1,0 +1,246 @@
+            renderer.clear();
+        }
+
+        const allTrees = [];
+
+        for (const record of this.activeRecords) {
+            if (!record.active) continue;
+
+            for (const tree of record.population.trees) {
+                if (tree.alive) allTrees.push(tree);
+            }
+        }
+
+        this.environment.rebuildCanopyGrid(allTrees);
+
+        for (const tree of allTrees) {
+            const species = tree.species;
+            const age = tree.ageFactor;
+
+            const growth =
+                age * age * (3 - 2 * age);
+
+            const height =
+                species.trunkLength *
+                growth *
+                tree.genome.maxHeight;
+
+            const radius =
+                species.trunkRadius *
+                Math.sqrt(Math.max(age, 0.001)) *
+                tree.genome.trunkThickness;
+
+            if (height <= 0.05) continue;
+
+            const trunkMatrix = BABYLON.Matrix.Compose(
+                new BABYLON.Vector3(
+                    radius,
+                    height,
+                    radius
+                ),
+                BABYLON.Quaternion.Identity(),
+                new BABYLON.Vector3(
+                    tree.position.x,
+                    tree.position.y + height * 0.5,
+                    tree.position.z
+                )
+            );
+
+            this.trunkRenderers[
+                tree.speciesName
+            ].addMatrix(trunkMatrix);
+
+            const canopy = species.canopy;
+
+            const canopyHeight = height * canopy.height;
+
+            const canopyWidth =
+                height *
+                canopy.width *
+                tree.genome.canopyWidth;
+
+            const canopyCenter = new BABYLON.Vector3(
+                tree.position.x,
+                tree.position.y +
+                    height * (
+                        canopy.startHeight +
+                        canopy.height * 0.5
+                    ),
+                tree.position.z
+            );
+
+            const foliageScale = Math.max(
+                0.08,
+                canopyWidth * 0.42
+            );
+
+            const foliageMatrix = BABYLON.Matrix.Compose(
+                new BABYLON.Vector3(
+                    foliageScale * 1.6,
+                    Math.max(0.1, canopyHeight * 0.45),
+                    foliageScale * 1.6
+                ),
+                BABYLON.Quaternion.Identity(),
+                canopyCenter
+            );
+
+            this.foliageRenderers[
+                tree.speciesName
+            ].addMatrix(foliageMatrix);
+        }
+
+        for (const renderer of Object.values(
+            this.trunkRenderers
+        )) {
+            renderer.update();
+        }
+
+        for (const renderer of Object.values(
+            this.foliageRenderers
+        )) {
+            renderer.update();
+        }
+
+        this.renderDirty = false;
+    }
+
+
+update(cameraPosition, deltaSeconds = 0) {
+    if (this.disposed) return;
+
+    // Streaming and simulation continue normally.
+    this.populationManager.updateVisibleChunks(
+        cameraPosition,
+        this.renderRadius
+    );
+
+    const deltaYears = deltaSeconds * 0.05;
+
+    if (deltaYears > 0) {
+        this.populationManager.updateSimulation(
+            deltaYears
+        );
+    }
+
+    // Batch expensive rendering work.
+    this.renderAccumulator += Math.max(
+        0,
+        Math.min(deltaSeconds, 0.25)
+    );
+
+    if (
+        this.renderDirty &&
+        (
+            this.renderAccumulator >= this.renderInterval
+        )
+    ) {
+        this.rebuildRendering();
+        this.renderAccumulator = 0;
+    }
+}
+
+
+    getStats() {
+        return {
+            ...this.populationManager.getStats(),
+
+            activeTrees: Array.from(
+                this.activeRecords
+            ).reduce(
+                (total, record) =>
+                    total + record.population.trees.filter(
+                        tree => tree.alive
+                    ).length,
+                0
+            )
+        };
+    }
+
+    dispose() {
+        if (this.disposed) return;
+
+        this.disposed = true;
+
+        this.populationManager.dispose();
+
+        for (const renderer of Object.values(
+            this.trunkRenderers
+        )) {
+            renderer.mesh.dispose();
+        }
+
+        for (const renderer of Object.values(
+            this.foliageRenderers
+        )) {
+            renderer.mesh.dispose();
+        }
+
+        this.activeRecords.clear();
+    }
+
+
+chooseSpeciesForSoil(soil, random) {
+    const fallback = random() < 0.55 ? "oak" : "pine";
+
+    if (!soil) {
+        return fallback;
+    }
+
+    const calculateScore = (speciesName) => {
+        const species = Species[speciesName];
+
+        // Some species definitions may not yet have
+        // geological affinity data.
+        if (!species || !species.soilAffinity) {
+            return 0.5;
+        }
+
+        const affinity = species.soilAffinity;
+
+        const preferred = Array.isArray(affinity.preferred)
+            ? affinity.preferred
+            : [];
+
+        const texture = preferred.includes(soil.surfaceSoil)
+            ? 1.0
+            : (affinity.tolerance ?? 0.5);
+
+        const fertility = 1 - Math.abs(
+            (soil.fertility ?? 0.5) -
+            (affinity.fertility ?? 0.5)
+        );
+
+        const drainage = 1 - Math.abs(
+            (soil.drainage ?? 0.5) -
+            (affinity.drainage ?? 0.5)
+        );
+
+        const moisture = 1 - Math.abs(
+            (soil.moisture ?? 0.5) -
+            (affinity.moisture ?? 0.5)
+        );
+
+        return (
+            texture * 0.45 +
+            fertility * 0.20 +
+            drainage * 0.20 +
+            moisture * 0.15
+        );
+    };
+
+    const oakScore = calculateScore("oak");
+    const pineScore = calculateScore("pine");
+
+    const total = oakScore + pineScore;
+
+    if (total <= 0) {
+        return fallback;
+    }
+
+    return random() < oakScore / total
+        ? "oak"
+        : "pine";
+}
+
+}
+

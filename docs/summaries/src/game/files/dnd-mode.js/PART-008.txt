@@ -1,0 +1,13 @@
+            Number.isInteger(rows) &&
+            Number.isInteger(columns) &&
+            rows >= MIN_GRID_DIMENSION &&
+            columns >= MIN_GRID_DIMENSION &&
+            rows <= this.maxGridRows &&
+            columns <= this.maxGridColumns
+        );
+    }
+
+}
+
+export { DnDMode };
+

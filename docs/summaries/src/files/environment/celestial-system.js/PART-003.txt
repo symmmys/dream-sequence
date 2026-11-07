@@ -1,0 +1,81 @@
+                0.003,
+                0.006,
+                0.022,
+                1
+            );
+    }
+
+    // -----------------------------------------
+    // TIME CONTROLS
+    // -----------------------------------------
+
+    setTimeScale(scale) {
+        this.timeScale =
+            BABYLON.Scalar.Clamp(scale, 0, 100);
+    }
+
+    setDayLength(seconds) {
+        this.dayLength = Math.max(60, seconds);
+    }
+
+    setTimeOfDay(normalizedTime) {
+        this.elapsed =
+            BABYLON.Scalar.Clamp(
+                normalizedTime,
+                0,
+                1
+            ) * this.dayLength;
+
+        this.update(0);
+    }
+
+    getTimeOfDay() {
+        return (this.elapsed / this.dayLength) % 1;
+    }
+
+    // -----------------------------------------
+    // DEBUG INFORMATION
+    // -----------------------------------------
+
+    getStats() {
+        return {
+            timeOfDay: this.getTimeOfDay(),
+            dayLength: this.dayLength,
+            timeScale: this.timeScale,
+            daylight: this.daylight,
+            twilight: this.twilight,
+            starVisibility: this.starVisibility,
+            sunIntensity: this.sunLight.intensity,
+            moonIntensity: this.moonLight.intensity,
+            sunDirection: this.sunDirection.asArray(),
+            moonDirection: this.moonDirection.asArray()
+        };
+    }
+
+    // -----------------------------------------
+    // CLEANUP
+    // -----------------------------------------
+dispose() {
+    if (this.skyMesh) {
+        this.skyMesh.dispose();
+    }
+
+    if (this.skyMaterial) {
+        this.skyMaterial.dispose();
+    }
+
+    // Retain compatibility if independent celestial
+    // meshes are reintroduced in a future implementation.
+    this.sunMesh?.dispose();
+    this.moonMesh?.dispose();
+    this.sunMaterial?.dispose();
+    this.moonMaterial?.dispose();
+
+    this.sunLight?.dispose();
+    this.moonLight?.dispose();
+    this.ambientLight?.dispose();
+}
+}
+
+export { CelestialSystem };
+

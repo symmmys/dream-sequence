@@ -1,0 +1,23 @@
+SOMNIUM — INDIVIDUAL SOURCE FILE INDEX
+================================================================
+
+Source file: src/game/player-controller.js
+Source directory: src/game/
+Generated: 2026-11-07T06:14:04
+Total source lines: 189
+Maximum chunk size: 300 lines
+Number of parts: 1
+
+SOURCE PARTS
+----------------------------------------------------------------
+Part: PART-001.txt
+Original lines: 1-189
+Lines in part: 189
+
+READING INSTRUCTIONS
+----------------------------------------------------------------
+- Read parts in ascending numerical order.
+- Concatenate parts without adding separator lines.
+- Part contents are original UTF-8 source text.
+- Original source line numbering is preserved.
+- No source lines are intentionally omitted.

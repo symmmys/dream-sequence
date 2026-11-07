@@ -1,0 +1,104 @@
+SOMNIUM — DIRECTORY SUMMARY
+================================================================
+
+Directory: src/rendering/
+Generated: 2026-11-07T06:14:04
+
+PURPOSE
+----------------------------------------------------------------
+Automatically generated source inventory.
+See individual modules for detailed responsibilities.
+
+SOURCE FILES (DIRECT CHILDREN)
+----------------------------------------------------------------
+- adaptive-graphics-controller.js
+  Exports: AdaptiveGraphicsController
+- cloud-renderer.js
+  Exports: CloudRenderer
+- rock-renderer.js
+  Exports: RockRenderer
+- surface-deposit-renderer.js
+  Exports: SurfaceDepositRenderer
+- thin-instance-renderer.js
+  Exports: ThinInstanceRenderer
+- tree-renderers.js
+  Exports: FoliageRenderer, TreeRenderer
+
+DIRECT DEPENDENCIES
+----------------------------------------------------------------
+- src/ecology/tree-generator.js
+
+DEPENDENTS
+----------------------------------------------------------------
+- src/atmosphere/cloud-system.js
+- src/buildings/building-renderer.js
+- src/ecology/forest.js
+- src/geology/geological-manager.js
+- src/geology/surface-deposit-system.js
+- src/scene/create-scene.js
+- src/world/chunk-cloud-system.js
+- src/world/chunk-ecology-system.js
+- src/world/chunk-geology-system.js
+
+INDIVIDUAL SOURCE FILE MANIFEST
+----------------------------------------------------------------
+
+Documentation root: docs/summaries/src/rendering/files/
+Maximum chunk size: 300 lines
+Text files documented: 6
+Binary/unreadable files skipped: 0
+
+Each source file has its own documentation directory.
+INDEX.txt identifies the original file and maps every
+numbered part to its exact original source line range.
+
+SOURCE: src/rendering/adaptive-graphics-controller.js
+  Lines: 184
+  Parts: 1
+  Index: docs/summaries/src/rendering/files/adaptive-graphics-controller.js/INDEX.txt
+    docs/summaries/src/rendering/files/adaptive-graphics-controller.js/PART-001.txt
+
+SOURCE: src/rendering/cloud-renderer.js
+  Lines: 195
+  Parts: 1
+  Index: docs/summaries/src/rendering/files/cloud-renderer.js/INDEX.txt
+    docs/summaries/src/rendering/files/cloud-renderer.js/PART-001.txt
+
+SOURCE: src/rendering/rock-renderer.js
+  Lines: 38
+  Parts: 1
+  Index: docs/summaries/src/rendering/files/rock-renderer.js/INDEX.txt
+    docs/summaries/src/rendering/files/rock-renderer.js/PART-001.txt
+
+SOURCE: src/rendering/surface-deposit-renderer.js
+  Lines: 158
+  Parts: 1
+  Index: docs/summaries/src/rendering/files/surface-deposit-renderer.js/INDEX.txt
+    docs/summaries/src/rendering/files/surface-deposit-renderer.js/PART-001.txt
+
+SOURCE: src/rendering/thin-instance-renderer.js
+  Lines: 133
+  Parts: 1
+  Index: docs/summaries/src/rendering/files/thin-instance-renderer.js/INDEX.txt
+    docs/summaries/src/rendering/files/thin-instance-renderer.js/PART-001.txt
+
+SOURCE: src/rendering/tree-renderers.js
+  Lines: 69
+  Parts: 1
+  Index: docs/summaries/src/rendering/files/tree-renderers.js/INDEX.txt
+    docs/summaries/src/rendering/files/tree-renderers.js/PART-001.txt
+
+RECURSIVE SOURCE DUMP
+----------------------------------------------------------------
+- SOURCE.txt contains recursively collected text files.
+- Individual files are available under files/.
+- Individual PART files contain at most 300 lines.
+- Binary files are excluded from both representations.
+
+NOTES
+----------------------------------------------------------------
+- Dependencies are extracted from relative JavaScript imports.
+- External packages and browser globals are not represented.
+- Dynamic imports using computed paths may not be detected.
+- This inventory does not establish runtime initialization order.
+- Generated documentation is not authoritative application state.

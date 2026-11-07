@@ -1,0 +1,53 @@
+SOMNIUM — D&D TACTICAL EDITOR REPAIR
+====================================
+
+This repair updates two coordinated application modules and adds the style-conformance
+ledger. Use the complete-project archive when possible.
+
+REPLACEMENT FILES
+-----------------
+Replace these files at the same relative paths:
+
+  src/game/dnd-mode.js
+  src/game/dnd-tactical-ui.js
+
+Add or replace these documentation files:
+
+  docs/STYLE-CONFORMANCE.md
+  docs/PROJECT-STATE.txt
+  docs/AI-ENTRYPOINT.txt
+
+The replacement-files ZIP preserves these relative paths.
+
+WHAT CHANGED
+------------
+- D&D mode startup camera radius is closer and scales with configured cell size.
+- A persistent FOCUS ACTIVE button is available on the map while the tactical panel is hidden.
+- Focus centers and zooms on the active battle character, or the selected character when there
+  is no active battle.
+- Grid rows and columns are independently configurable from 2 through 300.
+- Cell size is independently configurable from 0.5 through 1000 world units.
+- Grid configuration validates terrain coverage and character boundaries before applying.
+- Grid settings persist in a versioned format. Older square-grid saves migrate automatically.
+- The read-only gridSize property remains only as a compatibility getter; no code assigns to it.
+- The documentation generator has been run to refresh the source summaries, dependency graph,
+  tree, and master source bundle.
+
+INSTALLATION
+------------
+1. Back up the currently working project.
+2. Extract the replacement-files ZIP over the project root, preserving directory paths, or
+   replace the listed source/documentation files manually.
+3. Restart the local development server if needed.
+4. Hard-refresh the browser to avoid cached JavaScript modules.
+5. Enter D&D mode and test the items listed in docs/PROJECT-STATE.txt.
+
+VERIFICATION
+------------
+- Node.js syntax check: all 88 JavaScript files under src/ passed.
+- Focused mode/UI behavior tests: passed for independent dimensions, 300 x 300 limit,
+  cell-size validation, old save/API migration, terrain/character rejection, camera focus,
+  default camera radius, and UI argument wiring.
+- Browser runtime: not verified. The headless Chromium attempt timed out before a usable page
+  could be inspected. Test in the normal Somnium browser session before treating the repair
+  as fully deployed.

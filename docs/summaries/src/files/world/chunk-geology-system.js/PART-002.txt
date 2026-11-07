@@ -1,0 +1,95 @@
+        }
+    }
+
+    rebuildRendering() {
+        if (this.disposed) return;
+
+        for (const renderer of Object.values(this.renderers)) {
+            renderer.clear();
+        }
+
+        let visibleFormationCount = 0;
+
+        for (const key of this.activeChunks) {
+            const record = this.records.get(key);
+
+            if (!record) continue;
+
+            for (const formation of record.formations) {
+                if (!formation.alive) continue;
+
+                const config =
+                    RockSpecies[formation.speciesName];
+
+                const renderer =
+                    this.renderers[formation.speciesName];
+
+                if (!config || !renderer) continue;
+
+                const generator = new RockGenerator(
+                    config,
+                    formation.seed
+                );
+
+                // Conservative initial detail level.
+                // Higher recursive detail can be introduced
+                // after performance validation.
+                const depth = Math.min(
+                    1,
+                    config.recursionDepth
+                );
+
+                const matrices = generator.generate(
+                    formation.position,
+                    formation.scale,
+                    depth
+                );
+
+                renderer.addMatrices(matrices);
+
+                visibleFormationCount++;
+            }
+        }
+
+        for (const renderer of Object.values(this.renderers)) {
+            renderer.update();
+        }
+
+        this.visibleFormationCount =
+            visibleFormationCount;
+
+        this.renderDirty = false;
+    }
+
+    getStats() {
+        let totalFormations = 0;
+
+        for (const record of this.records.values()) {
+            totalFormations += record.formations.filter(
+                formation => formation.alive
+            ).length;
+        }
+
+        return {
+            generatedChunks: this.records.size,
+            activeChunks: this.activeChunks.size,
+            totalFormations,
+            visibleFormations: this.visibleFormationCount ?? 0
+        };
+    }
+
+    dispose() {
+        if (this.disposed) return;
+
+        this.disposed = true;
+
+        for (const renderer of Object.values(this.renderers)) {
+            renderer.mesh.dispose();
+        }
+
+        this.renderers = {};
+        this.activeChunks.clear();
+        this.records.clear();
+    }
+}
+

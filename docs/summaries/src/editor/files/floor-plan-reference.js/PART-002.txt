@@ -1,0 +1,125 @@
+        const xAxis = this.transform.transformDirection(
+            worldPosition,
+            {
+                x: cos,
+                y: 0,
+                z: -sin
+            }
+        );
+
+        const zAxis = this.transform.transformDirection(
+            worldPosition,
+            {
+                x: sin,
+                y: 0,
+                z: cos
+            }
+        );
+
+        const xScale = Math.hypot(
+            xAxis.x,
+            xAxis.y,
+            xAxis.z
+        );
+
+        const zScale = Math.hypot(
+            zAxis.x,
+            zAxis.y,
+            zAxis.z
+        );
+
+        if (
+            !Number.isFinite(xScale) ||
+            !Number.isFinite(zScale) ||
+            xScale <= 0 ||
+            zScale <= 0
+        ) {
+            throw new Error(
+                "Invalid projected floor-plan dimensions."
+            );
+        }
+
+        this.mesh.position.set(
+            rendered.x,
+            rendered.y + 0.08,
+            rendered.z
+        );
+
+        // CreateGround occupies local X-Z, not X-Y.
+        this.mesh.scaling.set(
+            width * xScale,
+            1,
+            depth * zScale
+        );
+
+        // Align the ground plane to its projected X axis.
+        const projectedYaw = Math.atan2(
+            -xAxis.z,
+            xAxis.x
+        );
+
+        this.mesh.rotation.set(
+            0,
+            projectedYaw,
+            0
+        );
+
+        this.mesh.isVisible = this.visible;
+        this.mesh.computeWorldMatrix(true);
+    }
+
+    setOpacity(value) {
+        if (!Number.isFinite(value)) {
+            throw new Error(
+                "Invalid floor-plan opacity."
+            );
+        }
+
+        this.opacity = Math.max(
+            0,
+            Math.min(1, value)
+        );
+
+        if (this.material) {
+            this.material.alpha = this.opacity;
+        }
+    }
+
+    setVisible(value) {
+        this.visible = Boolean(value);
+
+        if (this.mesh) {
+            this.mesh.setEnabled(this.visible);
+        }
+    }
+
+    toggleVisibility() {
+        this.setVisible(!this.visible);
+        return this.visible;
+    }
+
+    remove() {
+        this.mesh?.dispose();
+        this.material?.dispose();
+        this.texture?.dispose();
+
+        this.mesh = null;
+        this.material = null;
+        this.texture = null;
+
+        if (this.objectURL) {
+            URL.revokeObjectURL(this.objectURL);
+            this.objectURL = null;
+        }
+
+        this.image = null;
+        this.loaded = false;
+    }
+
+    dispose() {
+        this.remove();
+    }
+}
+
+export { FloorPlanReference };
+export default FloorPlanReference;

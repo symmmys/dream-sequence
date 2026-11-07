@@ -1,0 +1,224 @@
+SOMNIUM — DIRECTORY SOURCE DUMP
+========================================================================
+
+Directory: src/ui/
+Generated: 2026-11-07T06:14:04
+
+This file contains recursively collected UTF-8 text files.
+Binary files and excluded directories are omitted.
+File paths are relative to the project root.
+
+
+========================================================================
+FILE: src/ui/main-menu.js
+========================================================================
+
+
+class MainMenu {
+	constructor(gameManager, onDnD = null) {
+    this.gameManager = gameManager;
+    this.onDnD = onDnD;
+    this.container = null;
+
+    this.create();
+
+    this.unsubscribe = gameManager.onModeChanged(
+        mode => this.update(mode)
+    );
+
+    this.update(gameManager.mode);
+}
+
+    create() {
+        this.container = document.createElement("div");
+        this.container.id = "somnium-game-ui";
+
+        Object.assign(this.container.style, {
+            position: "fixed",
+            inset: "0",
+            zIndex: "1000",
+            pointerEvents: "none",
+            fontFamily: "Arial, sans-serif",
+            color: "white"
+        });
+
+        this.container.innerHTML = `
+            <style>
+                #somnium-game-ui button {
+                    color: white;
+                    background: #172b3c;
+                    border: 1px solid #536d82;
+                    padding: 14px 22px;
+                    cursor: pointer;
+                    border-radius: 5px;
+                    font-size: 14px;
+                }
+
+                #somnium-game-ui button:hover {
+                    background: #294a63;
+                }
+
+                .somnium-overlay {
+                    position: absolute;
+                    inset: 0;
+                    display: none;
+                    justify-content: center;
+                    align-items: center;
+                    background: rgba(5,12,20,0.94);
+                    pointer-events: auto;
+                    text-align: center;
+                }
+
+                .somnium-panel {
+                    width: min(760px, 90%);
+                }
+
+                .somnium-options {
+                    display: grid;
+                    grid-template-columns: repeat(2,minmax(0,1fr));
+                    gap: 16px;
+                    margin-top: 30px;
+                }
+
+                .somnium-options button {
+                    min-height: 125px;
+                }
+
+                .somnium-options small {
+                    display: block;
+                    margin-top: 12px;
+                    color: #b5c5d3;
+                }
+
+                #somnium-hud {
+                    position: absolute;
+                    top: 18px;
+                    right: 18px;
+                    display: none;
+                    gap: 8px;
+                    pointer-events: auto;
+                }
+
+                @media(max-width:520px) {
+                    .somnium-options {
+                        grid-template-columns: 1fr;
+                    }
+                }
+            </style>
+
+            <div id="somnium-menu" class="somnium-overlay">
+                <div class="somnium-panel">
+                    <h1 style="font-size:64px;letter-spacing:12px;font-weight:300">
+                        SOMNIUM
+                    </h1>
+
+                    <p style="color:#9aabbc;letter-spacing:3px">
+                        CHOOSE YOUR PERSPECTIVE
+                    </p>
+
+                    <div class="somnium-options">
+                        <button id="somnium-play-character">
+                            <strong>THIRD-PERSON</strong>
+                            <small>Explore as a character</small>
+                        </button>
+
+		<button id="somnium-play-dnd">
+		    <strong>D&amp;D MODE</strong>
+		    <small>Build tactical battlefields and play encounters</small>
+		</button>
+
+                        <button id="somnium-play-flight">
+                            <strong>FLIGHT SIMULATOR</strong>
+                            <small>Explore freely from above</small>
+                        </button>
+
+                        <button id="somnium-play-editor">
+                            <strong>BUILDING EDITOR</strong>
+                            <small>Design and position architecture</small>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="somnium-pause" class="somnium-overlay">
+                <div class="somnium-panel">
+                    <h1>PAUSED</h1>
+                    <button id="somnium-resume">RESUME</button>
+                    <button id="somnium-return">MAIN MENU</button>
+                </div>
+            </div>
+
+            <div id="somnium-hud">
+                <button id="somnium-switch">SWITCH VIEW (V)</button>
+                <button id="somnium-pause-button">PAUSE (ESC)</button>
+            </div>
+        `;
+
+        document.body.appendChild(this.container);
+
+        this.menu = this.container.querySelector("#somnium-menu");
+        this.pausePanel = this.container.querySelector("#somnium-pause");
+        this.hud = this.container.querySelector("#somnium-hud");
+
+        this.container.querySelector(
+            "#somnium-play-character"
+        ).onclick = () => this.gameManager.startThirdPerson();
+
+        this.container.querySelector(
+            "#somnium-play-flight"
+        ).onclick = () => this.gameManager.startFlight();
+
+        this.container.querySelector(
+            "#somnium-play-editor"
+        ).onclick = () => this.gameManager.startEditor();
+
+this.container.querySelector(
+    "#somnium-play-dnd"
+).onclick = () => {
+    this.onDnD?.();
+};
+
+        this.container.querySelector(
+            "#somnium-switch"
+        ).onclick = () => this.gameManager.togglePerspective();
+
+        this.container.querySelector(
+            "#somnium-pause-button"
+        ).onclick = () => this.gameManager.pause();
+
+        this.container.querySelector(
+            "#somnium-resume"
+        ).onclick = () => this.gameManager.resume();
+
+        this.container.querySelector(
+            "#somnium-return"
+        ).onclick = () => this.gameManager.returnToMenu();
+    }
+
+    update(mode) {
+        this.menu.style.display =
+            mode === "menu" ? "flex" : "none";
+
+        this.pausePanel.style.display =
+            mode === "paused" ? "flex" : "none";
+
+        this.hud.style.display =
+            mode === "flight" || mode === "thirdPerson"
+                ? "flex"
+                : "none";
+    }
+
+    dispose() {
+        this.unsubscribe?.();
+        this.container?.remove();
+    }
+}
+
+export { MainMenu };
+
+
+========================================================================
+END OF DIRECTORY SOURCE DUMP
+Files included: 1
+Binary/unreadable files skipped: 0
+========================================================================

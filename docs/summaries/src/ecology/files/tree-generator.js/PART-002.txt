@@ -1,0 +1,141 @@
+            branchLength,
+            branchRadius,
+            0,
+            maxDepth
+        );
+
+        return this.matrices;
+    }
+
+
+    growBranch(
+        start,
+        parentDirection,
+        length,
+        radius,
+        depth,
+        maxDepth
+    ) {
+
+        if (depth >= maxDepth) {
+            return;
+        }
+
+        const s = this.species;
+        const g = this.genome;
+
+        const branchCount = Math.max(
+            1,
+            Math.round(s.branchCount * g.branchDensity)
+        );
+
+        for (let i = 0; i < branchCount; i++) {
+
+            const phi =
+                2 * Math.PI * i / branchCount;
+
+            const radial = getRadialDirection(
+                parentDirection,
+                phi
+            );
+
+            const angle =
+                s.branchAngle * g.branchAngle;
+
+            const intrinsicDirection =
+                parentDirection.scale(
+                    Math.cos(angle)
+                ).add(
+                    radial.scale(
+                        Math.sin(angle)
+                    )
+                ).normalize();
+
+            const light =
+                this.environment.sampleLight(start);
+
+            const direction = BABYLON.Vector3.Lerp(
+                intrinsicDirection,
+                light.direction,
+                s.lightSensitivity *
+                g.lightSensitivity *
+                light.intensity
+            ).normalize();
+
+this.matrices.push(
+    makeBranchMatrix(
+        start,
+        direction,
+        length,
+        radius
+    )
+);
+            const end = start.add(
+                direction.scale(length)
+            );
+
+		const ageFactor = this.currentAgeFactor;
+
+let foliageScale =
+    (0.25 + ageFactor * 0.75) *
+    this.genome.leafSize *
+    this.genome.canopyWidth;
+
+if (s.branching === "radial") {
+
+    // Oak: broad, substantial foliage clusters
+    foliageScale *= 1.5;
+
+} else if (s.branching === "whorled") {
+
+    // Pine: smaller, more compact clusters
+    foliageScale *= 1.15;
+
+}
+
+if ( depth === maxDepth - 1 ) {
+
+    this.foliage.push({
+        position: end.clone(),
+        scale: foliageScale
+    });
+
+}
+
+if (s.branching === "whorled") {
+
+    const leader = BABYLON.Vector3.Lerp(
+        parentDirection,
+        light.direction,
+        s.lightSensitivity *
+        g.lightSensitivity *
+        light.intensity
+    ).normalize();
+
+    // Keep the visual leader branch
+    this.matrices.push(
+        makeBranchMatrix(
+            end,
+            leader,
+            length * s.lengthDecay,
+            radius * s.radiusDecay
+        )
+    );
+
+    // Do not recursively grow another leader branch.
+}
+
+// Continue normal branch growth
+this.growBranch(
+    end,
+    direction,
+    length * s.lengthDecay,
+    radius * s.radiusDecay,
+    depth + 1,
+    maxDepth
+);
+        }
+    }
+
+}
+export { TreeGenerator , DirectionRotation }

@@ -1,0 +1,57 @@
+D&D Tactical Mode — Interactive Movement and Camera Stability
+
+Implementation prepared: 2026-11-06
+
+Status: Proposed targeted source modifications. Deployment: Pending. Runtime verification: Pending.
+
+Movement Interface Improvements
+
+Updated module:
+
+src/game/dnd-mode.js
+
+Prepared improvements:
+
+Pickable movement-region cells.
+Mouse-hover destination highlighting.
+Distinct blue target-cell visualization.
+Mouse-click movement confirmation.
+Normal movement and Dash coloration retained.
+Movement continues through the authoritative DnDBattle model.
+Existing character movement accounting retained.
+Tactical Camera Stability
+
+Updated module:
+
+src/game/dnd-mode.js
+
+Prepared improvement:
+
+Preserve camera position relative to its target when the battlefield grid is translated.
+Preserve viewing angle and zoom distance.
+Avoid unintended camera displacement during grid repositioning.
+Retain ordinary camera recentering during character movement.
+Architectural Preservation
+DnDBattle remains authoritative for movement resources.
+DnDMode coordinates tactical interaction.
+Babylon.js remains responsible for rendering and picking.
+SpatialTransform remains responsible for world-to-render conversion.
+Terrain remains authoritative for elevation.
+Existing character and battle persistence remain unchanged.
+Outstanding Verification
+Verify movement overlays render correctly.
+Verify mouse picking identifies the intended destination.
+Verify blue highlighting follows the cursor.
+Verify movement limits and Dash accounting.
+Verify movement selection cancellation.
+Verify grid repositioning preserves camera distance.
+Verify camera zoom remains functional.
+Verify rendering and resource cleanup.
+Verify no regressions in character selection or initiative.
+Deployment Status
+
+Targeted source changes prepared for manual integration.
+
+Deployment and runtime verification pending.
+
+Do not mark this milestone as deployed or verified until tested in the running Babylon.js application.

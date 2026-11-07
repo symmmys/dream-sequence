@@ -1,0 +1,81 @@
+SOMNIUM — DIRECTORY SUMMARY
+================================================================
+
+Directory: src/buildings/
+Generated: 2026-11-07T06:14:04
+
+PURPOSE
+----------------------------------------------------------------
+Automatically generated source inventory.
+See individual modules for detailed responsibilities.
+
+SOURCE FILES (DIRECT CHILDREN)
+----------------------------------------------------------------
+- building-generator.js
+  Exports: BuildingGenerator
+- building-model.js
+  Exports: BuildingModel, createId
+- building-renderer.js
+  Exports: BuildingRenderer
+- building-system.js
+  Exports: BuildingSystem
+
+DIRECT DEPENDENCIES
+----------------------------------------------------------------
+- src/rendering/thin-instance-renderer.js
+
+DEPENDENTS
+----------------------------------------------------------------
+- src/scene/create-scene.js
+
+INDIVIDUAL SOURCE FILE MANIFEST
+----------------------------------------------------------------
+
+Documentation root: docs/summaries/src/buildings/files/
+Maximum chunk size: 300 lines
+Text files documented: 4
+Binary/unreadable files skipped: 0
+
+Each source file has its own documentation directory.
+INDEX.txt identifies the original file and maps every
+numbered part to its exact original source line range.
+
+SOURCE: src/buildings/building-generator.js
+  Lines: 347
+  Parts: 2
+  Index: docs/summaries/src/buildings/files/building-generator.js/INDEX.txt
+    docs/summaries/src/buildings/files/building-generator.js/PART-001.txt
+    docs/summaries/src/buildings/files/building-generator.js/PART-002.txt
+
+SOURCE: src/buildings/building-model.js
+  Lines: 206
+  Parts: 1
+  Index: docs/summaries/src/buildings/files/building-model.js/INDEX.txt
+    docs/summaries/src/buildings/files/building-model.js/PART-001.txt
+
+SOURCE: src/buildings/building-renderer.js
+  Lines: 277
+  Parts: 1
+  Index: docs/summaries/src/buildings/files/building-renderer.js/INDEX.txt
+    docs/summaries/src/buildings/files/building-renderer.js/PART-001.txt
+
+SOURCE: src/buildings/building-system.js
+  Lines: 201
+  Parts: 1
+  Index: docs/summaries/src/buildings/files/building-system.js/INDEX.txt
+    docs/summaries/src/buildings/files/building-system.js/PART-001.txt
+
+RECURSIVE SOURCE DUMP
+----------------------------------------------------------------
+- SOURCE.txt contains recursively collected text files.
+- Individual files are available under files/.
+- Individual PART files contain at most 300 lines.
+- Binary files are excluded from both representations.
+
+NOTES
+----------------------------------------------------------------
+- Dependencies are extracted from relative JavaScript imports.
+- External packages and browser globals are not represented.
+- Dynamic imports using computed paths may not be detected.
+- This inventory does not establish runtime initialization order.
+- Generated documentation is not authoritative application state.

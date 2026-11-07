@@ -1,0 +1,300 @@
+        );
+        this.completeCharacterMovement();
+    }
+
+    validateMovementRequest(character, row, col) {
+        if (!this.activeBattle?.active) {
+            throw new Error("Start a battle first.");
+        }
+        this.activeBattle.assertActiveCharacter(character);
+        this.validateMovementCoordinates(row, col);
+    }
+
+    validateMovementCoordinates(row, col) {
+        const valid = Number.isInteger(row) &&
+            Number.isInteger(col) &&
+            row >= 0 && col >= 0 &&
+            this.isValidGridCoordinate(row, col);
+        if (!valid) throw new Error("Invalid grid coordinates.");
+    }
+
+    createMovementDestination(character, row, col, movementType) {
+        const position = this.samplePosition(row, col);
+        position.altitude = this.getCharacterAltitude(character);
+        const distance = this.getMovementDistance(character, row, col);
+        this.consumeDashWhenRequired(character, distance, movementType);
+        return { position, distance };
+    }
+
+    completeCharacterMovement() {
+        this.syncAllCharacters();
+        this.centerCameraOnActiveCharacter();
+        this.saveBattle();
+        this.refreshMovementPreview();
+        this.refreshUI();
+    }
+
+    getMovementDistance(character, row, col) {
+        const rowDistance = Math.abs(row - character.position.row);
+        const columnDistance = Math.abs(col - character.position.col);
+        return (rowDistance + columnDistance) * this.cellSize;
+    }
+
+    consumeDashWhenRequired(character, distance, movementType = null) {
+        const resources = this.activeBattle.currentResources;
+        const baseRemaining = character.movement - resources.movementUsed;
+        const selectedDashRegion = movementType === "dash";
+        if (
+            (!selectedDashRegion && distance <= baseRemaining) ||
+            resources.dashUsed
+        ) return;
+        this.validateDashAvailability(character, distance, resources);
+        this.activeBattle.useAction(character, { description: "Dash" });
+    }
+
+    validateDashAvailability(character, distance, resources) {
+        if (resources.actionUsed) {
+            throw new Error("Dash requires an unused action.");
+        }
+        const dashAllowance = character.movement * 2 - resources.movementUsed;
+        if (distance > dashAllowance) {
+            throw new Error("Movement exceeds the Dash allowance.");
+        }
+    }
+
+    getActiveCharacter() {
+        if (!this.activeBattle?.active) return null;
+
+        return this.characters.get(
+            this.activeBattle.activeCharacterId
+        ) || null;
+    }
+
+    
+    setMovementPreview(enabled) {
+        this.movementPreview = Boolean(enabled);
+
+        if (this.movementPreview) {
+            this.refreshMovementPreview();
+        } else {
+            this.clearMovementMeshes();
+        }
+    }
+
+
+    refreshMovementPreview() {
+        this.clearMovementMeshes();
+        if (!this.movementPreview) return;
+
+        const character = this.getActiveCharacter();
+        if (!character || !this.activeBattle?.active) return;
+
+        const resources = this.activeBattle.currentResources;
+        if (!resources) return;
+
+        this.createMovementPreview(character, resources);
+    }
+
+    createMovementPreview(character, resources) {
+        const range = this.getMovementPreviewRange(character, resources);
+        for (let row = 0; row < this.gridRows; row++) {
+            this.createMovementPreviewRow(row, character, range);
+        }
+    }
+
+    getMovementPreviewRange(character, resources) {
+        const normalRemaining = this.getNormalMovementRemaining(character, resources);
+        const mayUseDash = this.canExtendMovement(resources);
+        const totalRemaining = this.getTotalMovementRemaining(
+            character,
+            resources,
+            mayUseDash
+        );
+        return this.createMovementPreviewRange(
+            normalRemaining,
+            totalRemaining,
+            mayUseDash
+        );
+    }
+
+    getNormalMovementRemaining(character, resources) {
+        return Math.max(0, character.movement - resources.movementUsed);
+    }
+
+    canExtendMovement(resources) {
+        return resources.dashUsed || !resources.actionUsed;
+    }
+
+    getTotalMovementRemaining(character, resources, mayUseDash) {
+        const multiplier = mayUseDash ? 2 : 1;
+        return Math.max(
+            0,
+            character.movement * multiplier - resources.movementUsed
+        );
+    }
+
+    createMovementPreviewRange(normalRemaining, totalRemaining, mayUseDash) {
+        return {
+            normalCells: Math.floor(normalRemaining / this.cellSize),
+            extendedCells: Math.floor(totalRemaining / this.cellSize),
+            mayUseDash
+        };
+    }
+
+    createMovementPreviewRow(row, character, range) {
+        for (let col = 0; col < this.gridColumns; col++) {
+            this.createMovementPreviewCell(row, col, character, range);
+        }
+    }
+
+    createMovementPreviewCell(row, col, character, range) {
+        if (!this.isValidGridCoordinate(row, col)) return;
+        const distance = this.getMovementDistance(character, row, col);
+        const type = this.getMovementCellType(distance, range);
+        if (type) this.createMovementCell(row, col, type);
+    }
+
+    getMovementCellType(distance, range) {
+        if (distance === 0) return null;
+        if (distance <= range.normalCells * this.cellSize) {
+            return "movement";
+        }
+        if (
+            range.mayUseDash &&
+            distance <= range.extendedCells * this.cellSize
+        ) {
+            return "dash";
+        }
+        return null;
+    }
+
+    createMovementCell(row, col, type) {
+        if (
+            row < 0 ||
+            col < 0 ||
+            !this.isValidGridCoordinate(row, col)
+        ) {
+            return;
+        }
+
+        const mesh = this.createProjectedCellMesh({
+            name: `dnd-movement-${row}-${col}`,
+            row,
+            col,
+            material: this.movementMaterials[type],
+            verticalOffset: 0.8,
+            pickable: true,
+            metadata: {
+                dndMovementCell: {
+                    row,
+                    col,
+                    type
+                }
+            }
+        });
+
+        if (!mesh) return;
+
+        this.movementMeshes.push(mesh);
+    }
+
+    setTargetMovementCell(cell) {
+        if (
+            cell &&
+            this.hoveredMovementCell &&
+            this.hoveredMovementCell.row === cell.row &&
+            this.hoveredMovementCell.col === cell.col
+        ) {
+            return;
+        }
+
+        this.hoveredMovementCell = cell
+            ? { ...cell }
+            : null;
+
+        this.targetMovementMesh?.dispose();
+        this.targetMovementMesh = null;
+
+        if (!cell || !this.movementPreview) return;
+
+        if (
+            cell.row < 0 ||
+            cell.col < 0 ||
+            !this.isValidGridCoordinate(cell.row, cell.col)
+        ) {
+            return;
+        }
+
+        this.targetMovementMesh = this.createProjectedCellMesh({
+            name: "dnd-movement-target",
+            row: cell.row,
+            col: cell.col,
+            material: this.targetMovementMaterial,
+            verticalOffset: 1.0,
+            pickable: false,
+            metadata: {
+                dndMovementTarget: true,
+                row: cell.row,
+                col: cell.col
+            }
+        });
+    }
+
+    clearMovementMeshes() {
+        this.setTargetMovementCell(null);
+
+        for (const mesh of this.movementMeshes) {
+            mesh.dispose();
+        }
+
+        this.movementMeshes = [];
+    }
+
+    performAction(character, description = "") {
+        if (!this.activeBattle?.active) {
+            throw new Error("Start a battle first.");
+        }
+
+        const event = this.activeBattle.useAction(
+            character,
+            { description }
+        );
+
+        this.saveBattle();
+        this.refreshMovementPreview();
+        this.refreshUI();
+
+        return event;
+    }
+
+    performBonusAction(character, description = "") {
+        if (!this.activeBattle?.active) {
+            throw new Error("Start a battle first.");
+        }
+
+        const event = this.activeBattle.useBonusAction(
+            character,
+            { description }
+        );
+
+        this.saveBattle();
+        this.refreshUI();
+
+        return event;
+    }
+
+    speakAsCharacter(character, text) {
+        if (!this.activeBattle?.active) {
+            throw new Error("Start a battle first.");
+        }
+
+        const event = this.activeBattle.speak(
+            character,
+            text
+        );
+
+        this.saveBattle();
+        this.refreshUI();
+
+        return event;
+    }

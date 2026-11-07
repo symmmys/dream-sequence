@@ -1,0 +1,300 @@
+
+        for (const id of ["floor-width", "floor-depth"]) {
+            element(id).onchange = () => {
+                this.updateFloorPlanPosition({
+                    width: Number(element("floor-width").value),
+                    depth: Number(element("floor-depth").value)
+                });
+            };
+        }
+
+const updatePlacement = () => {
+    if (!this.activeBuilding) return;
+
+    this.placement.update({
+        x: Number(element("position-x").value),
+        z: Number(element("position-z").value),
+        y: Number(element("position-y").value),
+        rotation:
+            Number(element("position-rotation").value) *
+            Math.PI / 180
+    });
+
+    this.updateFloorPlanPosition();
+
+    if (
+        this.activeBuilding.metadata?.editorPreview
+    ) {
+        this.previewRenderer.show(
+            this.activeBuilding
+        );
+    }
+};
+        for (const id of [
+            "position-x",
+            "position-z",
+            "position-y",
+            "position-rotation"
+        ]) {
+            element(id).onchange = updatePlacement;
+        }
+
+        element("building-close").onclick = () => this.close();
+
+        this.launcher = document.createElement("button");
+        this.launcher.textContent = "BUILD";
+
+        Object.assign(this.launcher.style, {
+            position: "fixed",
+            top: "18px",
+            left: "18px",
+            zIndex: "1601",
+            padding: "12px 20px",
+            cursor: "pointer"
+        });
+
+        this.launcher.onclick = () => this.open();
+        document.body.appendChild(this.launcher);
+    }
+
+    setStatus(message) {
+        this.status.textContent = message;
+    }
+
+    setMode(mode) {
+        this.mode = mode;
+        this.startPoint = null;
+        this.setStatus(`Active tool: ${mode}`);
+    }
+
+    open() {
+        this.container.style.display = "block";
+        this.enabled = true;
+        this.gameManager?.startEditor();
+
+        if (this.activeBuilding) {
+            this.editorCamera.focus(this.activeBuilding.position);
+        }
+    }
+
+    close() {
+        this.container.style.display = "none";
+        this.enabled = false;
+        this.startPoint = null;
+        this.gameManager?.exitEditor();
+    }
+
+    snap(value) {
+        return Math.round(value / this.gridSize) *
+            this.gridSize;
+    }
+
+    pickWorldPosition() {
+        const pick = this.scene.pick(
+            this.scene.pointerX,
+            this.scene.pointerY,
+            mesh => mesh.isPickable &&
+                mesh.metadata?.terrainChunk === true
+        );
+
+        if (!pick?.hit || !pick.pickedPoint) return null;
+
+        return this.transform.renderToWorld({
+            x: pick.pickedPoint.x,
+            y: pick.pickedPoint.y,
+            z: pick.pickedPoint.z
+        });
+    }
+
+    pointerDown() {
+	    if (
+    this.mode === "floor-plan" ||
+    this.mode !== "room"
+) {
+    return;
+}
+        const point = this.pickWorldPosition();
+
+        if (this.mode !== "room") return;
+
+        if (!point) {
+            this.setStatus("Cannot pick terrain.");
+            return;
+        }
+
+        this.startPoint = point;
+        this.setStatus("Drag to define the room footprint.");
+    }
+
+    pointerUp() {
+	if (this.mode === "floor-plan") {
+    return;
+}
+        const point = this.pickWorldPosition();
+
+        if (!point) {
+            if (this.startPoint) {
+                this.startPoint = null;
+                this.setStatus("No surface detected.");
+            }
+            return;
+        }
+
+        if (this.mode === "room") {
+            if (!this.startPoint) return;
+
+            const start = this.startPoint;
+            this.startPoint = null;
+
+            try {
+                this.createRoomFromPoints(start, point);
+            } catch (error) {
+                console.error("[BuildingEditor]", error);
+                this.setStatus(error.message);
+            }
+
+            return;
+        }
+
+        if (this.mode === "door" || this.mode === "window") {
+            this.placeOpening(this.mode, point);
+        }
+
+        if (this.mode === "furniture") {
+            this.placeFurniture(point);
+        }
+    }
+
+
+createRoomFromPoints(a, b) {
+    const minX = this.snap(Math.min(a.x, b.x));
+    const maxX = this.snap(Math.max(a.x, b.x));
+    const minZ = this.snap(Math.min(a.z, b.z));
+    const maxZ = this.snap(Math.max(a.z, b.z));
+
+    if (
+        maxX - minX < this.gridSize ||
+        maxZ - minZ < this.gridSize
+    ) {
+        this.setStatus("Room is too small.");
+        return;
+    }
+
+    // -----------------------------------------
+    // VALIDATE ACTIVE BUILDING REGISTRATION
+    // -----------------------------------------
+
+    let building = this.activeBuilding;
+
+    if (building) {
+        const registered = this.system.getBuilding(
+            building.id
+        );
+
+        if (registered) {
+            // Adopt the authoritative registered instance.
+            building = registered;
+            this.activeBuilding = registered;
+        } else {
+            // The building was removed, possibly by
+            // restoring another world.
+            console.warn(
+                "[BuildingEditor] Active building is no longer registered.",
+                building.id
+            );
+
+            this.activeBuilding = null;
+            this.selectedRoom = null;
+
+            this.placement.select(null);
+
+            building = null;
+        }
+    }
+
+    // -----------------------------------------
+    // CREATE BUILDING IF NECESSARY
+    // -----------------------------------------
+
+    if (!building) {
+        building = this.system.createBuilding({
+            name: "My Building",
+            position: {
+                x: minX,
+                y: a.y,
+                z: minZ
+            }
+        });
+
+        this.activeBuilding = building;
+
+        this.placement.select(building);
+        this.syncPositionInputs();
+    }
+
+    // -----------------------------------------
+    // CREATE ROOM
+    // -----------------------------------------
+
+    // Final registration invariant.
+    if (
+        this.system.getBuilding(building.id) !== building
+    ) {
+        throw new Error(
+            "Building registration mismatch."
+        );
+    }
+
+    const room = this.system.createRoom(
+        building.id,
+        {
+            name: `Room ${building.rooms.length + 1}`,
+
+            minX: minX - building.position.x,
+            maxX: maxX - building.position.x,
+
+            minZ: minZ - building.position.z,
+            maxZ: maxZ - building.position.z
+        }
+    );
+
+    this.selectedRoom = room;
+
+    this.updateFloorPlanPosition();
+
+    this.setStatus(
+        `Created ${room.name}: ` +
+        `${maxX - minX} × ${maxZ - minZ}`
+    );
+}
+
+    placeOpening(type, point) {
+        if (!this.activeBuilding || !this.selectedRoom) {
+            this.setStatus("Create a room first.");
+            return;
+        }
+
+        const building = this.activeBuilding;
+        const bounds = this.selectedRoom.bounds;
+
+        const x = point.x - building.position.x;
+        const z = point.z - building.position.z;
+
+        const distances = [
+            { side: "north", distance: Math.abs(z - bounds.minZ),
+                offset: (x - bounds.minX) /
+                    (bounds.maxX - bounds.minX) },
+            { side: "south", distance: Math.abs(z - bounds.maxZ),
+                offset: (x - bounds.minX) /
+                    (bounds.maxX - bounds.minX) },
+            { side: "west", distance: Math.abs(x - bounds.minX),
+                offset: (z - bounds.minZ) /
+                    (bounds.maxZ - bounds.minZ) },
+            { side: "east", distance: Math.abs(x - bounds.maxX),
+                offset: (z - bounds.minZ) /
+                    (bounds.maxZ - bounds.minZ) }
+        ];
+
+        distances.sort((a, b) => a.distance - b.distance);
+
+        const nearest = distances[0];

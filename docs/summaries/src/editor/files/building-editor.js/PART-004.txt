@@ -1,0 +1,56 @@
+        );
+        return false;
+    }
+
+    // Commit the preview.
+    this.previewRenderer.commit(building);
+
+    building.metadata.editorPreview = false;
+
+    this.system.refresh();
+
+    // Release the current building selection.
+    this.activeBuilding = null;
+    this.selectedRoom = null;
+    this.startPoint = null;
+
+    this.placement.select(null);
+
+    // Reset construction controls.
+    this.placeButton.disabled = true;
+
+    // Keep the previous image available as a reference,
+    // but require an explicit new build operation.
+    this.setStatus(
+        "Building placed successfully. " +
+        "Import another floor plan to construct the next building."
+    );
+
+    return true;
+}
+
+
+
+resetAfterWorldLoad() {
+    this.activeBuilding = null;
+    this.selectedRoom = null;
+    this.startPoint = null;
+
+    this.placement.select(null);
+
+    if (this.placeButton) {
+        this.placeButton.disabled = true;
+    }
+
+    this.previewRenderer?.clear?.();
+
+    this.setStatus(
+        "World loaded. Select a construction tool to begin."
+    );
+}
+
+
+}
+
+export { BuildingEditor };
+

@@ -1,0 +1,233 @@
+            successful++;
+        }
+
+        return successful;
+    }
+
+
+advance(deltaYears) {
+
+	   // Advance water and atmospheric systems.
+
+    this.waterSystem.update(deltaYears);
+
+    this.hydrology.update(deltaYears);
+
+    this.cloudSystem.update(deltaYears);
+
+
+	// Advance geological processes.
+	this.geology.advance(deltaYears);
+
+    const initialTreeCount = this.trees.length;
+
+    // Rebuild environmental canopy information
+    this.environment.rebuildCanopyGrid(
+        this.trees
+    );
+
+    for (
+        let i = 0;
+        i < initialTreeCount;
+        i++
+    ) {
+
+        const tree = this.trees[i];
+
+        if (!tree.alive) continue;
+
+        const wasAlive = tree.alive;
+
+tree.update(
+    deltaYears,
+    this.environment,
+    this.hydrology
+);
+        if (!tree.alive && wasAlive) {
+
+            this.renderDirty = true;
+
+        }
+
+        if (tree.alive && tree.isMature) {
+
+            const offspring =
+                this.spawnOffspring(tree);
+
+            if (offspring > 0) {
+                this.renderDirty = true;
+            }
+
+        }
+
+    }
+
+    this.simulationSteps++;
+
+    if (
+        this.renderDirty ||
+        this.simulationSteps >= this.renderEverySteps
+    ) {
+
+        this.renderAll();
+
+        this.renderDirty = false;
+
+        this.simulationSteps = 0;
+
+    }
+
+}
+
+
+updateRendering() {
+
+    if (!this.renderDirty) return;
+
+    this.renderAll();
+
+    this.renderDirty = false;
+}
+
+renderAll() {
+
+    this.renderers.oak.matrices = [];
+    this.renderers.pine.matrices = [];
+
+    this.foliageRenderers.oak.matrices = [];
+    this.foliageRenderers.pine.matrices = [];
+
+	
+const camera = this.scene.activeCamera;
+
+const cameraPosition = camera
+    ? camera.globalPosition
+    : BABYLON.Vector3.Zero();
+
+const maxRenderDistance = 250;
+
+const nearDistance = 80;
+const mediumDistance = 180;
+
+const maxRenderDistanceSquared =
+    maxRenderDistance * maxRenderDistance;
+
+const nearDistanceSquared =
+    nearDistance * nearDistance;
+
+const mediumDistanceSquared =
+    mediumDistance * mediumDistance;
+
+for (const tree of this.trees) {
+
+    if (!tree.alive) continue;
+
+    const dx =
+        tree.position.x - cameraPosition.x;
+
+    const dz =
+        tree.position.z - cameraPosition.z;
+
+    const distanceSquared =
+        dx * dx + dz * dz;
+
+    // Cull distant trees
+    if (
+        distanceSquared >
+        maxRenderDistanceSquared
+    ) {
+        continue;
+    }
+
+    // Determine geometry detail
+    let detailLevel;
+
+    if (distanceSquared < nearDistanceSquared) {
+
+        detailLevel = 2;
+
+    } else if (
+        distanceSquared < mediumDistanceSquared
+    ) {
+
+        detailLevel = 1;
+
+    } else {
+
+        detailLevel = 0;
+
+    }
+
+    const generator = new TreeGenerator(
+        tree.species,
+        this.environment,
+        tree.genome
+    );
+
+    const branches = generator.generate(
+        tree.position,
+        tree.ageFactor,
+        tree.thicknessFactor,
+        detailLevel
+    );
+
+    this.renderers[tree.speciesName]
+        .addMatrices(branches);
+
+    const foliage = generator.foliage;
+
+    const renderer =
+        this.foliageRenderers[tree.speciesName];
+
+    for (const cluster of foliage) {
+
+        let scale = cluster.scale;
+
+        if (tree.speciesName === "oak") {
+
+            scale *= 1.5;
+
+        } else {
+
+            scale *= 1.15;
+
+        }
+
+        renderer.add(
+            cluster.position,
+            scale
+        );
+
+    }
+
+}
+
+
+    // Upload branch buffers
+    this.renderers.oak.update();
+    this.renderers.pine.update();
+
+    // Upload foliage buffers
+    this.foliageRenderers.oak.update();
+    this.foliageRenderers.pine.update();
+
+
+	// Update geological formations.
+this.rockRenderer.update();
+// Update atmospheric rendering.
+
+this.cloudSystem.updateRendering();
+}
+
+
+generateWorldObjects(cloudCount = 35) {
+
+    this.cloudSystem.generate(cloudCount);
+
+}
+
+
+
+
+}
+export { Forest }

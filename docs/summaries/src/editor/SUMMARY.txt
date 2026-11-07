@@ -1,0 +1,109 @@
+SOMNIUM — DIRECTORY SUMMARY
+================================================================
+
+Directory: src/editor/
+Generated: 2026-11-07T06:14:04
+
+PURPOSE
+----------------------------------------------------------------
+Automatically generated source inventory.
+See individual modules for detailed responsibilities.
+
+SOURCE FILES (DIRECT CHILDREN)
+----------------------------------------------------------------
+- building-editor.js
+  Exports: BuildingEditor
+- building-placement.js
+  Exports: BuildingPlacement
+- building-preview-renderer.js
+  Exports: BuildingPreviewRenderer
+- editor-camera.js
+  Exports: EditorCamera
+- floor-plan-builder.js
+  Exports: FloorPlanBuilder
+- floor-plan-height-control.js
+  Exports: FloorPlanHeightControl
+- floor-plan-reference.js
+  Exports: FloorPlanReference
+
+DIRECT DEPENDENCIES
+----------------------------------------------------------------
+(No external local-directory imports detected.)
+
+DEPENDENTS
+----------------------------------------------------------------
+- src/scene/create-scene.js
+
+INDIVIDUAL SOURCE FILE MANIFEST
+----------------------------------------------------------------
+
+Documentation root: docs/summaries/src/editor/files/
+Maximum chunk size: 300 lines
+Text files documented: 7
+Binary/unreadable files skipped: 0
+
+Each source file has its own documentation directory.
+INDEX.txt identifies the original file and maps every
+numbered part to its exact original source line range.
+
+SOURCE: src/editor/building-editor.js
+  Lines: 956
+  Parts: 4
+  Index: docs/summaries/src/editor/files/building-editor.js/INDEX.txt
+    docs/summaries/src/editor/files/building-editor.js/PART-001.txt
+    docs/summaries/src/editor/files/building-editor.js/PART-002.txt
+    docs/summaries/src/editor/files/building-editor.js/PART-003.txt
+    docs/summaries/src/editor/files/building-editor.js/PART-004.txt
+
+SOURCE: src/editor/building-placement.js
+  Lines: 73
+  Parts: 1
+  Index: docs/summaries/src/editor/files/building-placement.js/INDEX.txt
+    docs/summaries/src/editor/files/building-placement.js/PART-001.txt
+
+SOURCE: src/editor/building-preview-renderer.js
+  Lines: 170
+  Parts: 1
+  Index: docs/summaries/src/editor/files/building-preview-renderer.js/INDEX.txt
+    docs/summaries/src/editor/files/building-preview-renderer.js/PART-001.txt
+
+SOURCE: src/editor/editor-camera.js
+  Lines: 65
+  Parts: 1
+  Index: docs/summaries/src/editor/files/editor-camera.js/INDEX.txt
+    docs/summaries/src/editor/files/editor-camera.js/PART-001.txt
+
+SOURCE: src/editor/floor-plan-builder.js
+  Lines: 372
+  Parts: 2
+  Index: docs/summaries/src/editor/files/floor-plan-builder.js/INDEX.txt
+    docs/summaries/src/editor/files/floor-plan-builder.js/PART-001.txt
+    docs/summaries/src/editor/files/floor-plan-builder.js/PART-002.txt
+
+SOURCE: src/editor/floor-plan-height-control.js
+  Lines: 195
+  Parts: 1
+  Index: docs/summaries/src/editor/files/floor-plan-height-control.js/INDEX.txt
+    docs/summaries/src/editor/files/floor-plan-height-control.js/PART-001.txt
+
+SOURCE: src/editor/floor-plan-reference.js
+  Lines: 425
+  Parts: 2
+  Index: docs/summaries/src/editor/files/floor-plan-reference.js/INDEX.txt
+    docs/summaries/src/editor/files/floor-plan-reference.js/PART-001.txt
+    docs/summaries/src/editor/files/floor-plan-reference.js/PART-002.txt
+
+RECURSIVE SOURCE DUMP
+----------------------------------------------------------------
+- SOURCE.txt contains recursively collected text files.
+- Individual files are available under files/.
+- Individual PART files contain at most 300 lines.
+- Binary files are excluded from both representations.
+
+NOTES
+----------------------------------------------------------------
+- Dependencies are extracted from relative JavaScript imports.
+- External packages and browser globals are not represented.
+- Dynamic imports using computed paths may not be detected.
+- This inventory does not establish runtime initialization order.
+- Generated documentation is not authoritative application state.

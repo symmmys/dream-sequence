@@ -1,0 +1,43 @@
+    distance(a, b) {
+
+        if (this.geometryName === "euclidean") {
+            return this.euclidean.distance(a, b);
+        }
+
+        const pointA =
+            this.projection.worldToBall(a);
+
+        const pointB =
+            this.projection.worldToBall(b);
+
+        return this.metric.distance(
+            pointA,
+            pointB
+        );
+    }
+
+    // -----------------------------------------
+    // DIAGNOSTICS
+    // -----------------------------------------
+
+    getInfo() {
+
+        return {
+            geometry: this.geometryName,
+
+            enabled: this.enabled,
+
+            renderScale: this.renderScale,
+
+            projection:
+                this.projection.getInfo(),
+
+            metric:
+                this.metric.getInfo()
+        };
+    }
+
+}
+
+export { SpatialTransform };
+

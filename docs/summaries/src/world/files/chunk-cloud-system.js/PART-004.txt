@@ -1,0 +1,100 @@
+
+        if (this.rainSystem) {
+            this.rainSystem.stop();
+        }
+
+        if (this.renderer) {
+            this.renderer.mesh.dispose(
+                false,
+                true
+            );
+        }
+
+        this.records.clear();
+        this.activeChunks.clear();
+
+        this.rainingCloud = null;
+
+        this.visibleCloudCount = 0;
+        this.totalGeneratedClouds = 0;
+        this.totalGeneratedStorms = 0;
+
+        console.log(
+            "[ChunkCloudSystem] Disposed."
+        );
+    }
+
+
+sampleWind(position, time) {
+    const x = position.x;
+    const z = position.z;
+
+    // Large-scale atmospheric circulation.
+    const broad = Math.sin(
+        x * 0.000035 + z * 0.000018 + time * 0.018
+    );
+
+    const secondary = Math.cos(
+        z * 0.000045 - x * 0.000012 + time * 0.012
+    );
+
+    const direction = new BABYLON.Vector3(
+        0.75 + broad * 0.20,
+        0,
+        0.30 + secondary * 0.25
+    ).normalize();
+
+    const speed = 4 + 9 * (
+        0.5 + 0.5 * Math.sin(
+            x * 0.00002 + z * 0.000025 + time * 0.01
+        )
+    );
+
+    return direction.scale(speed);
+}
+
+updateCloudEnvironment(cloud, deltaSeconds) {
+    // Keep the existing moisture and precipitation simulation.
+    // These values should be sampled periodically, not every frame.
+
+    cloud.environmentSampleTimer =
+        (cloud.environmentSampleTimer || 0) + deltaSeconds;
+
+    const sampleInterval = 2.0;
+
+    if (cloud.environmentSampleTimer >= sampleInterval) {
+        cloud.environmentSampleTimer = 0;
+
+        const position = cloud.position;
+
+        // Use the existing environmental sampling functions
+        // from your original updateCloud implementation.
+        if (this.moistureField) {
+            cloud.localMoisture =
+                this.moistureField.sample(
+                    position.x,
+                    position.z
+                );
+        }
+    }
+
+    // Preserve cloud water capacity.
+    cloud.waterContent = BABYLON.Scalar.Clamp(
+        cloud.waterContent,
+        0,
+        cloud.maxWaterCapacity
+    );
+
+    // Existing precipitation lifecycle.
+    if (cloud.isRaining) {
+        cloud.rainRemaining -= deltaSeconds;
+
+        if (cloud.rainRemaining <= 0) {
+            cloud.isRaining = false;
+            cloud.rainIntensity = 0;
+            cloud.rainRemaining = 0;
+        }
+    }
+}
+
+}

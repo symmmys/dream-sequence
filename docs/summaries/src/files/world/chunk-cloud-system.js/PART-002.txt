@@ -1,0 +1,300 @@
+        this.renderDirty = true;
+
+        console.log(
+            `[ChunkCloudSystem] Generated ${clouds.length} clouds in ${key}`,
+            {
+                storms: clouds.filter(
+                    cloud => cloud.isStormCloud
+                ).length
+            }
+        );
+
+        return record;
+    }
+
+    // ------------------------------------------------
+    // CHUNK STREAMING
+    // ------------------------------------------------
+
+    updateStreaming(cameraPosition) {
+        const center =
+            this.getChunkCoordinates(cameraPosition);
+
+        const desiredChunks = new Set();
+        const candidates = [];
+
+        for (
+            let x = center.x - this.renderRadius;
+            x <= center.x + this.renderRadius;
+            x++
+        ) {
+            for (
+                let z = center.z - this.renderRadius;
+                z <= center.z + this.renderRadius;
+                z++
+            ) {
+                const dx = x - center.x;
+                const dz = z - center.z;
+
+                if (
+                    dx * dx + dz * dz >
+                    this.renderRadius * this.renderRadius
+                ) {
+                    continue;
+                }
+
+                const minX = x * this.chunkSize;
+                const minZ = z * this.chunkSize;
+
+                const maxX = minX + this.chunkSize;
+                const maxZ = minZ + this.chunkSize;
+
+                if (
+                    maxX <= this.terrain.min.x ||
+                    minX >= this.terrain.max.x ||
+                    maxZ <= this.terrain.min.z ||
+                    minZ >= this.terrain.max.z
+                ) {
+                    continue;
+                }
+
+                const key = this.getChunkKey(x, z);
+
+                desiredChunks.add(key);
+
+                if (!this.records.has(key)) {
+                    candidates.push({
+                        x,
+                        z,
+                        distance: dx * dx + dz * dz
+                    });
+                }
+            }
+        }
+
+        candidates.sort(
+            (a, b) => a.distance - b.distance
+        );
+
+        let generated = 0;
+
+        for (const candidate of candidates) {
+            if (
+                generated >= this.maxChunksPerUpdate
+            ) {
+                break;
+            }
+
+            this.generateChunk(
+                candidate.x,
+                candidate.z
+            );
+
+            generated++;
+        }
+
+        const nextActive = new Set();
+
+        for (const key of desiredChunks) {
+            if (this.records.has(key)) {
+                nextActive.add(key);
+            }
+        }
+
+        const changed =
+            nextActive.size !== this.activeChunks.size ||
+            [...nextActive].some(
+                key => !this.activeChunks.has(key)
+            );
+
+        if (changed) {
+            this.activeChunks = nextActive;
+            this.renderDirty = true;
+        }
+    }
+
+	    // ------------------------------------------------
+    // ATMOSPHERIC MOISTURE
+    // ------------------------------------------------
+
+    getLocalMoisture(cloud) {
+        if (
+            !this.hydrology ||
+            typeof this.hydrology.sampleMoisture !== "function"
+        ) {
+            return 0.35;
+        }
+
+        return BABYLON.Scalar.Clamp(
+            this.hydrology.sampleMoisture(
+                cloud.position
+            ),
+            0,
+            1
+        );
+    }
+
+    getEvaporationPotential(cloud) {
+        if (
+            !this.waterSystem ||
+            typeof this.waterSystem.getEvaporationPotential !== "function"
+        ) {
+            return 0.2;
+        }
+
+        return BABYLON.Scalar.Clamp(
+            this.waterSystem.getEvaporationPotential(
+                cloud.position
+            ),
+            0,
+            1
+        );
+    }
+
+    // ------------------------------------------------
+    // CLOUD SIMULATION
+    // ------------------------------------------------
+
+updateCloud(cloud, deltaSeconds) {
+    cloud.position.addInPlace(
+        cloud.velocity.scale(deltaSeconds * 0.5)
+    );
+
+    // Environmental sampling is more expensive than
+    // the simple cloud-water simulation.
+    // Refresh it once per second instead of every tick.
+
+    cloud.environmentSampleTimer =
+        (cloud.environmentSampleTimer ?? 0) -
+        deltaSeconds;
+
+    if (cloud.environmentSampleTimer <= 0) {
+        cloud.localMoisture =
+            this.getLocalMoisture(cloud);
+
+        cloud.evaporationPotential =
+            this.getEvaporationPotential(cloud);
+
+        cloud.environmentSampleTimer = 1.0;
+    }
+
+    const moistureAvailability =
+        BABYLON.Scalar.Clamp(
+            cloud.localMoisture * 0.65 +
+            cloud.evaporationPotential * 0.35,
+            0,
+            1
+        );
+
+    if (!cloud.isRaining) {
+        cloud.waterContent +=
+            cloud.absorptionRate *
+            moistureAvailability *
+            deltaSeconds *
+            0.05;
+    }
+
+    cloud.waterContent = BABYLON.Scalar.Clamp(
+        cloud.waterContent,
+        0,
+        cloud.maxWaterCapacity
+    );
+
+    const moistureRatio = cloud.moistureRatio;
+
+    if (
+        !cloud.isRaining &&
+        moistureRatio >= 0.95
+    ) {
+        this.startRain(cloud);
+    }
+
+    if (cloud.isRaining) {
+        cloud.rainRemaining -= deltaSeconds;
+
+        if (cloud.rainRemaining <= 0) {
+            cloud.isRaining = false;
+            cloud.rainIntensity = 0;
+            cloud.rainRemaining = 0;
+            this.renderDirty = true;
+        }
+    }
+
+    const previous = cloud.moistureAtLastRender;
+
+    if (
+        previous < 0 ||
+        Math.abs(moistureRatio - previous) >= 0.08
+    ) {
+        this.renderDirty = true;
+    }
+}
+    // ------------------------------------------------
+    // PRECIPITATION
+    // ------------------------------------------------
+
+    startRain(cloud) {
+        cloud.isRaining = true;
+
+        cloud.rainRemaining =
+            cloud.rainDuration;
+
+        const moistureRatio =
+            cloud.moistureRatio;
+
+        const stormMultiplier =
+            cloud.isStormCloud ? 2.0 : 1.0;
+
+        cloud.rainIntensity =
+            (0.5 + moistureRatio * 1.5) *
+            stormMultiplier;
+
+        const releasedWater =
+            cloud.maxWaterCapacity * 0.45;
+
+        cloud.waterContent = Math.max(
+            0,
+            cloud.waterContent - releasedWater
+        );
+
+        if (
+            this.hydrology &&
+            typeof this.hydrology.addRain === "function"
+        ) {
+            const rainfallAmount =
+                0.25 * cloud.rainIntensity;
+
+            const rainfallRadius =
+                cloud.scale *
+                (cloud.isStormCloud ? 5 : 4);
+
+            this.hydrology.addRain(
+                cloud.position,
+                rainfallRadius,
+                rainfallAmount
+            );
+        }
+
+        this.renderDirty = true;
+
+        console.log(
+            "[ChunkCloudSystem] Precipitation initiated:",
+            {
+                species: cloud.speciesName,
+                position: cloud.position.asArray(),
+                moistureRatio,
+                intensity: cloud.rainIntensity
+            }
+        );
+    }
+
+
+updateSimulation(deltaSeconds) {
+    let strongestRainCloud = null;
+
+    // Only update currently active chunks.
+    for (const key of this.activeChunks) {
+        const record = this.records.get(key);
+
+        if (!record) continue;
+

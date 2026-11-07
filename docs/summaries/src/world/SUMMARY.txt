@@ -1,0 +1,275 @@
+SOMNIUM — DIRECTORY SUMMARY
+================================================================
+
+Directory: src/world/
+Generated: 2026-11-07T06:14:05
+
+PURPOSE
+----------------------------------------------------------------
+Automatically generated source inventory.
+See individual modules for detailed responsibilities.
+
+SOURCE FILES (DIRECT CHILDREN)
+----------------------------------------------------------------
+- chunk-cloud-system.js
+  Exports: ChunkCloudSystem
+- chunk-ecology-system.js
+  Exports: ChunkEcologySystem
+- chunk-geology-system.js
+  Exports: ChunkGeologySystem
+- chunk-population-manager.js
+  Exports: ChunkPopulationManager
+- terrain-mesh-worker.js
+- world-chunk.js
+  Exports: WorldChunk
+- world-manager.js
+  Exports: WorldManager
+
+DIRECT DEPENDENCIES
+----------------------------------------------------------------
+- src/atmosphere/cloud-generator.js
+- src/atmosphere/cloud-species.js
+- src/atmosphere/cloud.js
+- src/core/genetics.js
+- src/core/random.js
+- src/core/species.js
+- src/ecology/tree.js
+- src/environment/environment.js
+- src/geology/geological-field.js
+- src/geology/rock-generator.js
+- src/geology/rock-species.js
+- src/rendering/cloud-renderer.js
+- src/rendering/thin-instance-renderer.js
+- src/rendering/tree-renderers.js
+
+DEPENDENTS
+----------------------------------------------------------------
+- src/scene/create-scene.js
+
+INDIVIDUAL SOURCE FILE MANIFEST
+----------------------------------------------------------------
+
+Documentation root: docs/summaries/src/world/files/
+Maximum chunk size: 300 lines
+Text files documented: 31
+Binary/unreadable files skipped: 0
+
+Each source file has its own documentation directory.
+INDEX.txt identifies the original file and maps every
+numbered part to its exact original source line range.
+
+SOURCE: src/world/chunk-cloud-system.js
+  Lines: 1000
+  Parts: 4
+  Index: docs/summaries/src/world/files/chunk-cloud-system.js/INDEX.txt
+    docs/summaries/src/world/files/chunk-cloud-system.js/PART-001.txt
+    docs/summaries/src/world/files/chunk-cloud-system.js/PART-002.txt
+    docs/summaries/src/world/files/chunk-cloud-system.js/PART-003.txt
+    docs/summaries/src/world/files/chunk-cloud-system.js/PART-004.txt
+
+SOURCE: src/world/chunk-ecology-system.js
+  Lines: 546
+  Parts: 2
+  Index: docs/summaries/src/world/files/chunk-ecology-system.js/INDEX.txt
+    docs/summaries/src/world/files/chunk-ecology-system.js/PART-001.txt
+    docs/summaries/src/world/files/chunk-ecology-system.js/PART-002.txt
+
+SOURCE: src/world/chunk-geology-system.js
+  Lines: 395
+  Parts: 2
+  Index: docs/summaries/src/world/files/chunk-geology-system.js/INDEX.txt
+    docs/summaries/src/world/files/chunk-geology-system.js/PART-001.txt
+    docs/summaries/src/world/files/chunk-geology-system.js/PART-002.txt
+
+SOURCE: src/world/chunk-population-manager.js
+  Lines: 380
+  Parts: 2
+  Index: docs/summaries/src/world/files/chunk-population-manager.js/INDEX.txt
+    docs/summaries/src/world/files/chunk-population-manager.js/PART-001.txt
+    docs/summaries/src/world/files/chunk-population-manager.js/PART-002.txt
+
+SOURCE: src/world/fields/field-registry.js
+  Lines: 65
+  Parts: 1
+  Index: docs/summaries/src/world/files/fields/field-registry.js/INDEX.txt
+    docs/summaries/src/world/files/fields/field-registry.js/PART-001.txt
+
+SOURCE: src/world/fields/field-sampler.js
+  Lines: 40
+  Parts: 1
+  Index: docs/summaries/src/world/files/fields/field-sampler.js/INDEX.txt
+    docs/summaries/src/world/files/fields/field-sampler.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/euclidean-geometry.js
+  Lines: 34
+  Parts: 1
+  Index: docs/summaries/src/world/files/fields/geometry/euclidean-geometry.js/INDEX.txt
+    docs/summaries/src/world/files/fields/geometry/euclidean-geometry.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/geodesic-solver.js
+  Lines: 134
+  Parts: 1
+  Index: docs/summaries/src/world/files/fields/geometry/geodesic-solver.js/INDEX.txt
+    docs/summaries/src/world/files/fields/geometry/geodesic-solver.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/geometry-model.js
+  Lines: 29
+  Parts: 1
+  Index: docs/summaries/src/world/files/fields/geometry/geometry-model.js/INDEX.txt
+    docs/summaries/src/world/files/fields/geometry/geometry-model.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/geometry-renderer.js
+  Lines: 474
+  Parts: 2
+  Index: docs/summaries/src/world/files/fields/geometry/geometry-renderer.js/INDEX.txt
+    docs/summaries/src/world/files/fields/geometry/geometry-renderer.js/PART-001.txt
+    docs/summaries/src/world/files/fields/geometry/geometry-renderer.js/PART-002.txt
+
+SOURCE: src/world/fields/geometry/geometry-shader-manager.js
+  Lines: 454
+  Parts: 2
+  Index: docs/summaries/src/world/files/fields/geometry/geometry-shader-manager.js/INDEX.txt
+    docs/summaries/src/world/files/fields/geometry/geometry-shader-manager.js/PART-001.txt
+    docs/summaries/src/world/files/fields/geometry/geometry-shader-manager.js/PART-002.txt
+
+SOURCE: src/world/fields/geometry/hyperbolic-camera-controller.js
+  Lines: 265
+  Parts: 1
+  Index: docs/summaries/src/world/files/fields/geometry/hyperbolic-camera-controller.js/INDEX.txt
+    docs/summaries/src/world/files/fields/geometry/hyperbolic-camera-controller.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/poincare-geometry.js
+  Lines: 128
+  Parts: 1
+  Index: docs/summaries/src/world/files/fields/geometry/poincare-geometry.js/INDEX.txt
+    docs/summaries/src/world/files/fields/geometry/poincare-geometry.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/poincare-metric.js
+  Lines: 379
+  Parts: 2
+  Index: docs/summaries/src/world/files/fields/geometry/poincare-metric.js/INDEX.txt
+    docs/summaries/src/world/files/fields/geometry/poincare-metric.js/PART-001.txt
+    docs/summaries/src/world/files/fields/geometry/poincare-metric.js/PART-002.txt
+
+SOURCE: src/world/fields/geometry/poincare-projection.js
+  Lines: 313
+  Parts: 2
+  Index: docs/summaries/src/world/files/fields/geometry/poincare-projection.js/INDEX.txt
+    docs/summaries/src/world/files/fields/geometry/poincare-projection.js/PART-001.txt
+    docs/summaries/src/world/files/fields/geometry/poincare-projection.js/PART-002.txt
+
+SOURCE: src/world/fields/geometry/spatial-transform.js
+  Lines: 343
+  Parts: 2
+  Index: docs/summaries/src/world/files/fields/geometry/spatial-transform.js/INDEX.txt
+    docs/summaries/src/world/files/fields/geometry/spatial-transform.js/PART-001.txt
+    docs/summaries/src/world/files/fields/geometry/spatial-transform.js/PART-002.txt
+
+SOURCE: src/world/fields/material-field.js
+  Lines: 151
+  Parts: 1
+  Index: docs/summaries/src/world/files/fields/material-field.js/INDEX.txt
+    docs/summaries/src/world/files/fields/material-field.js/PART-001.txt
+
+SOURCE: src/world/fields/metric-tensor.js
+  Lines: 177
+  Parts: 1
+  Index: docs/summaries/src/world/files/fields/metric-tensor.js/INDEX.txt
+    docs/summaries/src/world/files/fields/metric-tensor.js/PART-001.txt
+
+SOURCE: src/world/fields/physical-properties.js
+  Lines: 59
+  Parts: 1
+  Index: docs/summaries/src/world/files/fields/physical-properties.js/INDEX.txt
+    docs/summaries/src/world/files/fields/physical-properties.js/PART-001.txt
+
+SOURCE: src/world/fields/spacetime-field.js
+  Lines: 84
+  Parts: 1
+  Index: docs/summaries/src/world/files/fields/spacetime-field.js/INDEX.txt
+    docs/summaries/src/world/files/fields/spacetime-field.js/PART-001.txt
+
+SOURCE: src/world/fields/spatial-lattice.js
+  Lines: 207
+  Parts: 1
+  Index: docs/summaries/src/world/files/fields/spatial-lattice.js/INDEX.txt
+    docs/summaries/src/world/files/fields/spatial-lattice.js/PART-001.txt
+
+SOURCE: src/world/fields/temperature-field.js
+  Lines: 67
+  Parts: 1
+  Index: docs/summaries/src/world/files/fields/temperature-field.js/INDEX.txt
+    docs/summaries/src/world/files/fields/temperature-field.js/PART-001.txt
+
+SOURCE: src/world/fields/world-field-system.js
+  Lines: 220
+  Parts: 1
+  Index: docs/summaries/src/world/files/fields/world-field-system.js/INDEX.txt
+    docs/summaries/src/world/files/fields/world-field-system.js/PART-001.txt
+
+SOURCE: src/world/fields/world-field.js
+  Lines: 41
+  Parts: 1
+  Index: docs/summaries/src/world/files/fields/world-field.js/INDEX.txt
+    docs/summaries/src/world/files/fields/world-field.js/PART-001.txt
+
+SOURCE: src/world/persistence/world-library-ui.js
+  Lines: 305
+  Parts: 2
+  Index: docs/summaries/src/world/files/persistence/world-library-ui.js/INDEX.txt
+    docs/summaries/src/world/files/persistence/world-library-ui.js/PART-001.txt
+    docs/summaries/src/world/files/persistence/world-library-ui.js/PART-002.txt
+
+SOURCE: src/world/persistence/world-persistence.js
+  Lines: 245
+  Parts: 1
+  Index: docs/summaries/src/world/files/persistence/world-persistence.js/INDEX.txt
+    docs/summaries/src/world/files/persistence/world-persistence.js/PART-001.txt
+
+SOURCE: src/world/persistence/world-session.js
+  Lines: 92
+  Parts: 1
+  Index: docs/summaries/src/world/files/persistence/world-session.js/INDEX.txt
+    docs/summaries/src/world/files/persistence/world-session.js/PART-001.txt
+
+SOURCE: src/world/persistence/world-state.js
+  Lines: 143
+  Parts: 1
+  Index: docs/summaries/src/world/files/persistence/world-state.js/INDEX.txt
+    docs/summaries/src/world/files/persistence/world-state.js/PART-001.txt
+
+SOURCE: src/world/terrain-mesh-worker.js
+  Lines: 501
+  Parts: 2
+  Index: docs/summaries/src/world/files/terrain-mesh-worker.js/INDEX.txt
+    docs/summaries/src/world/files/terrain-mesh-worker.js/PART-001.txt
+    docs/summaries/src/world/files/terrain-mesh-worker.js/PART-002.txt
+
+SOURCE: src/world/world-chunk.js
+  Lines: 238
+  Parts: 1
+  Index: docs/summaries/src/world/files/world-chunk.js/INDEX.txt
+    docs/summaries/src/world/files/world-chunk.js/PART-001.txt
+
+SOURCE: src/world/world-manager.js
+  Lines: 649
+  Parts: 3
+  Index: docs/summaries/src/world/files/world-manager.js/INDEX.txt
+    docs/summaries/src/world/files/world-manager.js/PART-001.txt
+    docs/summaries/src/world/files/world-manager.js/PART-002.txt
+    docs/summaries/src/world/files/world-manager.js/PART-003.txt
+
+RECURSIVE SOURCE DUMP
+----------------------------------------------------------------
+- SOURCE.txt contains recursively collected text files.
+- Individual files are available under files/.
+- Individual PART files contain at most 300 lines.
+- Binary files are excluded from both representations.
+
+NOTES
+----------------------------------------------------------------
+- Dependencies are extracted from relative JavaScript imports.
+- External packages and browser globals are not represented.
+- Dynamic imports using computed paths may not be detected.
+- This inventory does not establish runtime initialization order.
+- Generated documentation is not authoritative application state.

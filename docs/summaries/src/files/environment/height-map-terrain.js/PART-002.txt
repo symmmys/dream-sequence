@@ -1,0 +1,77 @@
+        let minimum = Infinity;
+        let maximum = -Infinity;
+        let sum = 0;
+        let count = 0;
+
+        const samples = [];
+
+        for (let z = 0; z <= gridSize; z++) {
+            for (let x = 0; x <= gridSize; x++) {
+                const wx = this.min.x +
+                    (x / gridSize) * this.worldSize;
+
+                const wz = this.min.z +
+                    (z / gridSize) * this.worldSize;
+
+                const height = this.sampleHeight(wx, wz);
+
+                minimum = Math.min(minimum, height);
+                maximum = Math.max(maximum, height);
+
+                sum += height;
+                count++;
+
+                if (
+                    x === 0 ||
+                    x === Math.floor(gridSize / 2) ||
+                    x === gridSize
+                ) {
+                    if (
+                        z === 0 ||
+                        z === Math.floor(gridSize / 2) ||
+                        z === gridSize
+                    ) {
+                        samples.push({
+                            x: wx,
+                            z: wz,
+                            height
+                        });
+                    }
+                }
+            }
+        }
+
+        return {
+            ready: true,
+
+            imageWidth: this.width,
+            imageHeight: this.height,
+
+            worldSize: this.worldSize,
+
+            heightChannel: this.heightChannel,
+
+            configuredHeightRange: {
+                min: this.minHeight,
+                max: this.maxHeight
+            },
+
+            sampledHeightRange: {
+                min: minimum,
+                max: maximum,
+                variation: maximum - minimum
+            },
+
+            averageHeight: sum / count,
+
+            sampleCount: count,
+            samples
+        };
+    }
+
+    dispose() {
+        this.pixels = null;
+        this.ready = false;
+    }
+}
+

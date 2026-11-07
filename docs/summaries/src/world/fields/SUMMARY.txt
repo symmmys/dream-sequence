@@ -1,0 +1,199 @@
+SOMNIUM — DIRECTORY SUMMARY
+================================================================
+
+Directory: src/world/fields/
+Generated: 2026-11-07T06:14:05
+
+PURPOSE
+----------------------------------------------------------------
+Automatically generated source inventory.
+See individual modules for detailed responsibilities.
+
+SOURCE FILES (DIRECT CHILDREN)
+----------------------------------------------------------------
+- field-registry.js
+  Exports: FieldRegistry
+- field-sampler.js
+  Exports: FieldSampler
+- material-field.js
+  Exports: MaterialField
+- metric-tensor.js
+  Exports: MetricTensor
+- physical-properties.js
+  Exports: PhysicalProperties
+- spacetime-field.js
+  Exports: SpacetimeField
+- spatial-lattice.js
+  Exports: SpatialLattice
+- temperature-field.js
+  Exports: TemperatureField
+- world-field-system.js
+  Exports: WorldFieldSystem
+- world-field.js
+  Exports: WorldField
+
+DIRECT DEPENDENCIES
+----------------------------------------------------------------
+- src/world/fields/geometry/euclidean-geometry.js
+- src/world/fields/geometry/geodesic-solver.js
+- src/world/fields/geometry/poincare-geometry.js
+
+DEPENDENTS
+----------------------------------------------------------------
+- src/ecology/forest.js
+- src/world/fields/geometry/euclidean-geometry.js
+- src/world/fields/geometry/poincare-geometry.js
+- src/world/fields/geometry/poincare-metric.js
+- src/world/fields/geometry/spatial-transform.js
+
+INDIVIDUAL SOURCE FILE MANIFEST
+----------------------------------------------------------------
+
+Documentation root: docs/summaries/src/world/fields/files/
+Maximum chunk size: 300 lines
+Text files documented: 20
+Binary/unreadable files skipped: 0
+
+Each source file has its own documentation directory.
+INDEX.txt identifies the original file and maps every
+numbered part to its exact original source line range.
+
+SOURCE: src/world/fields/field-registry.js
+  Lines: 65
+  Parts: 1
+  Index: docs/summaries/src/world/fields/files/field-registry.js/INDEX.txt
+    docs/summaries/src/world/fields/files/field-registry.js/PART-001.txt
+
+SOURCE: src/world/fields/field-sampler.js
+  Lines: 40
+  Parts: 1
+  Index: docs/summaries/src/world/fields/files/field-sampler.js/INDEX.txt
+    docs/summaries/src/world/fields/files/field-sampler.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/euclidean-geometry.js
+  Lines: 34
+  Parts: 1
+  Index: docs/summaries/src/world/fields/files/geometry/euclidean-geometry.js/INDEX.txt
+    docs/summaries/src/world/fields/files/geometry/euclidean-geometry.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/geodesic-solver.js
+  Lines: 134
+  Parts: 1
+  Index: docs/summaries/src/world/fields/files/geometry/geodesic-solver.js/INDEX.txt
+    docs/summaries/src/world/fields/files/geometry/geodesic-solver.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/geometry-model.js
+  Lines: 29
+  Parts: 1
+  Index: docs/summaries/src/world/fields/files/geometry/geometry-model.js/INDEX.txt
+    docs/summaries/src/world/fields/files/geometry/geometry-model.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/geometry-renderer.js
+  Lines: 474
+  Parts: 2
+  Index: docs/summaries/src/world/fields/files/geometry/geometry-renderer.js/INDEX.txt
+    docs/summaries/src/world/fields/files/geometry/geometry-renderer.js/PART-001.txt
+    docs/summaries/src/world/fields/files/geometry/geometry-renderer.js/PART-002.txt
+
+SOURCE: src/world/fields/geometry/geometry-shader-manager.js
+  Lines: 454
+  Parts: 2
+  Index: docs/summaries/src/world/fields/files/geometry/geometry-shader-manager.js/INDEX.txt
+    docs/summaries/src/world/fields/files/geometry/geometry-shader-manager.js/PART-001.txt
+    docs/summaries/src/world/fields/files/geometry/geometry-shader-manager.js/PART-002.txt
+
+SOURCE: src/world/fields/geometry/hyperbolic-camera-controller.js
+  Lines: 265
+  Parts: 1
+  Index: docs/summaries/src/world/fields/files/geometry/hyperbolic-camera-controller.js/INDEX.txt
+    docs/summaries/src/world/fields/files/geometry/hyperbolic-camera-controller.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/poincare-geometry.js
+  Lines: 128
+  Parts: 1
+  Index: docs/summaries/src/world/fields/files/geometry/poincare-geometry.js/INDEX.txt
+    docs/summaries/src/world/fields/files/geometry/poincare-geometry.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/poincare-metric.js
+  Lines: 379
+  Parts: 2
+  Index: docs/summaries/src/world/fields/files/geometry/poincare-metric.js/INDEX.txt
+    docs/summaries/src/world/fields/files/geometry/poincare-metric.js/PART-001.txt
+    docs/summaries/src/world/fields/files/geometry/poincare-metric.js/PART-002.txt
+
+SOURCE: src/world/fields/geometry/poincare-projection.js
+  Lines: 313
+  Parts: 2
+  Index: docs/summaries/src/world/fields/files/geometry/poincare-projection.js/INDEX.txt
+    docs/summaries/src/world/fields/files/geometry/poincare-projection.js/PART-001.txt
+    docs/summaries/src/world/fields/files/geometry/poincare-projection.js/PART-002.txt
+
+SOURCE: src/world/fields/geometry/spatial-transform.js
+  Lines: 343
+  Parts: 2
+  Index: docs/summaries/src/world/fields/files/geometry/spatial-transform.js/INDEX.txt
+    docs/summaries/src/world/fields/files/geometry/spatial-transform.js/PART-001.txt
+    docs/summaries/src/world/fields/files/geometry/spatial-transform.js/PART-002.txt
+
+SOURCE: src/world/fields/material-field.js
+  Lines: 151
+  Parts: 1
+  Index: docs/summaries/src/world/fields/files/material-field.js/INDEX.txt
+    docs/summaries/src/world/fields/files/material-field.js/PART-001.txt
+
+SOURCE: src/world/fields/metric-tensor.js
+  Lines: 177
+  Parts: 1
+  Index: docs/summaries/src/world/fields/files/metric-tensor.js/INDEX.txt
+    docs/summaries/src/world/fields/files/metric-tensor.js/PART-001.txt
+
+SOURCE: src/world/fields/physical-properties.js
+  Lines: 59
+  Parts: 1
+  Index: docs/summaries/src/world/fields/files/physical-properties.js/INDEX.txt
+    docs/summaries/src/world/fields/files/physical-properties.js/PART-001.txt
+
+SOURCE: src/world/fields/spacetime-field.js
+  Lines: 84
+  Parts: 1
+  Index: docs/summaries/src/world/fields/files/spacetime-field.js/INDEX.txt
+    docs/summaries/src/world/fields/files/spacetime-field.js/PART-001.txt
+
+SOURCE: src/world/fields/spatial-lattice.js
+  Lines: 207
+  Parts: 1
+  Index: docs/summaries/src/world/fields/files/spatial-lattice.js/INDEX.txt
+    docs/summaries/src/world/fields/files/spatial-lattice.js/PART-001.txt
+
+SOURCE: src/world/fields/temperature-field.js
+  Lines: 67
+  Parts: 1
+  Index: docs/summaries/src/world/fields/files/temperature-field.js/INDEX.txt
+    docs/summaries/src/world/fields/files/temperature-field.js/PART-001.txt
+
+SOURCE: src/world/fields/world-field-system.js
+  Lines: 220
+  Parts: 1
+  Index: docs/summaries/src/world/fields/files/world-field-system.js/INDEX.txt
+    docs/summaries/src/world/fields/files/world-field-system.js/PART-001.txt
+
+SOURCE: src/world/fields/world-field.js
+  Lines: 41
+  Parts: 1
+  Index: docs/summaries/src/world/fields/files/world-field.js/INDEX.txt
+    docs/summaries/src/world/fields/files/world-field.js/PART-001.txt
+
+RECURSIVE SOURCE DUMP
+----------------------------------------------------------------
+- SOURCE.txt contains recursively collected text files.
+- Individual files are available under files/.
+- Individual PART files contain at most 300 lines.
+- Binary files are excluded from both representations.
+
+NOTES
+----------------------------------------------------------------
+- Dependencies are extracted from relative JavaScript imports.
+- External packages and browser globals are not represented.
+- Dynamic imports using computed paths may not be detected.
+- This inventory does not establish runtime initialization order.
+- Generated documentation is not authoritative application state.

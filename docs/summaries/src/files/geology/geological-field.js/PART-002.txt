@@ -1,0 +1,120 @@
+        );
+
+        const organicThickness = soilDepth *
+            (surfaceSoil === "organic" ? 0.22 : 0.06);
+
+        const topsoilThickness = soilDepth * 0.42;
+        const subsoilThickness = soilDepth * 0.34;
+        const parentThickness = soilDepth -
+            organicThickness -
+            topsoilThickness -
+            subsoilThickness;
+
+        const horizons = {
+            O: {
+                material: "organic",
+                thickness: organicThickness
+            },
+            A: {
+                material: surfaceSoil,
+                thickness: topsoilThickness
+            },
+            B: {
+                material: geologyNoise > 0.58 ? "clay" : "silt",
+                thickness: subsoilThickness
+            },
+            C: {
+                material: bedrockType,
+                thickness: parentThickness
+            }
+        };
+
+        const weathering = clamp(
+            moisture * 0.45 +
+            surfaceVariation * 0.25 +
+            (1 - bedrock.hardness) * 0.30
+        );
+
+        return {
+            position: profile.position,
+            normal: profile.normal,
+            elevation,
+            slope,
+            slopeDegrees: slope,
+
+            speciesName: exposure > 0.82
+                ? bedrockType
+                : surfaceSoil,
+
+            bedrockType,
+            surfaceSoil,
+            horizons,
+
+            soilDepth,
+            exposure,
+            weathering,
+            moisture,
+            geology: geologyNoise,
+            strata,
+            surfaceVariation,
+
+            density: surface.density,
+            hardness: surface.hardness,
+            cohesion: surface.cohesion,
+            porosity: surface.porosity,
+            moistureCapacity: surface.moistureCapacity,
+            infiltration: surface.infiltration,
+            drainage: surface.drainage,
+            fertility: surface.fertility,
+            roughness: surface.roughness,
+
+            bedrockProperties: { ...bedrock },
+            soilProperties: { ...surface },
+            material: { ...surface },
+            color: surface.color
+        };
+    }
+
+    getMaterialAt(x, z) {
+        return this.sample(x, z);
+    }
+
+    getSoilProfileAt(x, z) {
+        const sample = this.sample(x, z);
+
+        if (!sample) return null;
+
+        return {
+            horizons: sample.horizons,
+            soilDepth: sample.soilDepth,
+            surfaceSoil: sample.surfaceSoil,
+            bedrockType: sample.bedrockType,
+            fertility: sample.fertility,
+            moistureCapacity: sample.moistureCapacity,
+            infiltration: sample.infiltration,
+            drainage: sample.drainage,
+            exposure: sample.exposure
+        };
+    }
+
+    getMaterialProperties(x, z) {
+        const sample = this.sample(x, z);
+
+        if (!sample) return null;
+
+        return {
+            density: sample.density,
+            hardness: sample.hardness,
+            cohesion: sample.cohesion,
+            porosity: sample.porosity,
+            moistureCapacity: sample.moistureCapacity,
+            infiltration: sample.infiltration,
+            drainage: sample.drainage,
+            fertility: sample.fertility,
+            roughness: sample.roughness
+        };
+    }
+}
+
+export { GeologicalField, MATERIALS };
+

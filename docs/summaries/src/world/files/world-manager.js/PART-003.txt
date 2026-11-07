@@ -1,0 +1,49 @@
+
+        this.material.dispose();
+
+        this.stats.loaded = 0;
+        this.stats.pendingMeshes = 0;
+    }
+
+failWorker(reason) {
+    console.error(
+        "[WorldManager] Worker failure:",
+        reason
+    );
+
+    this.stats.workerErrors++;
+
+    if (this.workerInitTimer) {
+        clearTimeout(this.workerInitTimer);
+        this.workerInitTimer = null;
+    }
+
+    const failedTask = this.currentTask;
+    this.currentTask = null;
+
+    if (this.worker) {
+        this.worker.terminate();
+        this.worker = null;
+    }
+
+    this.workerReady = false;
+    this.workerBusy = false;
+
+    // Retry the outstanding task synchronously.
+    if (failedTask) {
+        const chunk = this.chunks.get(failedTask.key);
+
+        if (
+            chunk &&
+            !chunk.disposed &&
+            chunk.revision === failedTask.revision
+        ) {
+            this.meshQueue.unshift(failedTask);
+        }
+    }
+
+    this.stats.pendingMeshes = this.meshQueue.length;
+    this.processFallbackQueue();
+}
+}
+

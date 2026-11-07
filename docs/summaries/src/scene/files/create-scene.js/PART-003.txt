@@ -1,0 +1,139 @@
+        water.update(position, world.renderRadius);
+
+        // -------------------------------------
+        // ATMOSPHERE
+        // -------------------------------------
+
+        clouds.update(position, deltaSeconds);
+
+        // -------------------------------------
+        // HYDROLOGY
+        // -------------------------------------
+
+        const deltaYears = deltaSeconds * 0.05;
+
+        hydrology.update(deltaYears);
+        rain.update();
+
+        // -------------------------------------
+        // ECOLOGY
+        // -------------------------------------
+
+        ecologyAccumulator += deltaSeconds;
+
+        if (ecologyAccumulator >= 0.25) {
+            const elapsed = ecologyAccumulator;
+            ecologyAccumulator = 0;
+
+            ecology.update(position, elapsed);
+        }
+    });
+
+    // -----------------------------------------
+    // DIAGNOSTICS
+    // -----------------------------------------
+
+    scene.metadata = {
+        ...(scene.metadata || {}),
+
+        worldSize: terrain.worldSize,
+
+        spatialTransform,
+        geometryRenderer,
+        geometryShaderManager,
+
+        getGeometryStats: () =>
+            geometryRenderer.getStats(),
+
+	getCelestialStats: () => celestial.getStats(),
+
+        getWorldStats: () =>
+            world.getStats(),
+
+        getEcologyStats: () =>
+            ecology.getStats(),
+
+        getGeologyStats: () =>
+            geology.getStats(),
+
+        getGraphicsStats: () =>
+            graphics.getStats(),
+
+        getHeightmapStats: () =>
+            terrain.getDiagnostics(64),
+
+        getWaterStats: () =>
+            water.getStats(),
+
+        getCloudStats: () =>
+            clouds.getStats(),
+
+        getGeometryShaderStats: () =>
+            geometryShaderManager.getStats(),
+
+        getHydrologyStats: () =>
+            hydrology.getStatistics(),
+
+        getGameStats: () =>
+            gameManager.getState()
+    };
+
+    // -----------------------------------------
+    // CLEANUP
+    // -----------------------------------------
+
+    scene.onDisposeObservable.add(() => {
+        console.log("[Scene] Disposing Somnium systems.");
+
+        mainMenu.dispose();
+        gameManager.dispose();
+
+        playerController.dispose();
+        characterCameraController.dispose();
+        playerCharacter.dispose();
+
+        geometryRenderer.dispose(world);
+
+        graphics.dispose();
+        ecology.dispose();
+        geology.dispose();
+        world.dispose();
+
+        terrain.dispose();
+        rain.dispose();
+        water.dispose();
+        clouds.dispose();
+
+        geometryShaderManager.dispose();
+        hyperbolicCamera.dispose();
+	celestial.dispose();
+
+
+	buildingEditor.dispose();
+	buildingSystem.dispose();
+
+
+	worldLibrary.dispose();
+	worldPersistence.close();
+    });
+
+    // -----------------------------------------
+    // INITIALIZATION COMPLETE
+    // -----------------------------------------
+
+    console.log("[Scene] Somnium initialized.");
+
+    console.log("[Scene] Configuration:", {
+        worldSize: WORLD_SIZE,
+        chunkSize: CHUNK_SIZE,
+        chunksAcross: WORLD_SIZE / CHUNK_SIZE,
+        initialPerspective: gameManager.mode,
+        treesPerChunk: ecology.treesPerChunk,
+        rocksPerChunk: geology.rocksPerChunk
+    });
+
+    return scene;
+}
+
+export default createScene;
+

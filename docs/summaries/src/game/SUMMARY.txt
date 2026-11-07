@@ -1,0 +1,131 @@
+SOMNIUM — DIRECTORY SUMMARY
+================================================================
+
+Directory: src/game/
+Generated: 2026-11-07T06:14:04
+
+PURPOSE
+----------------------------------------------------------------
+Automatically generated source inventory.
+See individual modules for detailed responsibilities.
+
+SOURCE FILES (DIRECT CHILDREN)
+----------------------------------------------------------------
+- camera-controller.js
+  Exports: CharacterCameraController
+- dnd-action-registry.js
+  Exports: DnDActionRegistry
+- dnd-battle.js
+  Exports: DnDBattle
+- dnd-character.js
+  Exports: DnDCharacter
+- dnd-mode.js
+  Exports: DnDMode
+- dnd-tactical-ui.js
+  Exports: DnDTacticalUI
+- game-manager.js
+  Exports: GameManager
+- player-character.js
+  Exports: PlayerCharacter
+- player-controller.js
+  Exports: PlayerController
+
+DIRECT DEPENDENCIES
+----------------------------------------------------------------
+(No external local-directory imports detected.)
+
+DEPENDENTS
+----------------------------------------------------------------
+- src/scene/create-scene.js
+
+INDIVIDUAL SOURCE FILE MANIFEST
+----------------------------------------------------------------
+
+Documentation root: docs/summaries/src/game/files/
+Maximum chunk size: 300 lines
+Text files documented: 9
+Binary/unreadable files skipped: 0
+
+Each source file has its own documentation directory.
+INDEX.txt identifies the original file and maps every
+numbered part to its exact original source line range.
+
+SOURCE: src/game/camera-controller.js
+  Lines: 195
+  Parts: 1
+  Index: docs/summaries/src/game/files/camera-controller.js/INDEX.txt
+    docs/summaries/src/game/files/camera-controller.js/PART-001.txt
+
+SOURCE: src/game/dnd-action-registry.js
+  Lines: 87
+  Parts: 1
+  Index: docs/summaries/src/game/files/dnd-action-registry.js/INDEX.txt
+    docs/summaries/src/game/files/dnd-action-registry.js/PART-001.txt
+
+SOURCE: src/game/dnd-battle.js
+  Lines: 347
+  Parts: 2
+  Index: docs/summaries/src/game/files/dnd-battle.js/INDEX.txt
+    docs/summaries/src/game/files/dnd-battle.js/PART-001.txt
+    docs/summaries/src/game/files/dnd-battle.js/PART-002.txt
+
+SOURCE: src/game/dnd-character.js
+  Lines: 129
+  Parts: 1
+  Index: docs/summaries/src/game/files/dnd-character.js/INDEX.txt
+    docs/summaries/src/game/files/dnd-character.js/PART-001.txt
+
+SOURCE: src/game/dnd-mode.js
+  Lines: 2113
+  Parts: 8
+  Index: docs/summaries/src/game/files/dnd-mode.js/INDEX.txt
+    docs/summaries/src/game/files/dnd-mode.js/PART-001.txt
+    docs/summaries/src/game/files/dnd-mode.js/PART-002.txt
+    docs/summaries/src/game/files/dnd-mode.js/PART-003.txt
+    docs/summaries/src/game/files/dnd-mode.js/PART-004.txt
+    docs/summaries/src/game/files/dnd-mode.js/PART-005.txt
+    docs/summaries/src/game/files/dnd-mode.js/PART-006.txt
+    docs/summaries/src/game/files/dnd-mode.js/PART-007.txt
+    docs/summaries/src/game/files/dnd-mode.js/PART-008.txt
+
+SOURCE: src/game/dnd-tactical-ui.js
+  Lines: 1145
+  Parts: 4
+  Index: docs/summaries/src/game/files/dnd-tactical-ui.js/INDEX.txt
+    docs/summaries/src/game/files/dnd-tactical-ui.js/PART-001.txt
+    docs/summaries/src/game/files/dnd-tactical-ui.js/PART-002.txt
+    docs/summaries/src/game/files/dnd-tactical-ui.js/PART-003.txt
+    docs/summaries/src/game/files/dnd-tactical-ui.js/PART-004.txt
+
+SOURCE: src/game/game-manager.js
+  Lines: 224
+  Parts: 1
+  Index: docs/summaries/src/game/files/game-manager.js/INDEX.txt
+    docs/summaries/src/game/files/game-manager.js/PART-001.txt
+
+SOURCE: src/game/player-character.js
+  Lines: 106
+  Parts: 1
+  Index: docs/summaries/src/game/files/player-character.js/INDEX.txt
+    docs/summaries/src/game/files/player-character.js/PART-001.txt
+
+SOURCE: src/game/player-controller.js
+  Lines: 189
+  Parts: 1
+  Index: docs/summaries/src/game/files/player-controller.js/INDEX.txt
+    docs/summaries/src/game/files/player-controller.js/PART-001.txt
+
+RECURSIVE SOURCE DUMP
+----------------------------------------------------------------
+- SOURCE.txt contains recursively collected text files.
+- Individual files are available under files/.
+- Individual PART files contain at most 300 lines.
+- Binary files are excluded from both representations.
+
+NOTES
+----------------------------------------------------------------
+- Dependencies are extracted from relative JavaScript imports.
+- External packages and browser globals are not represented.
+- Dynamic imports using computed paths may not be detected.
+- This inventory does not establish runtime initialization order.
+- Generated documentation is not authoritative application state.

@@ -1,0 +1,300 @@
+                        x: this.gridOrigin.x + distance,
+                        z: this.gridOrigin.z + offset
+                    };
+
+                const projected =
+                    this.projectTerrainPoint(worldPoint);
+
+                if (!projected) {
+                    points.length = 0;
+                    break;
+                }
+
+                points.push(projected);
+            }
+
+            if (points.length > 1) {
+                this.createGridLine(points);
+            }
+        }
+    }
+
+    createGridLine(points) {
+        const mesh = BABYLON.MeshBuilder.CreateLines(
+            "dndGridLine",
+            { points },
+            this.scene
+        );
+
+        mesh.color = new BABYLON.Color3(
+            0.3, 0.8, 0.95
+        );
+
+        mesh.alpha = 0.65;
+        mesh.isPickable = false;
+
+        this.gridMeshes.push(mesh);
+    }
+
+    disposeGridMeshes() {
+        for (const mesh of this.gridMeshes) {
+            mesh.dispose();
+        }
+
+        this.gridMeshes = [];
+    }
+
+    moveGrid(dx, dz) {
+        if (
+            !Number.isFinite(dx) ||
+            !Number.isFinite(dz)
+        ) return false;
+
+        return this.setGridOrigin(
+            this.gridOrigin.x + dx,
+            this.gridOrigin.z + dz
+        );
+    }
+
+    setGridOrigin(x, z) {
+        if (!this.isValidGridOrigin(x, z)) return this.rejectGridOrigin();
+        const previous = this.captureGridOriginState();
+        try {
+            this.applyGridOrigin({ x, z }, previous);
+            return true;
+        } catch (error) {
+            this.rollbackGridOrigin(previous);
+            return this.reportGridOriginError(error);
+        }
+    }
+
+    isValidGridOrigin(x, z) {
+        return Number.isSafeInteger(x) && Number.isSafeInteger(z);
+    }
+
+    rejectGridOrigin() {
+        this.showMessage("Grid coordinates must be integers.");
+        return false;
+    }
+
+    captureGridOriginState() {
+        return {
+            origin: { ...this.gridOrigin },
+            camera: this.captureCameraOrbit()
+        };
+    }
+
+    captureCameraOrbit() {
+        if (!this.camera) return null;
+        return {
+            radius: this.camera.radius,
+            alpha: this.camera.alpha,
+            beta: this.camera.beta
+        };
+    }
+
+    applyGridOrigin(origin, previous) {
+        this.validateGridOriginTerrain(origin);
+        this.gridOrigin = origin;
+        this.validateCharactersAtGridOrigin();
+        this.createGrid();
+        this.syncAllCharacters();
+        this.persistGridOrigin();
+        this.recenterCameraPreservingOrbit(previous.camera);
+        this.refreshGridDependents();
+    }
+
+    validateGridOriginTerrain(origin) {
+        const valid = this.validateTerrainCoverage(
+            this.gridRows,
+            this.gridColumns,
+            this.cellSize,
+            origin
+        );
+        if (!valid) throw new Error(
+            "The requested grid exceeds available terrain."
+        );
+    }
+
+    validateCharactersAtGridOrigin() {
+        for (const character of this.characters.values()) {
+            this.samplePosition(
+                character.position.row,
+                character.position.col
+            );
+        }
+    }
+
+    persistGridOrigin() {
+        try {
+            localStorage.setItem(
+                "somnium-dnd-grid-origin",
+                JSON.stringify(this.gridOrigin)
+            );
+        } catch (error) {
+            console.warn("[DnD] Grid origin could not be persisted.", error);
+        }
+    }
+
+    refreshGridDependents() {
+        this.refreshMovementPreview();
+        this.saveCharacters();
+        this.refreshUI();
+    }
+
+    rollbackGridOrigin(previous) {
+        this.gridOrigin = previous.origin;
+        this.createGrid();
+        this.syncAllCharacters();
+        this.recenterCameraPreservingOrbit(previous.camera);
+    }
+
+    recenterCameraPreservingOrbit(cameraState) {
+        if (!this.camera || !cameraState) return;
+        this.centerCameraOnActiveCharacter();
+        this.restoreCameraOrbit(cameraState);
+    }
+
+    reportGridOriginError(error) {
+        console.warn("[DnD] Grid repositioning rejected.", error);
+        this.showMessage(error.message);
+        return false;
+    }
+
+    addCharacter(name, row, col) {
+        const position = this.samplePosition(row, col);
+
+        const character = new DnDCharacter({
+            name,
+            position
+        });
+
+        this.characters.set(character.id, character);
+
+        this.createCharacterMesh(character);
+        this.syncAllCharacters();
+        this.selectCharacter(character.id);
+
+        this.saveCharacters();
+
+        return character;
+    }
+
+    createCharacterMesh(character) {
+        const meshes = this.createCharacterGeometry(character);
+        this.assignCharacterMaterials(meshes, character.id);
+        this.configureCharacterPicking(meshes, character.id);
+        this.characterMeshes.set(character.id, meshes);
+        this.syncCharacter(character);
+    }
+
+    createCharacterGeometry(character) {
+        const root = new BABYLON.TransformNode(
+            `dnd-character-${character.id}`,
+            this.scene
+        );
+        return {
+            root,
+            body: this.createCharacterBody(character.id, root),
+            head: this.createCharacterHead(character.id, root)
+        };
+    }
+
+    createCharacterBody(characterId, root) {
+        const body = BABYLON.MeshBuilder.CreateCapsule(
+            `dnd-body-${characterId}`,
+            { height: 1.8, radius: 0.35 },
+            this.scene
+        );
+        body.parent = root;
+        body.position.y = 0.9;
+        return body;
+    }
+
+    createCharacterHead(characterId, root) {
+        const head = BABYLON.MeshBuilder.CreateSphere(
+            `dnd-head-${characterId}`,
+            { diameter: 0.48 },
+            this.scene
+        );
+        head.parent = root;
+        head.position.y = 1.95;
+        return head;
+    }
+
+    assignCharacterMaterials(meshes, characterId) {
+        meshes.material = this.createCharacterMaterial(
+            `dnd-material-${characterId}`,
+            new BABYLON.Color3(0.2, 0.65, 0.9)
+        );
+        meshes.headMaterial = this.createCharacterMaterial(
+            `dnd-head-material-${characterId}`,
+            new BABYLON.Color3(0.82, 0.69, 0.55)
+        );
+        meshes.body.material = meshes.material;
+        meshes.head.material = meshes.headMaterial;
+    }
+
+    createCharacterMaterial(name, color) {
+        const material = new BABYLON.StandardMaterial(name, this.scene);
+        material.diffuseColor = color;
+        return material;
+    }
+
+    configureCharacterPicking(meshes, characterId) {
+        meshes.body.metadata = { dndCharacterId: characterId };
+        meshes.head.metadata = { dndCharacterId: characterId };
+        meshes.body.isPickable = true;
+        meshes.head.isPickable = true;
+    }
+
+    syncCharacter(character) {
+        const meshes = this.characterMeshes.get(character.id);
+        if (!meshes) return;
+
+        const layout = this.getCharacterCellLayout(character);
+        const position = this.getCharacterWorldPosition(character, layout);
+        const projected = this.transform.worldToRender(position);
+
+        this.updateCharacterPosition(character, position);
+        this.updateCharacterMeshTransform(meshes, projected, layout);
+    }
+
+    getCharacterWorldPosition(character, layout) {
+        const center = this.samplePosition(
+            character.position.row,
+            character.position.col
+        );
+        const x = center.x + layout.offsetX;
+        const z = center.z + layout.offsetZ;
+        const sample = this.terrain.sampleAt(x, z);
+        if (!sample) throw new Error("Unable to sample character terrain.");
+
+        return {
+            x,
+            y: sample.y + this.getCharacterAltitude(character),
+            z
+        };
+    }
+
+    getCharacterCellLayout(character) {
+        const occupants = this.getCellOccupants(
+            character.position.row,
+            character.position.col
+        );
+        if (occupants.length <= 1) return this.getCenteredCharacterLayout();
+
+        const index = this.getCharacterOccupancyIndex(occupants, character);
+        return this.createCharacterFormationLayout(index, occupants.length);
+    }
+
+    getCenteredCharacterLayout() {
+        return { offsetX: 0, offsetZ: 0, scale: 1 };
+    }
+
+    getCharacterOccupancyIndex(occupants, character) {
+        return Math.max(0, occupants.findIndex(
+            isMatchingCharacter.bind(null, character)
+        ));
+    }
+

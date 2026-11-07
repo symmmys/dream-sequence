@@ -1,0 +1,201 @@
+                : heightAt(
+                    originX + (edge === "east" ? size : 0),
+                    originZ + worldDistance
+                );
+        }
+
+        const coarseResolution = [32, 16, 8, 4][
+            clamp(otherLOD, 0, 3)
+        ];
+
+        const coarseStride = size / coarseResolution;
+
+        const lower =
+            Math.floor(worldDistance / coarseStride) *
+            coarseStride;
+
+        const upper = Math.min(
+            lower + coarseStride,
+            size
+        );
+
+        const t = upper === lower
+            ? 0
+            : (worldDistance - lower) / (upper - lower);
+
+        let ax, az, bx, bz;
+
+        if (edge === "north" || edge === "south") {
+            az = bz = originZ +
+                (edge === "south" ? size : 0);
+
+            ax = originX + lower;
+            bx = originX + upper;
+        } else {
+            ax = bx = originX +
+                (edge === "east" ? size : 0);
+
+            az = originZ + lower;
+            bz = originZ + upper;
+        }
+
+        return lerp(
+            heightAt(ax, az),
+            heightAt(bx, bz),
+            t
+        );
+    };
+
+    for (let iz = 0; iz <= resolution; iz++) {
+        for (let ix = 0; ix <= resolution; ix++) {
+            const worldX = originX + ix * stride;
+            const worldZ = originZ + iz * stride;
+
+            let h = heightAt(worldX, worldZ);
+
+            if (iz === 0) h = edgeHeight("north", ix);
+            if (iz === resolution) h = edgeHeight("south", ix);
+            if (ix === 0) h = edgeHeight("west", iz);
+            if (ix === resolution) h = edgeHeight("east", iz);
+
+            const spacing = Math.max(2, stride * 0.25);
+
+            const dx = (
+                heightAt(worldX + spacing, worldZ) -
+                heightAt(worldX - spacing, worldZ)
+            ) / (2 * spacing);
+
+            const dz = (
+                heightAt(worldX, worldZ + spacing) -
+                heightAt(worldX, worldZ - spacing)
+            ) / (2 * spacing);
+
+            const length = Math.hypot(dx, 1, dz);
+
+            const index = iz * (resolution + 1) + ix;
+            const offset = index * 3;
+
+            positions[offset] = worldX;
+            positions[offset + 1] = h;
+            positions[offset + 2] = worldZ;
+
+            normals[offset] = -dx / length;
+            normals[offset + 1] = 1 / length;
+            normals[offset + 2] = -dz / length;
+
+		const color = terrainColor(
+    h,
+    Math.hypot(dx, dz),
+    worldX,
+    worldZ
+);
+
+            const colorOffset = index * 4;
+
+            colors[colorOffset] = color[0];
+            colors[colorOffset + 1] = color[1];
+            colors[colorOffset + 2] = color[2];
+            colors[colorOffset + 3] = 1;
+        }
+    }
+
+    let cursor = 0;
+
+    for (let iz = 0; iz < resolution; iz++) {
+        for (let ix = 0; ix < resolution; ix++) {
+            const a = iz * (resolution + 1) + ix;
+            const b = a + 1;
+            const c = a + resolution + 1;
+            const d = c + 1;
+
+            indices[cursor++] = a;
+            indices[cursor++] = c;
+            indices[cursor++] = b;
+
+            indices[cursor++] = b;
+            indices[cursor++] = c;
+            indices[cursor++] = d;
+        }
+    }
+
+    return {
+        positions,
+        normals,
+        colors,
+        indices
+    };
+}
+
+self.onmessage = event => {
+    const message = event.data;
+
+    if (message.type === "init") {
+        terrain = {
+            ...message.terrain,
+            pixels: new Uint8ClampedArray(message.pixels)
+        };
+
+        self.postMessage({ type: "ready" });
+        return;
+    }
+
+    if (message.type === "generate" && terrain) {
+        try {
+            const data = generateMesh(message.job);
+
+            self.postMessage({
+                type: "complete",
+                id: message.id,
+                revision: message.revision,
+                data: {
+                    positions: data.positions,
+                    normals: data.normals,
+                    colors: data.colors,
+                    indices: data.indices
+                }
+            }, [
+                data.positions.buffer,
+                data.normals.buffer,
+                data.colors.buffer,
+                data.indices.buffer
+            ]);
+        } catch (error) {
+            self.postMessage({
+                type: "error",
+                id: message.id,
+                revision: message.revision,
+                message: error.message
+            });
+        }
+    }
+};
+
+function soilTypeAt(worldX, worldZ) {
+    const t = terrain;
+
+    const u = clamp(
+        (worldX - t.minX) / t.worldSize,
+        0,
+        1
+    );
+
+    const v = clamp(
+        (worldZ - t.minZ) / t.worldSize,
+        0,
+        1
+    );
+
+    const mapValue = pixelValue(
+        u * (t.width - 1),
+        v * (t.height - 1)
+    );
+
+    if (mapValue < 0.18) return "clay";
+    if (mapValue < 0.38) return "sand";
+    if (mapValue < 0.58) return "fertileSoil";
+    if (mapValue < 0.76) return "loam";
+    if (mapValue < 0.90) return "organic";
+
+    return "scree";
+}
+

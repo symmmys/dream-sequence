@@ -1,0 +1,3781 @@
+SOMNIUM — DIRECTORY SOURCE DUMP
+========================================================================
+
+Directory: src/world/fields/
+Generated: 2026-11-07T06:14:05
+
+This file contains recursively collected UTF-8 text files.
+Binary files and excluded directories are omitted.
+File paths are relative to the project root.
+
+
+========================================================================
+FILE: src/world/fields/field-registry.js
+========================================================================
+
+
+class FieldRegistry {
+
+    constructor() {
+
+        this.fields = new Map();
+
+    }
+
+    register(field) {
+
+        if (!field || !field.name || typeof field.sample !== "function") {
+
+            throw new TypeError("Invalid world field.");
+
+        }
+
+        if (this.fields.has(field.name)) {
+
+            throw new Error(
+                `Field already registered: ${field.name}`
+            );
+
+        }
+
+        this.fields.set(field.name, field);
+
+        return field;
+
+    }
+
+    unregister(name) {
+
+        return this.fields.delete(name);
+
+    }
+
+    get(name) {
+
+        return this.fields.get(name) || null;
+
+    }
+
+    has(name) {
+
+        return this.fields.has(name);
+
+    }
+
+    getAll() {
+
+        return Array.from(this.fields.values());
+
+    }
+
+    clear() {
+
+        this.fields.clear();
+
+    }
+
+}
+
+export { FieldRegistry };
+
+
+========================================================================
+FILE: src/world/fields/field-sampler.js
+========================================================================
+
+
+class FieldSampler {
+
+    constructor(registry) {
+
+        this.registry = registry;
+
+    }
+
+    sample(name, position, time = 0) {
+
+        const field = this.registry.get(name);
+
+        if (!field) return null;
+
+        return field.sample(position, time);
+
+    }
+
+    sampleAll(position, time = 0) {
+
+        const result = {};
+
+        for (const field of this.registry.getAll()) {
+
+            if (!field.enabled) continue;
+
+            result[field.name] =
+                field.sample(position, time);
+
+        }
+
+        return result;
+
+    }
+
+}
+
+export { FieldSampler };
+
+
+========================================================================
+FILE: src/world/fields/geometry/euclidean-geometry.js
+========================================================================
+
+
+import { GeometryModel } from "./geometry-model.js";
+import { MetricTensor } from "../metric-tensor.js";
+
+class EuclideanGeometry extends GeometryModel {
+
+    constructor() {
+
+        super("euclidean");
+
+        this.metric = MetricTensor.identity();
+
+    }
+
+    metricAt() {
+
+        return this.metric;
+
+    }
+
+    distance(a, b) {
+
+        return Math.hypot(
+            b.x - a.x,
+            b.y - a.y,
+            b.z - a.z
+        );
+
+    }
+
+}
+
+export { EuclideanGeometry };
+
+
+========================================================================
+FILE: src/world/fields/geometry/geodesic-solver.js
+========================================================================
+
+
+class GeodesicSolver {
+
+    constructor(geometry, options = {}) {
+
+        this.geometry = geometry;
+
+        this.iterations =
+            options.iterations ?? 80;
+
+        this.relaxation =
+            options.relaxation ?? 0.15;
+
+        this.segments =
+            options.segments ?? 24;
+
+    }
+
+    solve(start, end) {
+
+        const points = [];
+
+        for (
+            let i = 0;
+            i <= this.segments;
+            i++
+        ) {
+
+            const t = i / this.segments;
+
+            points.push({
+
+                x: start.x + (end.x - start.x) * t,
+
+                y: start.y + (end.y - start.y) * t,
+
+                z: start.z + (end.z - start.z) * t
+
+            });
+
+        }
+
+        const step = this.relaxation;
+
+        for (
+            let iteration = 0;
+            iteration < this.iterations;
+            iteration++
+        ) {
+
+            for (
+                let i = 1;
+                i < points.length - 1;
+                i++
+            ) {
+
+                const previous = points[i - 1];
+
+                const current = points[i];
+
+                const next = points[i + 1];
+
+                const midpoint = {
+
+                    x: (previous.x + next.x) * 0.5,
+
+                    y: (previous.y + next.y) * 0.5,
+
+                    z: (previous.z + next.z) * 0.5
+
+                };
+
+                const candidate = {
+
+                    x: current.x +
+                        (midpoint.x - current.x) * step,
+
+                    y: current.y +
+                        (midpoint.y - current.y) * step,
+
+                    z: current.z +
+                        (midpoint.z - current.z) * step
+
+                };
+
+                // Reject candidates outside bounded geometries.
+                if (
+                    typeof this.geometry.isInside === "function" &&
+                    !this.geometry.isInside(candidate)
+                ) {
+                    continue;
+                }
+
+                points[i] = candidate;
+
+            }
+
+        }
+
+        return {
+
+            points,
+
+            length: this.calculateLength(points)
+
+        };
+
+    }
+
+    calculateLength(points) {
+
+        let length = 0;
+
+        for (
+            let i = 0;
+            i < points.length - 1;
+            i++
+        ) {
+
+            length += this.geometry.distance(
+                points[i],
+                points[i + 1]
+            );
+
+        }
+
+        return length;
+
+    }
+
+}
+
+export { GeodesicSolver };
+
+
+========================================================================
+FILE: src/world/fields/geometry/geometry-model.js
+========================================================================
+
+
+class GeometryModel {
+
+    constructor(name) {
+
+        this.name = name;
+
+    }
+
+    metricAt() {
+
+        throw new Error(
+            "GeometryModel.metricAt() must be implemented."
+        );
+
+    }
+
+    distance(a, b) {
+
+        throw new Error(
+            "GeometryModel.distance() must be implemented."
+        );
+
+    }
+
+}
+
+export { GeometryModel };
+
+
+========================================================================
+FILE: src/world/fields/geometry/geometry-renderer.js
+========================================================================
+
+
+/**
+ * GeometryRenderer
+ *
+ * Applies spatial transformations to Babylon.js
+ * mesh geometry.
+ *
+ * Initial target:
+ * - Streamed terrain meshes.
+ *
+ * Preserves:
+ * - Original vertex positions.
+ * - Original vertex normals.
+ * - Mesh materials.
+ * - Vertex colors.
+ * - Mesh indices.
+ *
+ * Simulation coordinates remain unchanged.
+ */
+
+class GeometryRenderer {
+
+    constructor(scene, spatialTransform, options = {}) {
+
+        if (!scene || !spatialTransform) {
+            throw new Error(
+                "GeometryRenderer requires a scene and SpatialTransform."
+            );
+        }
+
+        this.scene = scene;
+        this.transform = spatialTransform;
+
+        this.enabled = options.enabled ?? true;
+
+        this.meshCache = new WeakMap();
+
+        this.statistics = {
+            transformedMeshes: 0,
+            transformedVertices: 0,
+            restoredMeshes: 0
+        };
+
+        console.log(
+            "[GeometryRenderer] Initialized:",
+            this.transform.getInfo()
+        );
+    }
+
+    // -----------------------------------------
+    // MESH TRANSFORMATION
+    // -----------------------------------------
+
+    applyMesh(mesh) {
+
+        if (!this.enabled || !mesh) {
+            return false;
+        }
+
+        if (this.transform.geometryName === "euclidean") {
+            return false;
+        }
+
+        const cached = this.meshCache.get(mesh);
+
+        if (cached) {
+            return false;
+        }
+
+        const positions =
+            mesh.getVerticesData(
+                BABYLON.VertexBuffer.PositionKind
+            );
+
+        const indices = mesh.getIndices();
+
+        if (
+            !positions ||
+            !indices ||
+            positions.length === 0
+        ) {
+            return false;
+        }
+
+        // Preserve authoritative mesh geometry.
+
+        const originalPositions =
+            new Float32Array(positions);
+
+        const originalNormals =
+            mesh.getVerticesData(
+                BABYLON.VertexBuffer.NormalKind
+            );
+
+        const cache = {
+            positions: originalPositions,
+
+            normals: originalNormals
+                ? new Float32Array(originalNormals)
+                : null
+        };
+
+        this.meshCache.set(mesh, cache);
+
+        // Transform every vertex.
+
+        const transformedPositions =
+            new Float32Array(positions.length);
+
+        for (
+            let i = 0;
+            i < positions.length;
+            i += 3
+        ) {
+
+            const projected =
+                this.transform.worldToRender({
+                    x: positions[i],
+                    y: positions[i + 1],
+                    z: positions[i + 2]
+                });
+
+            transformedPositions[i] = projected.x;
+            transformedPositions[i + 1] = projected.y;
+            transformedPositions[i + 2] = projected.z;
+        }
+
+        // Recalculate normals in the new geometry.
+
+        const transformedNormals =
+            new Float32Array(positions.length);
+
+        BABYLON.VertexData.ComputeNormals(
+            transformedPositions,
+            indices,
+            transformedNormals
+        );
+
+        mesh.setVerticesData(
+            BABYLON.VertexBuffer.PositionKind,
+            transformedPositions,
+            true,
+            3
+        );
+
+        mesh.setVerticesData(
+            BABYLON.VertexBuffer.NormalKind,
+            transformedNormals,
+            true,
+            3
+        );
+
+        mesh.refreshBoundingInfo();
+
+        mesh.computeWorldMatrix(true);
+
+        mesh.metadata = {
+            ...(mesh.metadata || {}),
+            spatialGeometry: this.transform.geometryName,
+            spatiallyTransformed: true
+        };
+
+        this.statistics.transformedMeshes++;
+
+        this.statistics.transformedVertices +=
+            positions.length / 3;
+
+        return true;
+    }
+
+    // -----------------------------------------
+    // RESTORE ORIGINAL GEOMETRY
+    // -----------------------------------------
+
+    restoreMesh(mesh) {
+
+        if (!mesh) return false;
+
+        const cache = this.meshCache.get(mesh);
+
+        if (!cache) return false;
+
+        mesh.setVerticesData(
+            BABYLON.VertexBuffer.PositionKind,
+            cache.positions,
+            true,
+            3
+        );
+
+        if (cache.normals) {
+
+            mesh.setVerticesData(
+                BABYLON.VertexBuffer.NormalKind,
+                cache.normals,
+                true,
+                3
+            );
+        }
+
+        mesh.refreshBoundingInfo();
+
+        mesh.computeWorldMatrix(true);
+
+        if (mesh.metadata) {
+
+            mesh.metadata.spatiallyTransformed = false;
+
+            delete mesh.metadata.spatialGeometry;
+        }
+
+        this.meshCache.delete(mesh);
+
+        this.statistics.restoredMeshes++;
+
+        return true;
+    }
+
+    // -----------------------------------------
+    // RESTORE ALL KNOWN CHUNKS
+    // -----------------------------------------
+
+    restoreWorld(worldManager) {
+
+        if (!worldManager) return;
+
+        for (const chunk of worldManager.chunks.values()) {
+
+            if (chunk.mesh) {
+                this.restoreMesh(chunk.mesh);
+            }
+        }
+    }
+
+    // -----------------------------------------
+    // REPROJECT ALL KNOWN CHUNKS
+    // -----------------------------------------
+
+    reprojectWorld(worldManager) {
+
+        if (!worldManager) return;
+
+        for (const chunk of worldManager.chunks.values()) {
+
+            if (!chunk.mesh) continue;
+
+            this.restoreMesh(chunk.mesh);
+
+            this.applyMesh(chunk.mesh);
+        }
+    }
+
+    // -----------------------------------------
+    // CONFIGURATION
+    // -----------------------------------------
+
+    setEnabled(enabled, worldManager = null) {
+
+        this.enabled = !!enabled;
+
+        if (!worldManager) return;
+
+        if (this.enabled) {
+            this.reprojectWorld(worldManager);
+        } else {
+            this.restoreWorld(worldManager);
+        }
+    }
+
+    // -----------------------------------------
+    // DIAGNOSTICS
+    // -----------------------------------------
+
+    getStats() {
+
+        return {
+            enabled: this.enabled,
+
+            geometry:
+                this.transform.geometryName,
+
+            ...this.statistics
+        };
+    }
+
+    // -----------------------------------------
+    // DISPOSAL
+    // -----------------------------------------
+
+    dispose(worldManager = null) {
+
+        if (worldManager) {
+            this.restoreWorld(worldManager);
+        }
+
+        this.enabled = false;
+
+        console.log(
+            "[GeometryRenderer] Disposed:",
+            this.getStats()
+        );
+    }
+	
+
+    // -----------------------------------------
+    // THIN INSTANCE TRANSFORMATION
+    // -----------------------------------------
+
+    transformInstanceMatrix(matrix) {
+
+        if (
+            !this.enabled ||
+            this.transform.geometryName === "euclidean"
+        ) {
+            return matrix;
+        }
+
+        if (
+            !matrix ||
+            !matrix.m ||
+            !Array.from(matrix.m).every(Number.isFinite)
+        ) {
+            return null;
+        }
+
+        // Extract translation directly from the matrix.
+
+        const translation = matrix.getTranslation();
+
+        if (
+            !translation ||
+            !Number.isFinite(translation.x) ||
+            !Number.isFinite(translation.y) ||
+            !Number.isFinite(translation.z)
+        ) {
+            return null;
+        }
+
+        // Reject positions outside the authoritative
+        // projection domain.
+
+        let projected;
+
+        try {
+
+            projected =
+                this.transform.worldToRender({
+                    x: translation.x,
+                    y: translation.y,
+                    z: translation.z
+                });
+
+        } catch (error) {
+
+            return null;
+        }
+
+        const scaling = new BABYLON.Vector3();
+        const rotation = new BABYLON.Quaternion();
+        const decomposedTranslation =
+            new BABYLON.Vector3();
+
+        if (
+            !matrix.decompose(
+                scaling,
+                rotation,
+                decomposedTranslation
+            )
+        ) {
+            return null;
+        }
+
+        // Validate the local transformation Jacobian.
+
+        let J;
+
+        try {
+
+            J = this.transform.getJacobian({
+                x: translation.x,
+                y: translation.y,
+                z: translation.z
+            });
+
+        } catch (error) {
+
+            return null;
+        }
+
+        if (!J.every(Number.isFinite)) {
+            return null;
+        }
+
+        // Estimate volume scaling.
+
+        const determinant =
+            J[0] * (J[4] * J[8] - J[5] * J[7]) -
+            J[1] * (J[3] * J[8] - J[5] * J[6]) +
+            J[2] * (J[3] * J[7] - J[4] * J[6]);
+
+        if (!Number.isFinite(determinant)) {
+            return null;
+        }
+
+        const scaleFactor = Math.cbrt(
+            Math.max(Math.abs(determinant), 1e-18)
+        );
+
+        const adjustedScale =
+            scaling.scale(scaleFactor);
+
+        return BABYLON.Matrix.Compose(
+            adjustedScale,
+            rotation,
+            new BABYLON.Vector3(
+                projected.x,
+                projected.y,
+                projected.z
+            )
+        );
+    }
+
+	
+    // -----------------------------------------
+    // CAMERA BOUNDARY PROTECTION
+    // -----------------------------------------
+
+    constrainCamera(camera) {
+
+        if (
+            !camera ||
+            this.transform.geometryName !== "poincare"
+        ) {
+            return;
+        }
+
+        const scale = this.transform.renderScale;
+        const radius = this.transform.projection.radius;
+
+        const x = camera.position.x / scale;
+        const y = camera.position.y / scale;
+        const z = camera.position.z / scale;
+
+        const distance = Math.hypot(x, y, z);
+
+        const maximumRadius =
+            radius * (1 - 1e-9);
+
+        if (distance >= maximumRadius) {
+
+            const factor =
+                maximumRadius / Math.max(distance, 1e-12);
+
+            camera.position.scaleInPlace(factor);
+        }
+    }
+
+    getWorldCameraPosition(camera) {
+
+        this.constrainCamera(camera);
+
+        return this.transform.renderToWorld({
+            x: camera.position.x,
+            y: camera.position.y,
+            z: camera.position.z
+        });
+    }
+
+
+
+
+}
+
+export { GeometryRenderer };
+
+
+========================================================================
+FILE: src/world/fields/geometry/geometry-shader-manager.js
+========================================================================
+
+
+/**
+ * GeometryShaderManager
+ *
+ * GPU-side spatial projection for Babylon.js.
+ *
+ * Initial implementation:
+ * - Three-dimensional Poincare projection.
+ * - Configurable curvature.
+ * - Configurable world bounds.
+ * - Basic diffuse lighting.
+ * - Independent shader material management.
+ *
+ * Initial limitation:
+ * - Ordinary meshes only.
+ * - Thin instances require a separate shader path.
+ */
+
+class GeometryShaderManager {
+
+    constructor(scene, spatialTransform, options = {}) {
+
+        if (!scene || !spatialTransform) {
+            throw new Error(
+                "GeometryShaderManager requires a scene and SpatialTransform."
+            );
+        }
+
+        this.scene = scene;
+        this.transform = spatialTransform;
+
+        this.enabled = options.enabled ?? true;
+
+        this.materials = new Set();
+        this.originalMaterials = new WeakMap();
+
+        this.renderScale =
+            options.renderScale ??
+            spatialTransform.renderScale;
+
+        this.initializeShaders();
+
+        console.log(
+            "[GeometryShaderManager] Initialized."
+        );
+    }
+
+    // -----------------------------------------
+    // SHADER REGISTRATION
+    // -----------------------------------------
+
+    initializeShaders() {
+
+        BABYLON.Effect.ShadersStore[
+            "somniumPoincareVertexShader"
+        ] = this.getVertexShader();
+
+        BABYLON.Effect.ShadersStore[
+            "somniumPoincareFragmentShader"
+        ] = this.getFragmentShader();
+    }
+
+    // -----------------------------------------
+    // VERTEX SHADER
+    // -----------------------------------------
+
+    getVertexShader() {
+
+        return `
+            precision highp float;
+
+            attribute vec3 position;
+            attribute vec3 normal;
+
+            uniform mat4 world;
+	    uniform mat4 viewProjection;
+
+            uniform vec3 worldCenter;
+            uniform vec3 worldHalfBounds;
+
+            uniform float ballRadius;
+            uniform float characteristicLength;
+            uniform float renderScale;
+            uniform float boundaryEpsilon;
+
+            varying vec3 vNormal;
+            varying vec3 vWorldPosition;
+
+            float safeTanh(float value) {
+
+                float x = clamp(value, 0.0, 20.0);
+
+                float e = exp(2.0 * x);
+
+                return (e - 1.0) / (e + 1.0);
+            }
+
+            vec3 poincareProject(vec3 worldPosition) {
+
+                vec3 delta =
+                    worldPosition - worldCenter;
+
+                float distanceFromCenter =
+                    length(delta);
+
+                if (distanceFromCenter < 0.000001) {
+                    return vec3(0.0);
+                }
+
+                vec3 direction =
+                    delta / distanceFromCenter;
+
+                vec3 safeDirection =
+                    max(abs(direction), vec3(0.000001));
+
+                vec3 boundaryDistances =
+                    worldHalfBounds / safeDirection;
+
+                float boundaryDistance =
+                    min(
+                        boundaryDistances.x,
+                        min(
+                            boundaryDistances.y,
+                            boundaryDistances.z
+                        )
+                    );
+
+                float u =
+                    distanceFromCenter /
+                    boundaryDistance;
+
+                u = clamp(
+                    u,
+                    0.0,
+                    1.0 - boundaryEpsilon
+                );
+
+                float hyperbolicDistance =
+                    characteristicLength *
+                    u / (1.0 - u);
+
+                float projectedRadius =
+                    ballRadius *
+                    safeTanh(
+                        hyperbolicDistance /
+                        (2.0 * ballRadius)
+                    );
+
+                return direction * projectedRadius;
+            }
+
+	void main(void) {
+
+    vec4 worldPosition =
+        world * vec4(position, 1.0);
+
+    vec3 projectedPosition =
+        poincareProject(worldPosition.xyz);
+
+    vWorldPosition =
+        projectedPosition * renderScale;
+
+    vNormal =
+        normalize(mat3(world) * normal);
+
+    gl_Position =
+        viewProjection *
+        vec4(vWorldPosition, 1.0);
+}
+
+        `;
+    }
+
+    // -----------------------------------------
+    // FRAGMENT SHADER
+    // -----------------------------------------
+
+    getFragmentShader() {
+
+        return `
+            precision highp float;
+
+            uniform vec4 baseColor;
+            uniform vec3 lightDirection;
+            uniform float ambientStrength;
+
+            varying vec3 vNormal;
+            varying vec3 vWorldPosition;
+
+            void main(void) {
+
+                vec3 normal =
+                    normalize(vNormal);
+
+                float diffuse =
+                    max(
+                        dot(normal, normalize(-lightDirection)),
+                        0.0
+                    );
+
+                float illumination =
+                    ambientStrength +
+                    (1.0 - ambientStrength) * diffuse;
+
+                vec3 color =
+                    baseColor.rgb * illumination;
+
+                gl_FragColor =
+                    vec4(color, baseColor.a);
+            }
+        `;
+    }
+
+    // -----------------------------------------
+    // MATERIAL CREATION
+    // -----------------------------------------
+
+    createMaterial(name, options = {}) {
+
+        const material =
+            new BABYLON.ShaderMaterial(
+                name,
+                this.scene,
+                {
+                    vertex: "somniumPoincare",
+                    fragment: "somniumPoincare"
+                },
+                {
+                    attributes: [
+                        "position",
+                        "normal"
+                    ],
+
+                    uniforms: [
+                        "world",
+                        "worldViewProjection",
+                        "worldCenter",
+                        "worldHalfBounds",
+                        "ballRadius",
+                        "characteristicLength",
+                        "renderScale",
+                        "boundaryEpsilon",
+                        "baseColor",
+                        "lightDirection",
+                        "ambientStrength"
+                    ]
+                }
+            );
+
+        const projection =
+            this.transform.projection;
+
+        const bounds = projection.bounds;
+
+        material.setVector3(
+            "worldCenter",
+            new BABYLON.Vector3(
+                projection.center.x,
+                projection.center.y,
+                projection.center.z
+            )
+        );
+
+        material.setVector3(
+            "worldHalfBounds",
+            new BABYLON.Vector3(
+                (bounds.maxX - bounds.minX) / 2,
+                (bounds.maxY - bounds.minY) / 2,
+                (bounds.maxZ - bounds.minZ) / 2
+            )
+        );
+
+        material.setFloat(
+            "ballRadius",
+            projection.radius
+        );
+
+        material.setFloat(
+            "characteristicLength",
+            projection.characteristicLength
+        );
+
+        material.setFloat(
+            "renderScale",
+            this.renderScale
+        );
+
+        material.setFloat(
+            "boundaryEpsilon",
+            projection.boundaryEpsilon
+        );
+
+        material.setColor4(
+            "baseColor",
+            options.color ??
+                new BABYLON.Color3(0.35, 0.55, 0.3),
+            options.alpha ?? 1
+        );
+
+        material.setVector3(
+            "lightDirection",
+            options.lightDirection ??
+                new BABYLON.Vector3(-0.5, -1, -0.3).normalize()
+        );
+
+        material.setFloat(
+            "ambientStrength",
+            options.ambientStrength ?? 0.3
+        );
+
+        material.backFaceCulling =
+            options.backFaceCulling ?? true;
+
+material.onBindObservable.add(mesh => {
+
+    const camera = this.scene.activeCamera;
+
+    if (!camera) return;
+
+    const world = mesh.getWorldMatrix();
+
+    const viewProjection =
+        camera.getViewMatrix().multiply(
+            camera.getProjectionMatrix()
+        );
+
+    material.setMatrix("world", world);
+
+    material.setMatrix(
+        "viewProjection",
+        viewProjection
+    );
+});
+        this.materials.add(material);
+
+        return material;
+    }
+
+    // -----------------------------------------
+    // APPLY TO MESH
+    // -----------------------------------------
+
+    apply(mesh, options = {}) {
+
+        if (!this.enabled || !mesh) {
+            return false;
+        }
+
+        if (
+            mesh.metadata?.spatiallyTransformed
+        ) {
+            throw new Error(
+                "Cannot apply GPU projection to a CPU-projected mesh."
+            );
+        }
+
+        if (
+            mesh.metadata?.geometryShaderApplied
+        ) {
+            return false;
+        }
+
+        if (!this.originalMaterials.has(mesh)) {
+
+            this.originalMaterials.set(
+                mesh,
+                mesh.material
+            );
+        }
+
+        const material =
+            this.createMaterial(
+                options.name ??
+                    `poincare-${mesh.name}`,
+                options
+            );
+
+        mesh.material = material;
+
+        mesh.metadata = {
+            ...(mesh.metadata || {}),
+            geometryShaderApplied: true
+        };
+
+        return true;
+    }
+
+    // -----------------------------------------
+    // RESTORE ORIGINAL MATERIAL
+    // -----------------------------------------
+
+    restore(mesh) {
+
+        if (!mesh) return false;
+
+        if (!this.originalMaterials.has(mesh)) {
+            return false;
+        }
+
+        mesh.material =
+            this.originalMaterials.get(mesh);
+
+        this.originalMaterials.delete(mesh);
+
+        if (mesh.metadata) {
+            delete mesh.metadata.geometryShaderApplied;
+        }
+
+        return true;
+    }
+
+    // -----------------------------------------
+    // CONFIGURATION
+    // -----------------------------------------
+
+    setEnabled(enabled) {
+
+        this.enabled = !!enabled;
+    }
+
+    // -----------------------------------------
+    // DIAGNOSTICS
+    // -----------------------------------------
+
+    getStats() {
+
+        return {
+            enabled: this.enabled,
+            geometry: this.transform.geometryName,
+            activeMaterials: this.materials.size,
+            renderScale: this.renderScale
+        };
+    }
+
+    // -----------------------------------------
+    // DISPOSAL
+    // -----------------------------------------
+
+    dispose() {
+
+        for (const material of this.materials) {
+            material.dispose();
+        }
+
+        this.materials.clear();
+
+        console.log(
+            "[GeometryShaderManager] Disposed."
+        );
+    }
+}
+
+export { GeometryShaderManager };
+
+
+========================================================================
+FILE: src/world/fields/geometry/hyperbolic-camera-controller.js
+========================================================================
+
+/**
+ * HyperbolicCameraController
+ *
+ * Converts ordinary Babylon.js camera input into
+ * hyperbolically distance-limited geodesic movement.
+ *
+ * Authoritative world coordinates remain unchanged.
+ */
+
+class HyperbolicCameraController {
+    constructor(camera, spatialTransform, options = {}) {
+        if (!camera || !spatialTransform) {
+            throw new Error(
+                "HyperbolicCameraController requires a camera and SpatialTransform."
+            );
+        }
+
+        this.camera = camera;
+        this.transform = spatialTransform;
+        this.projection = spatialTransform.projection;
+        this.metric = spatialTransform.metric;
+
+        this.enabled = options.enabled ?? true;
+
+        this.maxHyperbolicSpeed =
+            options.maxHyperbolicSpeed ?? 2.5;
+
+        this.boundaryMargin =
+            options.boundaryMargin ?? 1e-7;
+
+        this.maxDeltaSeconds =
+            options.maxDeltaSeconds ?? 0.05;
+
+        this.statistics = {
+            updates: 0,
+            geodesicMoves: 0,
+            boundaryCorrections: 0,
+            limitedMoves: 0
+        };
+
+        this.previousPosition = this.getBallPosition();
+
+        this.constrainCamera();
+
+        this.previousPosition = this.getBallPosition();
+
+        console.log(
+            "[HyperbolicCameraController] Initialized:",
+            this.getInfo()
+        );
+    }
+
+    // -----------------------------------------
+    // POSITION CONVERSION
+    // -----------------------------------------
+
+    getBallPosition() {
+        const scale = this.transform.renderScale;
+
+        return {
+            x: this.camera.position.x / scale,
+            y: this.camera.position.y / scale,
+            z: this.camera.position.z / scale
+        };
+    }
+
+    setBallPosition(position) {
+        const scale = this.transform.renderScale;
+
+        this.camera.position.set(
+            position.x * scale,
+            position.y * scale,
+            position.z * scale
+        );
+    }
+
+    // -----------------------------------------
+    // OPEN BALL PROTECTION
+    // -----------------------------------------
+
+    constrainPosition(position) {
+        const radius = this.projection.radius;
+
+        const maximumRadius =
+            radius * (1 - this.boundaryMargin);
+
+        const distance = Math.hypot(
+            position.x,
+            position.y,
+            position.z
+        );
+
+        if (distance < maximumRadius) {
+            return {
+                x: position.x,
+                y: position.y,
+                z: position.z
+            };
+        }
+
+        const factor =
+            maximumRadius / Math.max(distance, 1e-15);
+
+        this.statistics.boundaryCorrections++;
+
+        return {
+            x: position.x * factor,
+            y: position.y * factor,
+            z: position.z * factor
+        };
+    }
+
+    constrainCamera() {
+        const position = this.constrainPosition(
+            this.getBallPosition()
+        );
+
+        this.setBallPosition(position);
+
+        return position;
+    }
+
+    // -----------------------------------------
+    // GEODESIC CAMERA MOVEMENT
+    // -----------------------------------------
+
+    update(deltaSeconds) {
+        if (!this.enabled) {
+            return;
+        }
+
+        if (!Number.isFinite(deltaSeconds) ||
+            deltaSeconds <= 0) {
+            return;
+        }
+
+        const elapsed = Math.min(
+            deltaSeconds,
+            this.maxDeltaSeconds
+        );
+
+        const start = this.previousPosition;
+
+        // Babylon.js has already processed ordinary
+        // keyboard and mouse camera input.
+        const target = this.constrainPosition(
+            this.getBallPosition()
+        );
+
+        let distance;
+
+        try {
+            distance = this.metric.distance(
+                start,
+                target
+            );
+        } catch (error) {
+            this.setBallPosition(start);
+            return;
+        }
+
+        if (!Number.isFinite(distance)) {
+            this.setBallPosition(start);
+            return;
+        }
+
+        if (distance < 1e-10) {
+            this.setBallPosition(target);
+            this.previousPosition = target;
+            return;
+        }
+
+        // Limit movement by hyperbolic distance.
+        const maximumStep =
+            this.maxHyperbolicSpeed * elapsed;
+
+        const fraction = Math.min(
+            1,
+            maximumStep / distance
+        );
+
+        if (fraction < 1) {
+            this.statistics.limitedMoves++;
+        }
+
+        // Analytic Poincare geodesic interpolation.
+        const nextPosition =
+            this.metric.interpolateGeodesic(
+                start,
+                target,
+                fraction
+            );
+
+        const safePosition =
+            this.constrainPosition(nextPosition);
+
+        this.setBallPosition(safePosition);
+
+        this.previousPosition = safePosition;
+
+        this.statistics.updates++;
+        this.statistics.geodesicMoves++;
+    }
+
+    // -----------------------------------------
+    // AUTHORITATIVE WORLD POSITION
+    // -----------------------------------------
+
+    getWorldPosition() {
+        this.constrainCamera();
+
+        return this.transform.renderToWorld({
+            x: this.camera.position.x,
+            y: this.camera.position.y,
+            z: this.camera.position.z
+        });
+    }
+
+    // -----------------------------------------
+    // TELEPORT / POSITION SYNCHRONIZATION
+    // -----------------------------------------
+
+    synchronize() {
+        this.constrainCamera();
+        this.previousPosition = this.getBallPosition();
+    }
+
+    // -----------------------------------------
+    // CONFIGURATION
+    // -----------------------------------------
+
+    setEnabled(enabled) {
+        this.enabled = !!enabled;
+
+        this.synchronize();
+    }
+
+    getInfo() {
+        return {
+            enabled: this.enabled,
+            geometry: "poincare",
+            movement: "hyperbolic-geodesic",
+            maxHyperbolicSpeed: this.maxHyperbolicSpeed,
+            boundaryMargin: this.boundaryMargin,
+            boundaryReachable: false,
+            statistics: { ...this.statistics }
+        };
+    }
+
+    getStats() {
+        return this.getInfo();
+    }
+
+    // -----------------------------------------
+    // DISPOSAL
+    // -----------------------------------------
+
+    dispose() {
+        this.enabled = false;
+        this.camera = null;
+        this.previousPosition = null;
+    }
+}
+
+export { HyperbolicCameraController };
+
+
+========================================================================
+FILE: src/world/fields/geometry/poincare-geometry.js
+========================================================================
+
+
+import { GeometryModel } from "./geometry-model.js";
+import { MetricTensor } from "../metric-tensor.js";
+
+class PoincareGeometry extends GeometryModel {
+
+    constructor(curvature = -1) {
+
+        super("poincare");
+
+        if (
+            !Number.isFinite(curvature) ||
+            curvature >= 0
+        ) {
+            throw new Error(
+                "Poincare curvature must be negative."
+            );
+        }
+
+        this.curvature = curvature;
+
+        this.k = -curvature;
+
+        this.radius = 1 / Math.sqrt(this.k);
+
+    }
+
+    isInside(position) {
+
+        const radiusSquared =
+            position.x * position.x +
+            position.y * position.y +
+            position.z * position.z;
+
+        return radiusSquared <
+            this.radius * this.radius;
+
+    }
+
+    metricAt(position) {
+
+        if (!this.isInside(position)) {
+
+            throw new RangeError(
+                "Position lies outside the Poincare ball."
+            );
+
+        }
+
+        const r2 =
+            position.x * position.x +
+            position.y * position.y +
+            position.z * position.z;
+
+        const denominator =
+            1 - this.k * r2;
+
+        const factor =
+            4 / (denominator * denominator);
+
+        return new MetricTensor([
+
+            factor, 0, 0,
+
+            0, factor, 0,
+
+            0, 0, factor
+
+        ]);
+
+    }
+
+    distance(a, b) {
+
+        if (
+            !this.isInside(a) ||
+            !this.isInside(b)
+        ) {
+
+            throw new RangeError(
+                "Both positions must lie inside the Poincare ball."
+            );
+
+        }
+
+        const dot = 
+            a.x * b.x +
+            a.y * b.y +
+            a.z * b.z;
+
+        const normA =
+            a.x * a.x +
+            a.y * a.y +
+            a.z * a.z;
+
+        const normB =
+            b.x * b.x +
+            b.y * b.y +
+            b.z * b.z;
+
+        const differenceSquared =
+
+            (a.x - b.x) ** 2 +
+
+            (a.y - b.y) ** 2 +
+
+            (a.z - b.z) ** 2;
+
+        const numerator =
+            this.k * differenceSquared;
+
+        const denominator =
+            (1 - this.k * normA) *
+            (1 - this.k * normB);
+
+        const argument =
+            1 + 2 * numerator / denominator;
+
+        return Math.acosh(
+            Math.max(1, argument)
+        ) / Math.sqrt(this.k);
+
+    }
+
+}
+
+export { PoincareGeometry };
+
+
+========================================================================
+FILE: src/world/fields/geometry/poincare-metric.js
+========================================================================
+
+
+/**
+ * PoincareMetric
+ *
+ * Three-dimensional hyperbolic geometry
+ * represented using Poincare ball coordinates.
+ *
+ * Supports:
+ * - Metric tensor evaluation.
+ * - Exact hyperbolic distances.
+ * - Hyperboloid conversion.
+ * - Analytic geodesic interpolation.
+ * - Geodesic path generation.
+ */
+
+import { MetricTensor } from "../metric-tensor.js";
+
+class PoincareMetric {
+
+    constructor(curvature = -1) {
+
+        if (
+            !Number.isFinite(curvature) ||
+            curvature >= 0
+        ) {
+            throw new Error(
+                "Poincare curvature must be negative."
+            );
+        }
+
+        this.curvature = curvature;
+
+        this.k = -curvature;
+
+        this.radius = 1 / Math.sqrt(this.k);
+    }
+
+    // -----------------------------------------
+    // POSITION VALIDATION
+    // -----------------------------------------
+
+    validatePosition(position) {
+
+        if (
+            !position ||
+            !Number.isFinite(position.x) ||
+            !Number.isFinite(position.y) ||
+            !Number.isFinite(position.z)
+        ) {
+            throw new TypeError(
+                "Invalid Poincare position."
+            );
+        }
+
+        if (!this.isInside(position)) {
+            throw new RangeError(
+                "Position lies outside the open Poincare ball."
+            );
+        }
+    }
+
+    isInside(position) {
+
+        if (
+            !position ||
+            !Number.isFinite(position.x) ||
+            !Number.isFinite(position.y) ||
+            !Number.isFinite(position.z)
+        ) {
+            return false;
+        }
+
+        const radiusSquared =
+            position.x ** 2 +
+            position.y ** 2 +
+            position.z ** 2;
+
+        return radiusSquared <
+            this.radius ** 2;
+    }
+
+    // -----------------------------------------
+    // METRIC TENSOR
+    // -----------------------------------------
+
+    metricAt(position) {
+
+        this.validatePosition(position);
+
+        const radiusSquared =
+            position.x ** 2 +
+            position.y ** 2 +
+            position.z ** 2;
+
+        const denominator =
+            this.radius ** 2 - radiusSquared;
+
+        const factor =
+            4 * this.radius ** 4 /
+            (denominator ** 2);
+
+        return new MetricTensor([
+            factor, 0, 0,
+            0, factor, 0,
+            0, 0, factor
+        ]);
+    }
+
+    // -----------------------------------------
+    // HYPERBOLIC DISTANCE
+    // -----------------------------------------
+
+    distance(a, b) {
+
+        this.validatePosition(a);
+        this.validatePosition(b);
+
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        const dz = a.z - b.z;
+
+        const differenceSquared =
+            dx * dx + dy * dy + dz * dz;
+
+        const normA =
+            a.x ** 2 +
+            a.y ** 2 +
+            a.z ** 2;
+
+        const normB =
+            b.x ** 2 +
+            b.y ** 2 +
+            b.z ** 2;
+
+        const numerator =
+            this.k * differenceSquared;
+
+        const denominator =
+            (1 - this.k * normA) *
+            (1 - this.k * normB);
+
+        const argument =
+            1 + 2 * numerator / denominator;
+
+        return Math.acosh(
+            Math.max(1, argument)
+        ) / Math.sqrt(this.k);
+    }
+
+    // -----------------------------------------
+    // POINCARE TO HYPERBOLOID
+    // -----------------------------------------
+
+    toHyperboloid(position) {
+
+        this.validatePosition(position);
+
+        const R = this.radius;
+
+        const radiusSquared =
+            position.x ** 2 +
+            position.y ** 2 +
+            position.z ** 2;
+
+        const denominator =
+            R * R - radiusSquared;
+
+        const factor =
+            2 * R * R / denominator;
+
+        return {
+            w:
+                R * (R * R + radiusSquared) /
+                denominator,
+
+            x: factor * position.x,
+
+            y: factor * position.y,
+
+            z: factor * position.z
+        };
+    }
+
+    // -----------------------------------------
+    // HYPERBOLOID TO POINCARE
+    // -----------------------------------------
+
+    fromHyperboloid(position) {
+
+        const R = this.radius;
+
+        if (
+            !position ||
+            !Number.isFinite(position.w) ||
+            !Number.isFinite(position.x) ||
+            !Number.isFinite(position.y) ||
+            !Number.isFinite(position.z) ||
+            position.w <= 0
+        ) {
+            throw new TypeError(
+                "Invalid hyperboloid position."
+            );
+        }
+
+        const denominator =
+            position.w + R;
+
+        const result = {
+            x: R * position.x / denominator,
+
+            y: R * position.y / denominator,
+
+            z: R * position.z / denominator
+        };
+
+        this.validatePosition(result);
+
+        return result;
+    }
+
+    // -----------------------------------------
+    // MINKOWSKI INNER PRODUCT
+    // -----------------------------------------
+
+    minkowskiProduct(a, b) {
+
+        return (
+            -a.w * b.w +
+            a.x * b.x +
+            a.y * b.y +
+            a.z * b.z
+        );
+    }
+
+    // -----------------------------------------
+    // GEODESIC INTERPOLATION
+    // -----------------------------------------
+
+    interpolateGeodesic(a, b, t) {
+
+        this.validatePosition(a);
+        this.validatePosition(b);
+
+        if (
+            !Number.isFinite(t) ||
+            t < 0 ||
+            t > 1
+        ) {
+            throw new RangeError(
+                "Geodesic parameter must be between 0 and 1."
+            );
+        }
+
+        if (t === 0) return { ...a };
+        if (t === 1) return { ...b };
+
+        const A = this.toHyperboloid(a);
+        const B = this.toHyperboloid(b);
+
+        const R = this.radius;
+
+        const coshDistance =
+            -this.minkowskiProduct(A, B) /
+            (R * R);
+
+        const distance = Math.acosh(
+            Math.max(1, coshDistance)
+        );
+
+        // Handle nearly identical points.
+
+        if (distance < 1e-10) {
+
+            return {
+                x: a.x + (b.x - a.x) * t,
+                y: a.y + (b.y - a.y) * t,
+                z: a.z + (b.z - a.z) * t
+            };
+        }
+
+        const denominator =
+            Math.sinh(distance);
+
+        const weightA =
+            Math.sinh((1 - t) * distance) /
+            denominator;
+
+        const weightB =
+            Math.sinh(t * distance) /
+            denominator;
+
+        const point = {
+            w:
+                weightA * A.w +
+                weightB * B.w,
+
+            x:
+                weightA * A.x +
+                weightB * B.x,
+
+            y:
+                weightA * A.y +
+                weightB * B.y,
+
+            z:
+                weightA * A.z +
+                weightB * B.z
+        };
+
+        return this.fromHyperboloid(point);
+    }
+
+    // -----------------------------------------
+    // GEODESIC PATH
+    // -----------------------------------------
+
+    geodesic(a, b, segments = 32) {
+
+        this.validatePosition(a);
+        this.validatePosition(b);
+
+        if (
+            !Number.isInteger(segments) ||
+            segments < 1 ||
+            segments > 10000
+        ) {
+            throw new RangeError(
+                "Invalid geodesic segment count."
+            );
+        }
+
+        const points = [];
+
+        for (let i = 0; i <= segments; i++) {
+
+            const t = i / segments;
+
+            points.push(
+                this.interpolateGeodesic(
+                    a,
+                    b,
+                    t
+                )
+            );
+        }
+
+        return {
+            points,
+
+            length: this.distance(a, b),
+
+            segments,
+
+            geometry: "poincare-3d"
+        };
+    }
+
+    // -----------------------------------------
+    // INFORMATION
+    // -----------------------------------------
+
+    getInfo() {
+
+        return {
+            geometry: "poincare-3d",
+
+            curvature: this.curvature,
+
+            radius: this.radius,
+
+            dimensions: 3,
+
+            boundaryReachable: false
+        };
+    }
+}
+
+export { PoincareMetric };
+
+
+========================================================================
+FILE: src/world/fields/geometry/poincare-projection.js
+========================================================================
+
+
+/**
+ * PoincareProjection
+ *
+ * Maps Somnium's finite 3D world into an open
+ * three-dimensional Poincare ball.
+ *
+ * All three spatial dimensions participate
+ * in the transformation.
+ *
+ * The world boundary approaches the ball
+ * boundary asymptotically.
+ */
+
+class PoincareProjection {
+
+    constructor(options = {}) {
+
+        this.bounds = {
+            minX: options.minX ?? -500000,
+            maxX: options.maxX ?? 500000,
+
+            minY: options.minY ?? -2000,
+            maxY: options.maxY ?? 1000,
+
+            minZ: options.minZ ?? -500000,
+            maxZ: options.maxZ ?? 500000
+        };
+
+        this.curvature = options.curvature ?? -1;
+
+        if (
+            !Number.isFinite(this.curvature) ||
+            this.curvature >= 0
+        ) {
+            throw new Error(
+                "Poincare curvature must be negative."
+            );
+        }
+
+        this.k = -this.curvature;
+
+        this.radius = 1 / Math.sqrt(this.k);
+
+	this.characteristicLength =
+options.characteristicLength ?? 100000;
+
+        this.boundaryEpsilon =
+            options.boundaryEpsilon ?? 1e-9;
+
+        if (
+            !Number.isFinite(this.characteristicLength) ||
+            this.characteristicLength <= 0
+        ) {
+            throw new Error(
+                "Invalid characteristic length."
+            );
+        }
+
+        if (
+            !Number.isFinite(this.boundaryEpsilon) ||
+            this.boundaryEpsilon <= 0 ||
+            this.boundaryEpsilon >= 0.01
+        ) {
+            throw new Error(
+                "Invalid boundary epsilon."
+            );
+        }
+
+        this.center = {
+            x: (this.bounds.minX + this.bounds.maxX) / 2,
+            y: (this.bounds.minY + this.bounds.maxY) / 2,
+            z: (this.bounds.minZ + this.bounds.maxZ) / 2
+        };
+
+        this.validateBounds();
+    }
+
+    // -----------------------------------------
+    // VALIDATION
+    // -----------------------------------------
+
+    validateBounds() {
+
+        const values = Object.values(this.bounds);
+
+        if (
+            !values.every(Number.isFinite) ||
+            this.bounds.minX >= this.bounds.maxX ||
+            this.bounds.minY >= this.bounds.maxY ||
+            this.bounds.minZ >= this.bounds.maxZ
+        ) {
+            throw new Error(
+                "Invalid three-dimensional world bounds."
+            );
+        }
+    }
+
+    validatePosition(position) {
+
+        if (
+            !position ||
+            !Number.isFinite(position.x) ||
+            !Number.isFinite(position.y) ||
+            !Number.isFinite(position.z)
+        ) {
+            throw new TypeError(
+                "Invalid three-dimensional position."
+            );
+        }
+    }
+
+    // -----------------------------------------
+    // WORLD BOUNDARY DISTANCE
+    // -----------------------------------------
+
+    getBoundaryDistance(direction) {
+
+        const b = this.bounds;
+
+        const distances = [];
+
+        if (direction.x > 0) {
+            distances.push(
+                (b.maxX - this.center.x) / direction.x
+            );
+        } else if (direction.x < 0) {
+            distances.push(
+                (b.minX - this.center.x) / direction.x
+            );
+        }
+
+        if (direction.y > 0) {
+            distances.push(
+                (b.maxY - this.center.y) / direction.y
+            );
+        } else if (direction.y < 0) {
+            distances.push(
+                (b.minY - this.center.y) / direction.y
+            );
+        }
+
+        if (direction.z > 0) {
+            distances.push(
+                (b.maxZ - this.center.z) / direction.z
+            );
+        } else if (direction.z < 0) {
+            distances.push(
+                (b.minZ - this.center.z) / direction.z
+            );
+        }
+
+        return Math.min(...distances);
+    }
+
+    // -----------------------------------------
+    // WORLD TO POINCARE BALL
+    // -----------------------------------------
+
+    worldToBall(position) {
+
+        this.validatePosition(position);
+
+        const dx = position.x - this.center.x;
+        const dy = position.y - this.center.y;
+        const dz = position.z - this.center.z;
+
+        const distance = Math.hypot(dx, dy, dz);
+
+        if (distance === 0) {
+            return { x: 0, y: 0, z: 0 };
+        }
+
+        const direction = {
+            x: dx / distance,
+            y: dy / distance,
+            z: dz / distance
+        };
+
+        const boundaryDistance =
+            this.getBoundaryDistance(direction);
+
+        const normalizedRadius =
+            distance / boundaryDistance;
+
+        if (
+            normalizedRadius < 0 ||
+            normalizedRadius > 1 + 1e-10
+        ) {
+            throw new RangeError(
+                "Position lies outside world bounds."
+            );
+        }
+
+        // Clamp exact boundary positions slightly inward.
+        // The mathematical boundary remains unreachable.
+
+        const u = Math.min(
+            normalizedRadius,
+            1 - this.boundaryEpsilon
+        );
+
+        // Compactify the finite world.
+
+        const hyperbolicDistance =
+            this.characteristicLength *
+            u / (1 - u);
+
+        // Hyperbolic radial projection.
+
+const projectedRadius = Math.min(
+    this.radius * Math.tanh(
+        hyperbolicDistance / (2 * this.radius)
+    ),
+    this.radius * (1 - this.boundaryEpsilon)
+);
+	
+        return {
+            x: direction.x * projectedRadius,
+            y: direction.y * projectedRadius,
+            z: direction.z * projectedRadius
+        };
+    }
+
+    // -----------------------------------------
+    // POINCARE BALL TO WORLD
+    // -----------------------------------------
+
+    ballToWorld(position) {
+
+        this.validatePosition(position);
+
+        const radius = Math.hypot(
+            position.x,
+            position.y,
+            position.z
+        );
+
+        if (radius >= this.radius) {
+            throw new RangeError(
+                "Position is outside the open Poincare ball."
+            );
+        }
+
+        if (radius === 0) {
+            return { ...this.center };
+        }
+
+        const direction = {
+            x: position.x / radius,
+            y: position.y / radius,
+            z: position.z / radius
+        };
+
+        const ratio = radius / this.radius;
+
+        const hyperbolicDistance =
+            2 * this.radius * Math.atanh(ratio);
+
+        const u =
+            hyperbolicDistance /
+            (
+                this.characteristicLength +
+                hyperbolicDistance
+            );
+
+        const boundaryDistance =
+            this.getBoundaryDistance(direction);
+
+        const worldDistance =
+            u * boundaryDistance;
+
+        return {
+            x: this.center.x +
+                direction.x * worldDistance,
+
+            y: this.center.y +
+                direction.y * worldDistance,
+
+            z: this.center.z +
+                direction.z * worldDistance
+        };
+    }
+
+    // -----------------------------------------
+    // PROJECTION INFORMATION
+    // -----------------------------------------
+
+    getInfo() {
+
+        return {
+            geometry: "poincare-3d",
+
+            dimensions: 3,
+
+            curvature: this.curvature,
+
+            radius: this.radius,
+
+            center: { ...this.center },
+
+            bounds: { ...this.bounds },
+
+            characteristicLength:
+                this.characteristicLength,
+
+            boundaryReachable: false
+        };
+    }
+}
+
+export { PoincareProjection };
+
+
+========================================================================
+FILE: src/world/fields/geometry/spatial-transform.js
+========================================================================
+
+
+/**
+ * SpatialTransform
+ *
+ * Coordinates world geometry transformations.
+ *
+ * Separates:
+ * - Authoritative world coordinates.
+ * - Mathematical geometry coordinates.
+ * - Rendering coordinates.
+ *
+ * Supports Euclidean and Poincare geometry.
+ */
+
+import { PoincareProjection } from "./poincare-projection.js";
+import { PoincareMetric } from "./poincare-metric.js";
+
+import { EuclideanGeometry } from "./euclidean-geometry.js";
+import { MetricTensor } from "../metric-tensor.js";
+
+class SpatialTransform {
+
+    constructor(options = {}) {
+
+        this.geometryName =
+            options.geometry ?? "poincare";
+
+        this.renderScale =
+            options.renderScale ?? 10000;
+
+        this.enabled =
+            options.enabled ?? true;
+
+        if (
+            !Number.isFinite(this.renderScale) ||
+            this.renderScale <= 0
+        ) {
+            throw new Error(
+                "Invalid geometry render scale."
+            );
+        }
+
+        this.euclidean =
+            new EuclideanGeometry();
+
+        this.projection =
+            options.projection ??
+            new PoincareProjection(
+                options.bounds ?? {}
+            );
+
+        this.metric =
+            options.metric ??
+            new PoincareMetric(
+                this.projection.curvature
+            );
+
+        this.setGeometry(this.geometryName);
+    }
+
+    // -----------------------------------------
+    // GEOMETRY SELECTION
+    // -----------------------------------------
+
+    setGeometry(name) {
+
+        if (
+            name !== "euclidean" &&
+            name !== "poincare"
+        ) {
+            throw new Error(
+                `Unsupported geometry: ${name}`
+            );
+        }
+
+        this.geometryName = name;
+
+        console.log(
+            "[SpatialTransform] Geometry:",
+            name
+        );
+
+    }
+
+    // -----------------------------------------
+    // WORLD TO GEOMETRY COORDINATES
+    // -----------------------------------------
+
+    worldToGeometry(position) {
+
+        if (
+            !this.enabled ||
+            this.geometryName === "euclidean"
+        ) {
+            return {
+                x: position.x,
+                y: position.y,
+                z: position.z
+            };
+        }
+
+        return this.projection.worldToBall(position);
+    }
+
+    // -----------------------------------------
+    // GEOMETRY TO WORLD COORDINATES
+    // -----------------------------------------
+
+    geometryToWorld(position) {
+
+        if (
+            !this.enabled ||
+            this.geometryName === "euclidean"
+        ) {
+            return { ...position };
+        }
+
+        return this.projection.ballToWorld(position);
+    }
+
+    // -----------------------------------------
+    // WORLD TO RENDER COORDINATES
+    // -----------------------------------------
+
+    worldToRender(position) {
+
+        const point =
+            this.worldToGeometry(position);
+
+        if (
+            !this.enabled ||
+            this.geometryName === "euclidean"
+        ) {
+            return point;
+        }
+
+        return {
+            x: point.x * this.renderScale,
+            y: point.y * this.renderScale,
+            z: point.z * this.renderScale
+        };
+    }
+
+    // -----------------------------------------
+    // RENDER TO WORLD COORDINATES
+    // -----------------------------------------
+
+    renderToWorld(position) {
+
+        if (
+            !this.enabled ||
+            this.geometryName === "euclidean"
+        ) {
+            return { ...position };
+        }
+
+        return this.geometryToWorld({
+            x: position.x / this.renderScale,
+            y: position.y / this.renderScale,
+            z: position.z / this.renderScale
+        });
+    }
+
+    // -----------------------------------------
+    // NUMERICAL JACOBIAN
+    // -----------------------------------------
+
+    getJacobian(position, options = {}) {
+
+        const h = options.step ?? 0.01;
+
+        if (
+            !Number.isFinite(h) ||
+            h <= 0
+        ) {
+            throw new Error(
+                "Invalid Jacobian step."
+            );
+        }
+
+        const origin =
+            this.worldToRender(position);
+
+        const columns = [];
+
+        for (const axis of ["x", "y", "z"]) {
+
+            const forward = { ...position };
+            const backward = { ...position };
+
+            forward[axis] += h;
+            backward[axis] -= h;
+
+            const a = this.worldToRender(forward);
+            const b = this.worldToRender(backward);
+
+            columns.push([
+                (a.x - b.x) / (2 * h),
+                (a.y - b.y) / (2 * h),
+                (a.z - b.z) / (2 * h)
+            ]);
+        }
+
+        return [
+            columns[0][0],
+            columns[1][0],
+            columns[2][0],
+
+            columns[0][1],
+            columns[1][1],
+            columns[2][1],
+
+            columns[0][2],
+            columns[1][2],
+            columns[2][2]
+        ];
+    }
+
+    // -----------------------------------------
+    // DIRECTION TRANSFORMATION
+    // -----------------------------------------
+
+    transformDirection(position, direction) {
+
+        const J = this.getJacobian(position);
+
+        return {
+            x:
+                J[0] * direction.x +
+                J[1] * direction.y +
+                J[2] * direction.z,
+
+            y:
+                J[3] * direction.x +
+                J[4] * direction.y +
+                J[5] * direction.z,
+
+            z:
+                J[6] * direction.x +
+                J[7] * direction.y +
+                J[8] * direction.z
+        };
+    }
+
+    // -----------------------------------------
+    // SPATIAL METRIC
+    // -----------------------------------------
+
+	
+    metricAtWorld(position) {
+
+        if (
+            !this.enabled ||
+            this.geometryName === "euclidean"
+        ) {
+            return this.euclidean.metricAt(position);
+        }
+
+        const ballPosition =
+            this.projection.worldToBall(position);
+
+        const geometryMetric =
+            this.metric.metricAt(ballPosition).values;
+
+        // Convert the rendering Jacobian into
+        // the mathematical projection Jacobian.
+
+        const J = this.getJacobian(position).map(
+            value => value / this.renderScale
+        );
+
+        // Pull back G into world coordinates:
+        // G_world = transpose(J) * G_ball * J
+
+        const values = new Array(9).fill(0);
+
+        for (let i = 0; i < 3; i++) {
+            for (let j = 0; j < 3; j++) {
+
+                for (let k = 0; k < 3; k++) {
+                    for (let l = 0; l < 3; l++) {
+
+                        values[i * 3 + j] +=
+                            J[k * 3 + i] *
+                            geometryMetric[k * 3 + l] *
+                            J[l * 3 + j];
+                    }
+                }
+            }
+        }
+
+        return new MetricTensor(values);
+    }
+
+
+
+    // -----------------------------------------
+    // HYPERBOLIC DISTANCE
+    // -----------------------------------------
+
+    distance(a, b) {
+
+        if (this.geometryName === "euclidean") {
+            return this.euclidean.distance(a, b);
+        }
+
+        const pointA =
+            this.projection.worldToBall(a);
+
+        const pointB =
+            this.projection.worldToBall(b);
+
+        return this.metric.distance(
+            pointA,
+            pointB
+        );
+    }
+
+    // -----------------------------------------
+    // DIAGNOSTICS
+    // -----------------------------------------
+
+    getInfo() {
+
+        return {
+            geometry: this.geometryName,
+
+            enabled: this.enabled,
+
+            renderScale: this.renderScale,
+
+            projection:
+                this.projection.getInfo(),
+
+            metric:
+                this.metric.getInfo()
+        };
+    }
+
+}
+
+export { SpatialTransform };
+
+
+========================================================================
+FILE: src/world/fields/material-field.js
+========================================================================
+
+
+import { WorldField } from "./world-field.js";
+import { PhysicalProperties } from "./physical-properties.js";
+
+const DEFAULT_MATERIALS = {
+
+    granite: {
+        density: 2.7,
+        hardness: 0.98,
+        cohesion: 0.95,
+        thermalConductivity: 2.5,
+        heatCapacity: 0.79,
+        elasticity: 0.7,
+        porosity: 0.02,
+        moistureCapacity: 0.15
+    },
+
+    limestone: {
+        density: 2.5,
+        hardness: 0.65,
+        cohesion: 0.65,
+        thermalConductivity: 1.3,
+        heatCapacity: 0.91,
+        elasticity: 0.5,
+        porosity: 0.12,
+        moistureCapacity: 0.45
+    },
+
+    sand: {
+        density: 1.6,
+        hardness: 0.08,
+        cohesion: 0.12,
+        thermalConductivity: 0.3,
+        heatCapacity: 0.8,
+        elasticity: 0.1,
+        porosity: 0.4,
+        moistureCapacity: 0.3
+    },
+
+    clay: {
+        density: 1.8,
+        hardness: 0.28,
+        cohesion: 0.45,
+        thermalConductivity: 1.0,
+        heatCapacity: 0.9,
+        elasticity: 0.25,
+        porosity: 0.35,
+        moistureCapacity: 0.9
+    },
+
+    fertileSoil: {
+        density: 1.3,
+        hardness: 0.05,
+        cohesion: 0.15,
+        thermalConductivity: 0.6,
+        heatCapacity: 1.2,
+        elasticity: 0.1,
+        porosity: 0.55,
+        moistureCapacity: 1.0
+    },
+
+    coal: {
+        density: 1.4,
+        hardness: 0.35,
+        cohesion: 0.55,
+        thermalConductivity: 0.3,
+        heatCapacity: 1.1,
+        elasticity: 0.25,
+        porosity: 0.1,
+        moistureCapacity: 0.2
+    },
+
+    anomaly: {
+        density: 1.0,
+        hardness: 0.85,
+        cohesion: 0.35,
+        thermalConductivity: 0.5,
+        heatCapacity: 1.0,
+        elasticity: 0.5,
+        porosity: 0.2,
+        moistureCapacity: 0.5
+    }
+
+};
+
+class MaterialField extends WorldField {
+
+    constructor(geologicalField, options = {}) {
+
+        super("material", options);
+
+        this.geologicalField = geologicalField;
+
+        this.materials = {
+
+            ...DEFAULT_MATERIALS,
+
+            ...(options.materials || {})
+
+        };
+
+    }
+
+    evaluate(position, time = 0) {
+
+        const geology = this.geologicalField.sample(
+            position.x,
+            position.z
+        );
+
+        if (!geology) return null;
+
+        const materialName = geology.speciesName;
+
+        const properties =
+            this.materials[materialName];
+
+        if (!properties) {
+
+            return {
+
+                name: materialName,
+
+                geology,
+
+                properties: new PhysicalProperties()
+
+            };
+
+        }
+
+        return {
+
+            name: materialName,
+
+            geology,
+
+            properties: new PhysicalProperties(
+                properties
+            ),
+
+            time
+
+        };
+
+    }
+
+}
+
+export { MaterialField };
+
+
+========================================================================
+FILE: src/world/fields/metric-tensor.js
+========================================================================
+
+
+class MetricTensor {
+
+    constructor(values = null) {
+
+        this.values = values
+            ? Array.from(values)
+            : [
+                1, 0, 0,
+                0, 1, 0,
+                0, 0, 1
+            ];
+
+        this.validate();
+
+    }
+
+    validate() {
+
+        if (this.values.length !== 9) {
+            throw new Error("MetricTensor requires 9 values.");
+        }
+
+        if (!this.values.every(Number.isFinite)) {
+            throw new Error("Metric contains non-finite values.");
+        }
+
+        const m = this.values;
+        const tolerance = 1e-10;
+
+        if (
+            Math.abs(m[1] - m[3]) > tolerance ||
+            Math.abs(m[2] - m[6]) > tolerance ||
+            Math.abs(m[5] - m[7]) > tolerance
+        ) {
+            throw new Error("Metric must be symmetric.");
+        }
+
+        this.cholesky();
+
+    }
+
+    cholesky() {
+
+        const m = this.values;
+
+        const L = new Array(9).fill(0);
+
+        for (let i = 0; i < 3; i++) {
+
+            for (let j = 0; j <= i; j++) {
+
+                let sum = m[i * 3 + j];
+
+                for (let k = 0; k < j; k++) {
+
+                    sum -=
+                        L[i * 3 + k] *
+                        L[j * 3 + k];
+
+                }
+
+                if (i === j) {
+
+                    if (sum <= 0 || !Number.isFinite(sum)) {
+                        throw new Error(
+                            "Metric must be positive definite."
+                        );
+                    }
+
+                    L[i * 3 + j] = Math.sqrt(sum);
+
+                } else {
+
+                    L[i * 3 + j] =
+                        sum / L[j * 3 + j];
+
+                }
+
+            }
+
+        }
+
+        return L;
+
+    }
+
+    determinant() {
+
+        const L = this.cholesky();
+
+        const d =
+            L[0] * L[4] * L[8];
+
+        return d * d;
+
+    }
+
+    quadraticForm(vector) {
+
+        const m = this.values;
+
+        const x = [vector.x, vector.y, vector.z];
+
+        let result = 0;
+
+        for (let i = 0; i < 3; i++) {
+
+            for (let j = 0; j < 3; j++) {
+
+                result +=
+                    x[i] * m[i * 3 + j] * x[j];
+
+            }
+
+        }
+
+        return result;
+
+    }
+
+    norm(vector) {
+
+        return Math.sqrt(
+            Math.max(0, this.quadraticForm(vector))
+        );
+
+    }
+
+    static identity() {
+
+        return new MetricTensor();
+
+    }
+
+    static interpolate(a, b, t) {
+
+        const A = a.cholesky();
+        const B = b.cholesky();
+
+        const L = new Array(9).fill(0);
+
+        for (let i = 0; i < 9; i++) {
+
+            L[i] =
+                A[i] + (B[i] - A[i]) * t;
+
+        }
+
+        const values = new Array(9).fill(0);
+
+        // G = L * transpose(L)
+
+        for (let i = 0; i < 3; i++) {
+
+            for (let j = 0; j < 3; j++) {
+
+                for (let k = 0; k < 3; k++) {
+
+                    values[i * 3 + j] +=
+                        L[i * 3 + k] *
+                        L[j * 3 + k];
+
+                }
+
+            }
+
+        }
+
+        return new MetricTensor(values);
+
+    }
+
+}
+
+export { MetricTensor };
+
+
+========================================================================
+FILE: src/world/fields/physical-properties.js
+========================================================================
+
+
+class PhysicalProperties {
+
+    constructor(options = {}) {
+
+        this.density = options.density ?? 1.0;
+
+        this.hardness = options.hardness ?? 0.5;
+
+        this.cohesion = options.cohesion ?? 0.5;
+
+        this.thermalConductivity =
+            options.thermalConductivity ?? 0.5;
+
+        this.heatCapacity =
+            options.heatCapacity ?? 1.0;
+
+        this.elasticity =
+            options.elasticity ?? 0.5;
+
+        this.porosity =
+            options.porosity ?? 0.3;
+
+        this.moistureCapacity =
+            options.moistureCapacity ?? 0.5;
+
+        this.validate();
+
+    }
+
+    validate() {
+
+        for (const [key, value] of Object.entries(this)) {
+
+            if (
+                typeof value === "number" &&
+                (!Number.isFinite(value) || value < 0)
+            ) {
+
+                throw new Error(
+                    `Invalid physical property: ${key}`
+                );
+
+            }
+
+        }
+
+    }
+
+    clone() {
+
+        return new PhysicalProperties(this);
+
+    }
+
+}
+
+export { PhysicalProperties };
+
+
+========================================================================
+FILE: src/world/fields/spacetime-field.js
+========================================================================
+
+
+import { WorldField } from "./world-field.js";
+import { MetricTensor } from "./metric-tensor.js";
+
+class SpacetimeField extends WorldField {
+
+    constructor(options = {}) {
+
+        super("spacetime", options);
+
+        this.metricProvider =
+            options.metricProvider || null;
+
+        this.lapseProvider =
+            options.lapseProvider || null;
+
+        this.defaultMetric =
+            options.defaultMetric || MetricTensor.identity();
+
+        this.defaultLapse =
+            options.defaultLapse ?? 1.0;
+
+        if (
+            !Number.isFinite(this.defaultLapse) ||
+            this.defaultLapse <= 0
+        ) {
+            throw new Error("Lapse must be positive.");
+        }
+
+    }
+
+    evaluate(position, time = 0) {
+
+        const metric = this.metricProvider
+            ? this.metricProvider(position, time)
+            : this.defaultMetric;
+
+        const lapse = this.lapseProvider
+            ? this.lapseProvider(position, time)
+            : this.defaultLapse;
+
+        if (!(metric instanceof MetricTensor)) {
+            throw new TypeError("Invalid spatial metric.");
+        }
+
+        if (
+            !Number.isFinite(lapse) ||
+            lapse <= 0
+        ) {
+            throw new Error("Invalid temporal lapse.");
+        }
+
+        return {
+
+            metric,
+
+            lapse,
+
+            coordinateTime: time,
+
+            properTimeRate: lapse
+
+        };
+
+    }
+
+    getProperTime(position, coordinateDelta, time = 0) {
+
+        if (
+            !Number.isFinite(coordinateDelta) ||
+            coordinateDelta < 0
+        ) {
+            throw new RangeError("Invalid time interval.");
+        }
+
+        return this.sample(position, time).lapse *
+            coordinateDelta;
+
+    }
+
+}
+
+export { SpacetimeField };
+
+
+========================================================================
+FILE: src/world/fields/spatial-lattice.js
+========================================================================
+
+
+class SpatialLattice {
+
+    constructor({
+        origin = { x: 0, y: 0, z: 0 },
+        dimensions = { x: 16, y: 16, z: 16 },
+        cellSize = 10,
+        defaultValue = null,
+        interpolate = null
+    } = {}) {
+
+        if (
+            !Number.isFinite(cellSize) ||
+            cellSize <= 0
+        ) {
+            throw new Error("Invalid lattice cell size.");
+        }
+
+        this.origin = { ...origin };
+
+        this.dimensions = { ...dimensions };
+
+        this.cellSize = cellSize;
+
+        this.defaultValue = defaultValue;
+
+        this.interpolate = interpolate ||
+            SpatialLattice.interpolateValues;
+
+        this.values = new Map();
+
+    }
+
+    getKey(x, y, z) {
+
+        return `${x},${y},${z}`;
+
+    }
+
+    set(x, y, z, value) {
+
+        this.validateCoordinates(x, y, z);
+
+        this.values.set(
+            this.getKey(x, y, z),
+            value
+        );
+
+    }
+
+    get(x, y, z) {
+
+        return this.values.get(
+            this.getKey(x, y, z)
+        ) ?? this.defaultValue;
+
+    }
+
+    validateCoordinates(x, y, z) {
+
+        const d = this.dimensions;
+
+        if (
+            !Number.isInteger(x) ||
+            !Number.isInteger(y) ||
+            !Number.isInteger(z) ||
+            x < 0 || y < 0 || z < 0 ||
+            x >= d.x || y >= d.y || z >= d.z
+        ) {
+
+            throw new RangeError(
+                "Lattice coordinates out of bounds."
+            );
+
+        }
+
+    }
+
+    worldToGrid(position) {
+
+        return {
+
+            x: (position.x - this.origin.x) / this.cellSize,
+
+            y: (position.y - this.origin.y) / this.cellSize,
+
+            z: (position.z - this.origin.z) / this.cellSize
+
+        };
+
+    }
+
+    sample(position) {
+
+        const p = this.worldToGrid(position);
+
+        const x0 = Math.floor(p.x);
+        const y0 = Math.floor(p.y);
+        const z0 = Math.floor(p.z);
+
+        const tx = p.x - x0;
+        const ty = p.y - y0;
+        const tz = p.z - z0;
+
+        const d = this.dimensions;
+
+        if (
+            p.x < 0 || p.y < 0 || p.z < 0 ||
+            p.x > d.x - 1 ||
+            p.y > d.y - 1 ||
+            p.z > d.z - 1
+        ) {
+            return this.defaultValue;
+        }
+
+        const x1 = Math.min(x0 + 1, d.x - 1);
+        const y1 = Math.min(y0 + 1, d.y - 1);
+        const z1 = Math.min(z0 + 1, d.z - 1);
+
+        const samples = [
+
+            [this.get(x0, y0, z0), (1-tx)*(1-ty)*(1-tz)],
+            [this.get(x1, y0, z0), tx*(1-ty)*(1-tz)],
+            [this.get(x0, y1, z0), (1-tx)*ty*(1-tz)],
+            [this.get(x1, y1, z0), tx*ty*(1-tz)],
+
+            [this.get(x0, y0, z1), (1-tx)*(1-ty)*tz],
+            [this.get(x1, y0, z1), tx*(1-ty)*tz],
+            [this.get(x0, y1, z1), (1-tx)*ty*tz],
+            [this.get(x1, y1, z1), tx*ty*tz]
+
+        ];
+
+        return this.interpolate(samples);
+
+    }
+
+    static interpolateValues(samples) {
+
+	if (samples.some(([value]) => value == null)) {
+		return null;
+	}
+        const first = samples[0][0];
+
+        if (first === null || first === undefined) {
+            return null;
+        }
+
+        if (typeof first === "number") {
+
+            return samples.reduce(
+                (sum, [value, weight]) =>
+                    sum + value * weight,
+                0
+            );
+
+        }
+
+        if (Array.isArray(first)) {
+
+            return first.map((_, i) =>
+
+                samples.reduce(
+                    (sum, [value, weight]) =>
+                        sum + value[i] * weight,
+                    0
+                )
+
+            );
+
+        }
+
+        if (
+            typeof first === "object" &&
+            "x" in first &&
+            "y" in first &&
+            "z" in first
+        ) {
+
+            const result = {
+                x: 0,
+                y: 0,
+                z: 0
+            };
+
+            for (const [value, weight] of samples) {
+
+                if (!value) continue;
+
+                result.x += value.x * weight;
+                result.y += value.y * weight;
+                result.z += value.z * weight;
+
+            }
+
+            return result;
+
+        }
+
+        return first;
+
+    }
+
+}
+
+export { SpatialLattice };
+
+
+========================================================================
+FILE: src/world/fields/temperature-field.js
+========================================================================
+
+
+import { WorldField } from "./world-field.js";
+
+class TemperatureField extends WorldField {
+
+    constructor(options = {}) {
+
+        super("temperature", options);
+
+        this.baseTemperature =
+            options.baseTemperature ?? 15;
+
+        this.referenceHeight =
+            options.referenceHeight ?? 0;
+
+        this.lapseRate =
+            options.lapseRate ?? 0.0065;
+
+        this.spatialVariation =
+            options.spatialVariation || null;
+
+        this.temporalVariation =
+            options.temporalVariation || null;
+
+    }
+
+    evaluate(position, time = 0) {
+
+        const altitudeDifference =
+            position.y - this.referenceHeight;
+
+        let temperature =
+            this.baseTemperature -
+            altitudeDifference * this.lapseRate;
+
+        if (this.spatialVariation) {
+
+            temperature +=
+                this.spatialVariation(position, time);
+
+        }
+
+        if (this.temporalVariation) {
+
+            temperature +=
+                this.temporalVariation(position, time);
+
+        }
+
+        return {
+
+            value: temperature,
+
+            unit: "celsius",
+
+            position,
+
+            time
+
+        };
+
+    }
+
+}
+
+export { TemperatureField };
+
+
+========================================================================
+FILE: src/world/fields/world-field-system.js
+========================================================================
+
+
+import { FieldRegistry } from "./field-registry.js";
+import { FieldSampler } from "./field-sampler.js";
+
+import { SpacetimeField } from "./spacetime-field.js";
+import { TemperatureField } from "./temperature-field.js";
+import { MaterialField } from "./material-field.js";
+
+import { MetricTensor } from "./metric-tensor.js";
+
+import { EuclideanGeometry } from "./geometry/euclidean-geometry.js";
+import { PoincareGeometry } from "./geometry/poincare-geometry.js";
+import { GeodesicSolver } from "./geometry/geodesic-solver.js";
+
+
+class WorldFieldSystem {
+
+    constructor(options = {}) {
+
+        this.terrain = options.terrain || null;
+
+        this.geologicalField =
+            options.geologicalField || null;
+
+        this.registry = new FieldRegistry();
+
+        this.sampler = new FieldSampler(
+            this.registry
+        );
+
+        this.geometries = new Map();
+
+        // Default geometry.
+        this.geometries.set(
+            "euclidean",
+            new EuclideanGeometry()
+        );
+
+        this.geometries.set(
+            "poincare",
+            new PoincareGeometry(-1)
+        );
+
+        this.activeGeometry =
+            this.geometries.get("euclidean");
+
+        // Initial spacetime configuration.
+        this.spacetime = new SpacetimeField({
+
+            defaultMetric: MetricTensor.identity(),
+
+            defaultLapse: 1.0
+
+        });
+
+        // Initial environmental fields.
+        this.temperature = new TemperatureField(
+            options.temperature || {}
+        );
+
+        this.material = this.geologicalField
+            ? new MaterialField(
+                this.geologicalField,
+                options.material || {}
+            )
+            : null;
+
+        // Register fields.
+        this.registry.register(this.spacetime);
+
+        this.registry.register(this.temperature);
+
+        if (this.material) {
+
+            this.registry.register(this.material);
+
+        }
+
+    }
+
+    registerField(field) {
+
+        return this.registry.register(field);
+
+    }
+
+    unregisterField(name) {
+
+        return this.registry.unregister(name);
+
+    }
+
+    getField(name) {
+
+        return this.registry.get(name);
+
+    }
+
+    sample(name, position, time = 0) {
+
+        return this.sampler.sample(
+            name,
+            position,
+            time
+        );
+
+    }
+
+    sampleAll(position, time = 0) {
+
+        return this.sampler.sampleAll(
+            position,
+            time
+        );
+
+    }
+
+    sampleEnvironment(position, time = 0) {
+
+        return {
+
+            spacetime: this.sample(
+                "spacetime",
+                position,
+                time
+            ),
+
+            temperature: this.sample(
+                "temperature",
+                position,
+                time
+            ),
+
+            material: this.sample(
+                "material",
+                position,
+                time
+            )
+
+        };
+
+    }
+
+    setGeometry(name) {
+
+        const geometry = this.geometries.get(name);
+
+        if (!geometry) {
+
+            throw new Error(
+                `Unknown geometry model: ${name}`
+            );
+
+        }
+
+        this.activeGeometry = geometry;
+
+        return geometry;
+
+    }
+
+    registerGeometry(name, geometry) {
+
+        if (!geometry || typeof geometry.metricAt !== "function") {
+
+            throw new TypeError("Invalid geometry model.");
+
+        }
+
+        this.geometries.set(name, geometry);
+
+        return geometry;
+
+    }
+
+    getGeometry(name = null) {
+
+        if (!name) return this.activeGeometry;
+
+        return this.geometries.get(name) || null;
+
+    }
+
+    createGeodesicSolver(options = {}) {
+
+        return new GeodesicSolver(
+            this.activeGeometry,
+            options
+        );
+
+    }
+
+    getSpatialMetric(position) {
+
+        return this.activeGeometry.metricAt(position);
+
+    }
+
+    getProperTime(position, coordinateDelta, time = 0) {
+
+        return this.spacetime.getProperTime(
+            position,
+            coordinateDelta,
+            time
+        );
+
+    }
+
+    dispose() {
+
+        this.registry.clear();
+
+        this.geometries.clear();
+
+    }
+
+}
+
+export { WorldFieldSystem };
+
+
+========================================================================
+FILE: src/world/fields/world-field.js
+========================================================================
+
+
+class WorldField {
+
+    constructor(name, options = {}) {
+
+        if (!name) {
+            throw new Error("WorldField requires a name.");
+        }
+
+        this.name = name;
+
+        this.enabled = options.enabled ?? true;
+
+        this.priority = options.priority ?? 0;
+
+        this.metadata = options.metadata || {};
+
+    }
+
+    sample(position, time = 0) {
+
+        if (!this.enabled) return null;
+
+        if (!position) return null;
+
+        return this.evaluate(position, time);
+
+    }
+
+    evaluate() {
+
+        throw new Error(
+            "WorldField.evaluate() must be implemented."
+        );
+
+    }
+
+}
+
+export { WorldField };
+
+
+========================================================================
+END OF DIRECTORY SOURCE DUMP
+Files included: 20
+Binary/unreadable files skipped: 0
+========================================================================

@@ -1,0 +1,80 @@
+            ...this.statistics,
+            totalRecords: this.records.size,
+            activeRecords: this.activeKeys.size,
+            pendingRecords: this.pending.length
+        };
+    }
+
+    exportRecord(x, z) {
+        const record = this.getRecord(x, z);
+
+        if (!record) return null;
+
+        return {
+            version: 1,
+            coordinates: { x, z },
+            seed: record.seed,
+            bounds: { ...record.bounds },
+            simulationTime: record.simulationTime,
+            population: this.adapter.serialize
+                ? this.adapter.serialize(record)
+                : structuredClone(record.population)
+        };
+    }
+
+    importRecord(data) {
+        if (!data || data.version !== 1) {
+            throw new Error(
+                "Unsupported population record version."
+            );
+        }
+
+        const { x, z } = data.coordinates;
+        const key = this.getKey(x, z);
+
+        const previous = this.records.get(key);
+
+        if (previous?.active) {
+            this.deactivateRecord(previous);
+        }
+
+        const record = {
+            x,
+            z,
+            key,
+            seed: data.seed,
+            bounds: { ...data.bounds },
+
+            population: this.adapter.deserialize
+                ? this.adapter.deserialize(data.population)
+                : structuredClone(data.population),
+
+            active: false,
+            generated: true,
+            simulationTime: data.simulationTime ?? 0,
+            lastRequested: Date.now(),
+            metadata: { version: 1 }
+        };
+
+        this.records.set(key, record);
+
+        return record;
+    }
+
+    dispose() {
+        for (const record of this.records.values()) {
+            if (record.active) {
+                this.deactivateRecord(record);
+            }
+
+            this.adapter.dispose?.(record);
+        }
+
+        this.records.clear();
+        this.pending.length = 0;
+        this.activeKeys.clear();
+
+        this.simulationCursor = 0;
+    }
+}
+

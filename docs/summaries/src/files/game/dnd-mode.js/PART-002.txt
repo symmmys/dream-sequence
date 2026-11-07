@@ -1,0 +1,300 @@
+                continue;
+            }
+
+            this.movementColors[type] = colors[type];
+
+            const color = BABYLON.Color3.FromHexString(
+                colors[type]
+            );
+
+            const material = this.movementMaterials[type];
+
+            material.diffuseColor = color;
+            material.emissiveColor = color.scale(0.55);
+        }
+
+        if (this.movementPreview) {
+            this.refreshMovementPreview();
+        }
+    }
+
+    restoreGridConfiguration() {
+        try {
+            const saved = JSON.parse(
+                localStorage.getItem(GRID_SETTINGS_KEY) || "null"
+            );
+
+            if (!saved || typeof saved !== "object") return;
+
+            // Accept both the current rectangular schema and legacy saves.
+            const rows = saved.rows ?? saved.gridRows ?? saved.gridSize;
+            const columns = saved.columns ?? saved.gridColumns ?? saved.gridSize;
+            const cellSize = saved.cellSize ?? this.cellSize;
+
+            if (
+                !this.validateGridDimensions(rows, columns) ||
+                !this.isValidCellSize(cellSize)
+            ) {
+                console.warn(
+                    "[DnD] Ignoring invalid saved grid configuration."
+                );
+                return;
+            }
+
+            this.gridRows = rows;
+            this.gridColumns = columns;
+            this.cellSize = cellSize;
+        } catch (error) {
+            console.warn(
+                "[DnD] Unable to restore grid configuration.",
+                error
+            );
+        }
+    }
+
+    saveGridConfiguration() {
+        try {
+            localStorage.setItem(
+                GRID_SETTINGS_KEY,
+                JSON.stringify({
+                    version: 2,
+                    rows: this.gridRows,
+                    columns: this.gridColumns,
+                    cellSize: this.cellSize
+                })
+            );
+            return true;
+        } catch (error) {
+            console.warn(
+                "[DnD] Grid configuration could not be persisted.",
+                error
+            );
+            return false;
+        }
+    }
+
+    createCamera() {
+        const canvas =
+            this.scene.getEngine().getRenderingCanvas();
+
+        this.camera = new BABYLON.ArcRotateCamera(
+            "dndTacticalCamera",
+            -Math.PI / 2,
+            Math.PI / 3,
+            BABYLON.Scalar.Clamp(
+                this.cellSize * 3,
+                MIN_CAMERA_RADIUS * 2,
+                INITIAL_CAMERA_RADIUS
+            ),
+            BABYLON.Vector3.Zero(),
+            this.scene
+        );
+
+        this.camera.lowerRadiusLimit = MIN_CAMERA_RADIUS;
+        this.camera.upperRadiusLimit = 1500;
+        this.camera.wheelPrecision = 30;
+
+        this.camera.panningSensibility = 0;
+        this.camera.inertia = 0.8;
+
+        this.camera.attachControl(canvas, true);
+
+        this.scene.activeCamera = this.camera;
+
+        this.centerCameraOnActiveCharacter();
+    }
+
+    getCameraFocusCharacter() {
+        return this.getActiveCharacter() || this.selectedCharacter;
+    }
+
+    centerCameraOnActiveCharacter() {
+        if (!this.camera) return false;
+        const character = this.getCameraFocusCharacter();
+        if (character) return this.centerCameraOnCharacter(character);
+        return this.centerCameraOnGridCenter();
+    }
+
+    centerCameraOnGridCenter() {
+        const row = (this.gridRows - 1) / 2;
+        const col = (this.gridColumns - 1) / 2;
+        const position = this.samplePosition(row, col);
+        const projected = this.transform.worldToRender({
+            x: position.x,
+            y: position.y + 1,
+            z: position.z
+        });
+        this.camera.setTarget(new BABYLON.Vector3(
+            projected.x,
+            projected.y,
+            projected.z
+        ));
+        return true;
+    }
+
+    centerCameraOnSelectedCharacter() {
+        if (!this.selectedCharacter || !this.camera) return false;
+        return this.centerCameraOnCharacter(this.selectedCharacter);
+    }
+
+    centerCameraOnCharacter(character) {
+        if (!character || !this.camera) return false;
+
+        const meshes = this.characterMeshes.get(character.id);
+        if (!meshes) return false;
+
+        this.syncCharacter(character);
+        const target = meshes.root.position.add(
+            new BABYLON.Vector3(0, 1, 0)
+        );
+        this.camera.setTarget(target);
+        return true;
+    }
+
+    zoomToActiveCharacter() {
+        const character = this.getCameraFocusCharacter();
+
+        if (!character || !this.camera) {
+            this.showMessage("Select a character or start a battle first.");
+            return false;
+        }
+
+        this.centerCameraOnCharacter(character);
+        this.clearCameraInertia();
+        this.camera.lowerRadiusLimit = MIN_CAMERA_RADIUS;
+        this.camera.radius = BABYLON.Scalar.Clamp(
+            this.cellSize * FOCUS_CAMERA_RADIUS_FACTOR,
+            MIN_CAMERA_RADIUS,
+            32
+        );
+
+        return true;
+    }
+
+    clearCameraInertia() {
+        if (!this.camera) return;
+
+        this.camera.inertialRadiusOffset = 0;
+        this.camera.inertialAlphaOffset = 0;
+        this.camera.inertialBetaOffset = 0;
+        this.camera.inertialPanningX = 0;
+        this.camera.inertialPanningY = 0;
+    }
+
+    // Retained for compatibility with earlier UI integrations.
+    zoomToGrid() {
+        return this.zoomToActiveCharacter();
+    }
+
+    worldPosition(row, col) {
+        return {
+            x: this.gridOrigin.x + (col + 0.5) * this.cellSize,
+            z: this.gridOrigin.z + (row + 0.5) * this.cellSize
+        };
+    }
+
+    samplePosition(row, col) {
+        const position = this.worldPosition(row, col);
+
+        const sample = this.terrain.sampleAt(
+            position.x,
+            position.z
+        );
+
+        if (!sample) {
+            throw new Error(
+                "Unable to sample battlefield terrain."
+            );
+        }
+
+        return {
+            ...position,
+            y: sample.y,
+            row,
+            col
+        };
+    }
+
+    projectTerrainPoint(point) {
+        const sample = this.terrain.sampleAt(
+            point.x,
+            point.z
+        );
+
+        if (!sample) return null;
+
+        const projected = this.transform.worldToRender({
+            x: point.x,
+            y: sample.y + 0.5,
+            z: point.z
+        });
+
+        return new BABYLON.Vector3(
+            projected.x,
+            projected.y,
+            projected.z
+        );
+    }
+
+    createGrid() {
+        this.disposeGridMeshes();
+
+        const largeGrid =
+            this.gridRows * this.gridColumns > 10000;
+
+        const divisions = largeGrid
+            ? 1
+            : Math.min(
+                6,
+                Math.max(2, Math.ceil(this.cellSize / 2))
+            );
+
+        const horizontalExtent =
+            this.gridColumns * this.cellSize;
+
+        const verticalExtent =
+            this.gridRows * this.cellSize;
+
+        this.createGridAxis({
+            count: this.gridColumns,
+            subdivisions: divisions,
+            fixedAxis: "x",
+            extent: verticalExtent
+        });
+
+        this.createGridAxis({
+            count: this.gridRows,
+            subdivisions: divisions,
+            fixedAxis: "z",
+            extent: horizontalExtent
+        });
+    }
+
+    createGridAxis({
+        count,
+        subdivisions,
+        fixedAxis,
+        extent
+    }) {
+        for (let index = 0; index <= count; index++) {
+            const offset = index * this.cellSize;
+            const points = [];
+
+            for (
+                let step = 0;
+                step <= subdivisions *
+                    Math.ceil(extent / this.cellSize);
+                step++
+            ) {
+                const distance =
+                    Math.min(
+                        step * this.cellSize / subdivisions,
+                        extent
+                    );
+
+                const worldPoint = fixedAxis === "x"
+                    ? {
+                        x: this.gridOrigin.x + offset,
+                        z: this.gridOrigin.z + distance
+                    }
+                    : {

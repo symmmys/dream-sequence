@@ -1,0 +1,300 @@
+
+let terrain = null;
+
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+function lerp(a, b, t) {
+    return a + (b - a) * t;
+}
+
+
+function hashNoise2D(x, z, seed = 1) {
+    let n =
+        Math.imul(x | 0, 374761393) +
+        Math.imul(z | 0, 668265263) +
+        Math.imul(seed | 0, 1442695041);
+
+    n = Math.imul(
+        n ^ (n >>> 13),
+        1274126177
+    );
+
+    n ^= n >>> 16;
+
+    return (n >>> 0) / 4294967295;
+}
+
+function smoothNoise2D(x, z, seed = 1) {
+    const ix = Math.floor(x);
+    const iz = Math.floor(z);
+
+    const fx = x - ix;
+    const fz = z - iz;
+
+    const u = fx * fx * (3 - 2 * fx);
+    const v = fz * fz * (3 - 2 * fz);
+
+    const a = hashNoise2D(ix, iz, seed);
+    const b = hashNoise2D(ix + 1, iz, seed);
+    const c = hashNoise2D(ix, iz + 1, seed);
+    const d = hashNoise2D(ix + 1, iz + 1, seed);
+
+    return lerp(
+        lerp(a, b, u),
+        lerp(c, d, u),
+        v
+    );
+}
+
+function fractalNoise2D(x, z, seed, octaves = 3) {
+    let value = 0;
+    let amplitude = 1;
+    let frequency = 1;
+    let totalAmplitude = 0;
+
+    for (let i = 0; i < octaves; i++) {
+        value += smoothNoise2D(
+            x * frequency,
+            z * frequency,
+            seed + i * 1013
+        ) * amplitude;
+
+        totalAmplitude += amplitude;
+        amplitude *= 0.5;
+        frequency *= 2;
+    }
+
+    return value / totalAmplitude;
+}
+
+function mixColor(a, b, t) {
+    return [
+        lerp(a[0], b[0], t),
+        lerp(a[1], b[1], t),
+        lerp(a[2], b[2], t)
+    ];
+}
+
+
+function pixelValue(x, z) {
+    const t = terrain;
+
+    x = clamp(x, 0, t.width - 1);
+    z = clamp(z, 0, t.height - 1);
+
+    const index = (Math.floor(z) * t.width + Math.floor(x)) * 4;
+    const p = t.pixels;
+
+    const r = p[index];
+    const g = p[index + 1];
+    const b = p[index + 2];
+
+    switch (t.heightChannel) {
+        case "red": return r / 255;
+        case "green": return g / 255;
+        case "blue": return b / 255;
+        case "luminance":
+            return (
+                0.2126 * r +
+                0.7152 * g +
+                0.0722 * b
+            ) / 255;
+        case "average":
+        default:
+            return (r + g + b) / 765;
+    }
+}
+
+function heightAt(x, z) {
+    const u = clamp(
+        (x - terrain.minX) / terrain.worldSize,
+        0, 1
+    );
+
+    const v = clamp(
+        (z - terrain.minZ) / terrain.worldSize,
+        0, 1
+    );
+
+    const px = u * (terrain.width - 1);
+    const pz = v * (terrain.height - 1);
+
+    const x0 = Math.floor(px);
+    const z0 = Math.floor(pz);
+
+    const x1 = Math.min(x0 + 1, terrain.width - 1);
+    const z1 = Math.min(z0 + 1, terrain.height - 1);
+
+    const tx = px - x0;
+    const tz = pz - z0;
+
+    const a = lerp(
+        pixelValue(x0, z0),
+        pixelValue(x1, z0),
+        tx
+    );
+
+    const b = lerp(
+        pixelValue(x0, z1),
+        pixelValue(x1, z1),
+        tx
+    );
+
+    return lerp(
+        terrain.minHeight,
+        terrain.maxHeight,
+        lerp(a, b, tz)
+    );
+}
+
+
+function terrainColor(height, slope, worldX, worldZ) {
+    const t = terrain;
+
+    const elevation = clamp(
+        (height - t.minHeight) /
+        (t.maxHeight - t.minHeight),
+        0,
+        1
+    );
+
+    const slopeDegrees =
+        Math.atan(slope) * 180 / Math.PI;
+
+    const seed = 91827;
+
+    const moisture = fractalNoise2D(
+        worldX * 0.0025,
+        worldZ * 0.0025,
+        seed + 1000,
+        3
+    ) * 0.7 + fractalNoise2D(
+        worldX * 0.009,
+        worldZ * 0.009,
+        seed + 3000,
+        3
+    ) * 0.3;
+
+    const geology = fractalNoise2D(
+        worldX * 0.00375,
+        worldZ * 0.00375,
+        seed + 2000,
+        3
+    );
+
+    const variation = fractalNoise2D(
+        worldX * 0.025,
+        worldZ * 0.025,
+        seed + 5000,
+        3
+    );
+
+    const exposure = clamp(
+        slopeDegrees / 42 * 0.78 +
+        elevation * 0.12 +
+        (1 - moisture) * 0.10,
+        0,
+        1
+    );
+
+    const soilType = soilTypeAt(worldX, worldZ);
+
+    const soilColors = {
+        clay:        [0.48, 0.29, 0.21],
+        sand:        [0.92, 0.73, 0.39],
+        fertileSoil: [0.43, 0.29, 0.18],
+        loam:        [0.35, 0.25, 0.16],
+        organic:     [0.19, 0.13, 0.085],
+        scree:       [0.43, 0.41, 0.37]
+    };
+
+    const soil = soilColors[soilType];
+    let bedrock;
+
+    if (geology < 0.28) {
+        bedrock = [0.63, 0.60, 0.51];
+    } else if (geology < 0.48) {
+        bedrock = [0.65, 0.43, 0.29];
+    } else if (geology > 0.84) {
+        bedrock = [0.24, 0.23, 0.22];
+    } else {
+        bedrock = [0.39, 0.37, 0.34];
+    }
+
+    if (elevation > 0.70 && geology > 0.65) {
+        bedrock = [0.39, 0.37, 0.34];
+    }
+
+    // Blend surface material into exposed bedrock.
+    let color = mixColor(
+        soil,
+        bedrock,
+        clamp((exposure - 0.25) / 0.65)
+    );
+
+    // Small-scale geological surface variation.
+    const texture = 0.92 + variation * 0.16;
+
+    color = color.map(value =>
+        clamp(value * texture, 0, 1)
+    );
+
+    // Snow and frost at the highest elevations.
+    if (elevation > 0.92) {
+        const snow = [0.82, 0.84, 0.82];
+
+        color = mixColor(
+            color,
+            snow,
+            clamp((elevation - 0.92) / 0.08)
+        );
+    }
+
+    return color;
+}
+
+
+
+
+
+function generateMesh(job) {
+    const {
+        x,
+        z,
+        size,
+        lod,
+        neighborLODs
+    } = job;
+
+    const resolution = [32, 16, 8, 4][
+        clamp(lod, 0, 3)
+    ];
+
+    const stride = size / resolution;
+
+    const count = (resolution + 1) ** 2;
+
+    const positions = new Float32Array(count * 3);
+    const normals = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 4);
+
+    const indices = new Uint32Array(
+        resolution * resolution * 6
+    );
+
+    const originX = x * size;
+    const originZ = z * size;
+
+    const edgeHeight = (edge, index) => {
+        const otherLOD = neighborLODs[edge];
+
+        const worldDistance = index * stride;
+
+        if (otherLOD <= lod) {
+            return edge === "north" || edge === "south"
+                ? heightAt(
+                    originX + worldDistance,
+                    originZ + (edge === "south" ? size : 0)
+                )

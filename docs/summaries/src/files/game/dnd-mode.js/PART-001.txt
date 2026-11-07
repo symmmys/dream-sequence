@@ -1,0 +1,300 @@
+
+import { DnDCharacter } from "./dnd-character.js";
+import { DnDBattle } from "./dnd-battle.js";
+import { DnDActionRegistry } from "./dnd-action-registry.js";
+import { DnDTacticalUI } from "./dnd-tactical-ui.js";
+
+const GRID_SETTINGS_KEY = "somnium-dnd-grid-settings";
+const MIN_GRID_DIMENSION = 2;
+const MAX_GRID_DIMENSION = 300;
+const MIN_CELL_SIZE = 0.5;
+const MAX_CELL_SIZE = 1000;
+const INITIAL_CAMERA_RADIUS = 30;
+const FOCUS_CAMERA_RADIUS_FACTOR = 2;
+const MIN_CAMERA_RADIUS = 8;
+const MAX_CHARACTER_ALTITUDE = 1000;
+const CHARACTER_MODEL_DIAMETER = 0.8;
+const REPLAY_STEP_DELAY = 450;
+
+function resolveDelay(milliseconds, resolve) {
+    setTimeout(resolve, milliseconds);
+}
+
+function waitFor(milliseconds) {
+    return new Promise(resolveDelay.bind(null, milliseconds));
+}
+
+function serializeBattle(battle) {
+    return battle.toJSON();
+}
+
+function serializeCharacter(character) {
+    return character.toJSON();
+}
+
+function restoreBattle(data) {
+    return DnDBattle.fromJSON(data);
+}
+
+function isMovementAction(action) {
+    return action.type === "move";
+}
+
+function isMatchingCharacter(character, candidate) {
+    return candidate.id === character.id;
+}
+
+class DnDMode {
+    constructor(scene, terrain, spatialTransform) {
+        this.initializeDomainState(scene, terrain, spatialTransform);
+        this.initializeRenderingState();
+        this.initializeRuntimeState(scene);
+        this.restoreGridOriginPreference();
+        this.restoreGridConfiguration();
+        this.initializeBattlefield();
+        this.restoreBattles();
+        this.logRestorationSummary();
+        this.initializeTacticalInterface();
+        this.bindSceneInput();
+        this.refreshUI();
+    }
+
+    initializeDomainState(scene, terrain, spatialTransform) {
+        this.scene = scene;
+        this.terrain = terrain;
+        this.transform = spatialTransform;
+        this.characters = new Map();
+        this.battles = [];
+        this.activeBattle = null;
+        this.selectedCharacter = null;
+        this.gridRows = 20;
+        this.gridColumns = 20;
+        this.cellSize = 10;
+        this.maxGridRows = MAX_GRID_DIMENSION;
+        this.maxGridColumns = MAX_GRID_DIMENSION;
+        this.gridOrigin = { x: -100, z: -100 };
+    }
+
+    initializeRenderingState() {
+        this.gridMeshes = [];
+        this.characterMeshes = new Map();
+        this.movementMeshes = [];
+        this.movementPreview = false;
+        this.movementColors = { movement: "#25d9a0", dash: "#e9a33c" };
+        this.movementMaterials = {};
+        this.targetMovementMesh = null;
+        this.hoveredMovementCell = null;
+        this.initializeMovementTargetMaterial();
+    }
+
+    initializeMovementTargetMaterial() {
+        this.targetMovementMaterial = new BABYLON.StandardMaterial(
+            "dnd-movement-target-material",
+            this.scene
+        );
+        this.targetMovementMaterial.diffuseColor = new BABYLON.Color3(0.15, 0.55, 1.0);
+        this.targetMovementMaterial.emissiveColor = new BABYLON.Color3(0.1, 0.35, 0.9);
+        this.targetMovementMaterial.alpha = 0.3;
+        this.targetMovementMaterial.disableLighting = true;
+        this.targetMovementMaterial.backFaceCulling = false;
+    }
+
+    initializeRuntimeState(scene) {
+        this.disposed = false;
+        this.replaying = false;
+        this.gamepadState = new Map();
+        this.gamepadDeadzone = 0.5;
+        this.gamepadRepeatDelay = 180;
+        this.lastGamepadNavigation = 0;
+        this.actionRegistry = new DnDActionRegistry();
+        this.registerDefaultActionHandlers();
+        this.previousCamera = scene.activeCamera;
+        this.camera = null;
+    }
+
+    restoreGridOriginPreference() {
+        try {
+            const savedOrigin = JSON.parse(
+                localStorage.getItem("somnium-dnd-grid-origin") || "null"
+            );
+            if (this.isValidGridOrigin(savedOrigin?.x, savedOrigin?.z)) {
+                this.gridOrigin = savedOrigin;
+            }
+        } catch (error) {
+            console.warn("[DnD] Unable to restore grid origin.", error);
+        }
+    }
+
+    initializeBattlefield() {
+        this.createMovementMaterials();
+        this.createCamera();
+        this.createGrid();
+    }
+
+    logRestorationSummary() {
+        console.info(
+            "[DnD] Character restoration complete:",
+            this.characters.size,
+            "characters"
+        );
+    }
+
+    initializeTacticalInterface() {
+        try {
+            this.createUI();
+            console.info("[DnD] Tactical UI initialized.");
+        } catch (error) {
+            this.handleInterfaceInitializationFailure(error);
+        }
+    }
+
+    handleInterfaceInitializationFailure(error) {
+        console.error("[DnD] Tactical UI initialization failed:", error);
+        this.ui = null;
+        this.panel = null;
+    }
+
+    bindSceneInput() {
+        this.onKeyDown = this.handleKeyDown.bind(this);
+        this.onPointerObservable = this.handlePointerObservable.bind(this);
+        this.scene.onPointerObservable.add(this.onPointerObservable);
+        this.onGamepadUpdate = this.updateGamepad.bind(this);
+        this.gamepadObserver = this.scene.onBeforeRenderObservable.add(
+            this.onGamepadUpdate
+        );
+    }
+
+    handleKeyDown(event) {
+        if (this.disposed) return;
+        if (this.isFormInput(event.target)) return;
+
+        if (event.code === "ArrowLeft") {
+            event.preventDefault();
+            this.selectAdjacentCharacter(-1);
+        }
+
+        if (event.code === "ArrowRight") {
+            event.preventDefault();
+            this.selectAdjacentCharacter(1);
+        }
+    }
+
+    isFormInput(target) {
+        return (
+            target instanceof HTMLElement &&
+            ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)
+        );
+    }
+
+    handlePointerObservable(pointerInfo) {
+        if (this.disposed) return;
+
+        if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERMOVE) {
+            this.handleMovementPointerMove();
+            return;
+        }
+
+        if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERPICK) {
+            this.handlePointerPick();
+        }
+    }
+
+    isMovementCellMesh(mesh) {
+        return Boolean(mesh.metadata?.dndMovementCell);
+    }
+
+    isSelectableBattlefieldMesh(mesh) {
+        return Boolean(
+            mesh.metadata?.dndMovementCell ||
+            mesh.metadata?.dndCharacterId
+        );
+    }
+
+    handleMovementPointerMove() {
+        if (!this.movementPreview) {
+            this.setTargetMovementCell(null);
+            return;
+        }
+
+        const pick = this.scene.pick(
+            this.scene.pointerX,
+            this.scene.pointerY,
+            this.isMovementCellMesh.bind(this),
+            false,
+            this.camera
+        );
+
+        const cell = pick?.hit
+            ? pick.pickedMesh?.metadata?.dndMovementCell
+            : null;
+
+        this.setTargetMovementCell(cell || null);
+    }
+
+    handlePointerPick() {
+        const pick = this.scene.pick(
+            this.scene.pointerX,
+            this.scene.pointerY,
+            this.isSelectableBattlefieldMesh.bind(this),
+            false,
+            this.camera
+        );
+
+        if (!pick?.hit || !pick.pickedMesh) return;
+
+        const movementCell =
+            pick.pickedMesh.metadata?.dndMovementCell;
+
+        if (movementCell && this.movementPreview) {
+            this.handleMovementCellPick(movementCell);
+            return;
+        }
+
+        const characterId = pick.pickedMesh.metadata?.dndCharacterId;
+
+        if (characterId) this.selectCharacter(characterId);
+    }
+
+    handleMovementCellPick(cell) {
+        const character = this.getActiveCharacter();
+        if (!character) return;
+
+        try {
+            this.moveCharacter(character, cell.row, cell.col, cell.type);
+            this.setTargetMovementCell(null);
+        } catch (error) {
+            this.showMessage(error.message);
+        }
+    }
+
+    createMovementMaterials() {
+        for (const type of ["movement", "dash"]) {
+            const material = new BABYLON.StandardMaterial(
+                `dnd-${type}-range-material`,
+                this.scene
+            );
+
+            const color = BABYLON.Color3.FromHexString(
+                this.movementColors[type]
+            );
+
+            material.diffuseColor = color;
+
+            material.emissiveColor = color.scale(0.65);
+
+            // More transparent battlefield overlays.
+            material.alpha = 0.22;
+
+            material.disableLighting = true;
+            material.backFaceCulling = false;
+
+            // Keep overlays visible without depth-writing.
+            material.needDepthPrePass = true;
+
+            this.movementMaterials[type] = material;
+        }
+    }
+
+    setMovementColors(colors) {
+        for (const type of ["movement", "dash"]) {
+            if (!/^#[0-9a-f]{6}$/i.test(colors[type] || "")) {

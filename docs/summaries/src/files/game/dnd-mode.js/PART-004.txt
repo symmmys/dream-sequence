@@ -1,0 +1,300 @@
+    createCharacterFormationLayout(index, count) {
+        const radius = this.getCharacterFormationRadius(count);
+        const angle = (Math.PI * 2 * index) / count;
+        const spacing = 2 * radius * Math.sin(Math.PI / count);
+        const boundaryDiameter = this.cellSize - 2 * radius;
+        const scale = this.getCharacterFormationScale(
+            spacing,
+            boundaryDiameter
+        );
+
+        return {
+            offsetX: Math.cos(angle) * radius,
+            offsetZ: Math.sin(angle) * radius,
+            scale
+        };
+    }
+
+    getCharacterFormationRadius(count) {
+        const requiredRadius = CHARACTER_MODEL_DIAMETER /
+            (2 * Math.sin(Math.PI / count));
+        return Math.min(this.cellSize * 0.25, requiredRadius);
+    }
+
+    getCharacterFormationScale(spacing, boundaryDiameter) {
+        return Math.min(
+            1,
+            spacing / CHARACTER_MODEL_DIAMETER,
+            boundaryDiameter / CHARACTER_MODEL_DIAMETER
+        );
+    }
+
+    getCellOccupants(row, col) {
+        const occupants = [];
+        for (const character of this.characters.values()) {
+            if (
+                character.position.row === row &&
+                character.position.col === col
+            ) {
+                occupants.push(character);
+            }
+        }
+        return occupants;
+    }
+
+    getCharacterAltitude(character) {
+        const altitude = character.position.altitude;
+        if (!Number.isFinite(altitude)) return 0;
+        return Math.min(MAX_CHARACTER_ALTITUDE, Math.max(0, altitude));
+    }
+
+    updateCharacterPosition(character, position) {
+        character.position.x = position.x;
+        character.position.y = position.y;
+        character.position.z = position.z;
+        character.position.altitude = this.getCharacterAltitude(character);
+    }
+
+    updateCharacterMeshTransform(meshes, projected, layout) {
+        meshes.root.position.set(projected.x, projected.y, projected.z);
+        meshes.root.scaling.set(layout.scale, layout.scale, layout.scale);
+    }
+
+    setCharacterAltitude(character, altitude) {
+        this.validateCharacterAltitude(character, altitude);
+        character.position.altitude = altitude;
+        this.syncCharacter(character);
+        this.saveCharacters();
+        this.refreshUI();
+        return true;
+    }
+
+    validateCharacterAltitude(character, altitude) {
+        if (!this.characters.has(character?.id)) {
+            throw new Error("Select a character before changing altitude.");
+        }
+        if (
+            !Number.isFinite(altitude) ||
+            altitude < 0 ||
+            altitude > MAX_CHARACTER_ALTITUDE
+        ) {
+            throw new Error(`Altitude must be between 0 and ${MAX_CHARACTER_ALTITUDE} world units.`);
+        }
+    }
+
+    removeCharacter(characterId) {
+        const character = this.characters.get(characterId);
+        if (!character) return false;
+        this.validateCharacterRemoval(characterId);
+        this.disposeCharacterMeshes(characterId);
+        this.characters.delete(characterId);
+        this.clearCharacterSelection(characterId);
+        this.syncAllCharacters();
+        this.updateCharacterHighlight();
+        this.saveCharacters();
+        this.refreshUI();
+        return true;
+    }
+
+    validateCharacterRemoval(characterId) {
+        if (this.activeBattle?.characterIds.includes(characterId)) {
+            throw new Error("Cannot remove a character participating in the active battle.");
+        }
+    }
+
+    disposeCharacterMeshes(characterId) {
+        const meshes = this.characterMeshes.get(characterId);
+        if (!meshes) return;
+        meshes.root.dispose(false, true);
+        meshes.material.dispose();
+        meshes.headMaterial.dispose();
+        this.characterMeshes.delete(characterId);
+    }
+
+    clearCharacterSelection(characterId) {
+        if (this.selectedCharacter?.id === characterId) {
+            this.selectedCharacter = null;
+        }
+    }
+
+    updateCharacterHighlight() {
+        for (const [id, meshes] of this.characterMeshes) {
+            const selected =
+                id === this.selectedCharacter?.id;
+
+            meshes.material.diffuseColor = selected
+                ? new BABYLON.Color3(1, 0.78, 0.15)
+                : new BABYLON.Color3(0.2, 0.65, 0.9);
+
+            meshes.material.emissiveColor = selected
+                ? new BABYLON.Color3(0.25, 0.12, 0)
+                : BABYLON.Color3.Black();
+        }
+    }
+
+    selectCharacter(id) {
+        const character = this.characters.get(id);
+
+        if (!character) return;
+
+        this.selectedCharacter = character;
+
+        this.updateCharacterHighlight();
+
+        if (!this.activeBattle) {
+            this.centerCameraOnActiveCharacter();
+        }
+
+        this.refreshMovementPreview();
+        this.refreshUI();
+    }
+
+    selectAdjacentCharacter(direction) {
+        const characters = [...this.characters.values()];
+
+        if (!characters.length) return;
+
+        let index = -1;
+        for (let cursor = 0; cursor < characters.length; cursor++) {
+            if (characters[cursor].id === this.selectedCharacter?.id) {
+                index = cursor;
+                break;
+            }
+        }
+
+        index = index < 0
+            ? 0
+            : (index + direction + characters.length) %
+                characters.length;
+
+        this.selectCharacter(characters[index].id);
+    }
+
+    updateGamepad() {
+        if (this.disposed) return;
+
+        const gamepads = navigator.getGamepads?.();
+
+        if (!gamepads) return;
+
+        for (const gamepad of gamepads) {
+            if (!gamepad || !gamepad.connected) continue;
+
+            const left = gamepad.buttons[14]?.pressed;
+            const right = gamepad.buttons[15]?.pressed;
+
+            const shoulderLeft =
+                gamepad.buttons[4]?.pressed;
+
+            const shoulderRight =
+                gamepad.buttons[5]?.pressed;
+
+            const axis = gamepad.axes[0] || 0;
+
+            const direction =
+                left || shoulderLeft ||
+                axis < -this.gamepadDeadzone
+                    ? -1
+                    : right || shoulderRight ||
+                        axis > this.gamepadDeadzone
+                        ? 1
+                        : 0;
+
+            const previous =
+                this.gamepadState.get(gamepad.index) || 0;
+
+            const now = performance.now();
+
+            if (
+                direction !== 0 &&
+                (
+                    direction !== previous ||
+                    now - this.lastGamepadNavigation >
+                        this.gamepadRepeatDelay
+                )
+            ) {
+                this.selectAdjacentCharacter(direction);
+                this.lastGamepadNavigation = now;
+            }
+
+            this.gamepadState.set(
+                gamepad.index,
+                direction
+            );
+        }
+    }
+
+    startBattle() {
+        if (this.activeBattle?.active) {
+            this.showMessage("A battle is already in progress.");
+            return;
+        }
+
+        if (!this.characters.size) {
+            this.showMessage(
+                "Add characters before starting a battle."
+            );
+            return;
+        }
+
+        const battle = new DnDBattle({
+            name: `Battle ${this.battles.length + 1}`,
+            characterIds: [...this.characters.keys()]
+        });
+
+        battle.start([...this.characters.values()]);
+
+        this.activeBattle = battle;
+        this.battles.push(battle);
+
+        this.setMovementPreview(false);
+        this.selectCharacter(battle.activeCharacterId);
+        this.centerCameraOnActiveCharacter();
+
+        this.saveBattle();
+        this.refreshUI();
+    }
+
+    advanceTurn() {
+        if (!this.activeBattle?.active) return;
+
+        this.setMovementPreview(false);
+
+        this.activeBattle.advanceTurn();
+
+        const activeId =
+            this.activeBattle.activeCharacterId;
+
+        this.selectCharacter(activeId);
+        this.centerCameraOnActiveCharacter();
+
+        this.saveBattle();
+        this.refreshUI();
+    }
+
+    endBattle() {
+        if (!this.activeBattle) return;
+
+        this.setMovementPreview(false);
+
+        this.activeBattle.stop();
+        this.saveBattle();
+
+        this.activeBattle = null;
+
+        this.refreshUI();
+        this.centerCameraOnActiveCharacter();
+    }
+
+    moveCharacter(character, row, col, movementType = null) {
+        this.validateMovementRequest(character, row, col);
+        const destination = this.createMovementDestination(
+            character,
+            row,
+            col,
+            movementType
+        );
+        this.activeBattle.move(
+            character,
+            destination.position,
+            destination.distance

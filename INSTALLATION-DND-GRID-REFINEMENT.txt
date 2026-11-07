@@ -1,0 +1,43 @@
+SOMNIUM — D&D GRID REFINEMENT
+============================
+
+This update refines tactical character positioning, movement/action economy, Dash,
+and flight altitude while preserving the previously repaired editor and grid controls.
+
+RECOMMENDED INSTALLATION
+------------------------
+1. Make a backup of your current Somnium project folder.
+2. Extract the complete project archive.
+3. Replace your working project folder with the extracted project contents.
+4. Start Somnium through your usual local development server.
+
+The complete archive is the safest option because it includes all synchronized source,
+style-conformance documentation, project-state notes, and regenerated source summaries.
+
+TARGETED REPLACEMENT ARCHIVE
+----------------------------
+The smaller replacement archive contains these coordinated files:
+
+- src/game/dnd-mode.js
+- src/game/dnd-tactical-ui.js
+- src/game/dnd-battle.js
+- src/game/dnd-character.js
+- tests/dnd-tactical-logic.test.mjs
+- docs/STYLE-CONFORMANCE.md
+- docs/PROJECT-STATE.txt
+
+Extract it at the project root, allowing the files to overwrite their matching paths.
+
+AUTOMATED REGRESSION TESTS
+--------------------------
+From the project root, run:
+
+node --experimental-default-type=module --test tests/dnd-tactical-logic.test.mjs
+
+The focused suite currently contains eight passing tests.
+
+VERIFICATION LIMITATION
+-----------------------
+All 88 JavaScript files under src/ pass Node.js syntax checks. The focused tactical tests
+pass. Actual Babylon.js browser rendering, pointer picking, and save/reload behavior still
+need to be verified in the running browser application.

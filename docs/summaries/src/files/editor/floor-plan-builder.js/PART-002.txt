@@ -1,0 +1,72 @@
+                        y: this.doorHeight
+                    },
+                    "wood"
+                );
+
+                counts.doors++;
+                continue;
+            }
+
+            if (segment.kind === "window") {
+                const windowDepth = Math.max(
+                    0.035,
+                    detectedThickness * 0.25
+                );
+
+                add(
+                    "glazing",
+                    "window",
+                    {
+                        x,
+                        y: floorY + this.windowSill +
+                            this.windowHeight * 0.5,
+                        z
+                    },
+                    horizontal
+                        ? {
+                            x: length,
+                            y: this.windowHeight,
+                            z: windowDepth
+                        }
+                        : {
+                            x: windowDepth,
+                            y: this.windowHeight,
+                            z: length
+                        },
+                    "glass"
+                );
+
+                counts.windows++;
+            }
+        }
+
+        const legacyTypes = new Set([
+            "floor-plan-floor",
+            "floor-plan-wall",
+            "floor-plan-door",
+            "floor-plan-window"
+        ]);
+
+        building.components = building.components.filter(
+            component =>
+                !legacyTypes.has(component.type) &&
+                !component.type?.startsWith(prefix)
+        );
+
+        for (const component of generated) {
+            building.addComponent(component);
+        }
+
+        return {
+            ...counts,
+            floor: floorIndex,
+            totalSegments: segments.length,
+            wallHeight: this.wallHeight,
+            wallThickness: this.wallThickness,
+            generatedComponents: generated.length
+        };
+    }
+}
+
+export { FloorPlanBuilder };
+

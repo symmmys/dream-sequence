@@ -1,0 +1,47 @@
+            throw new Error("Invalid battle save.");
+        }
+
+        const battle = new DnDBattle(data);
+
+        if (
+            !Number.isInteger(battle.currentTurn) ||
+            battle.currentTurn < 0 ||
+            (
+                battle.turnOrder.length > 0 &&
+                battle.currentTurn >= battle.turnOrder.length
+            )
+        ) {
+            throw new Error(
+                "Invalid saved initiative position."
+            );
+        }
+
+        if (
+            !Number.isInteger(battle.round) ||
+            battle.round < 1
+        ) {
+            throw new Error("Invalid saved battle round.");
+        }
+
+        for (const id of battle.turnOrder) {
+            const resources = battle.turnResources[id];
+
+            if (!resources) {
+                battle.turnResources[id] = {
+                    actionUsed: false,
+                    bonusActionUsed: false,
+                    dashUsed: false,
+                    movementUsed: 0,
+                    speechCount: 0
+                };
+            } else {
+                resources.dashUsed ??= false;
+            }
+        }
+
+        return battle;
+    }
+}
+
+export { DnDBattle };
+

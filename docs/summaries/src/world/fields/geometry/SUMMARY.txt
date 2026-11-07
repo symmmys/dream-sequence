@@ -1,0 +1,134 @@
+SOMNIUM — DIRECTORY SUMMARY
+================================================================
+
+Directory: src/world/fields/geometry/
+Generated: 2026-11-07T06:14:05
+
+PURPOSE
+----------------------------------------------------------------
+Automatically generated source inventory.
+See individual modules for detailed responsibilities.
+
+SOURCE FILES (DIRECT CHILDREN)
+----------------------------------------------------------------
+- euclidean-geometry.js
+  Exports: EuclideanGeometry
+- geodesic-solver.js
+  Exports: GeodesicSolver
+- geometry-model.js
+  Exports: GeometryModel
+- geometry-renderer.js
+  Exports: GeometryRenderer
+- geometry-shader-manager.js
+  Exports: GeometryShaderManager
+- hyperbolic-camera-controller.js
+  Exports: HyperbolicCameraController
+- poincare-geometry.js
+  Exports: PoincareGeometry
+- poincare-metric.js
+  Exports: PoincareMetric
+- poincare-projection.js
+  Exports: PoincareProjection
+- spatial-transform.js
+  Exports: SpatialTransform
+
+DIRECT DEPENDENCIES
+----------------------------------------------------------------
+- src/world/fields/metric-tensor.js
+
+DEPENDENTS
+----------------------------------------------------------------
+- src/scene/create-scene.js
+- src/world/fields/world-field-system.js
+
+INDIVIDUAL SOURCE FILE MANIFEST
+----------------------------------------------------------------
+
+Documentation root: docs/summaries/src/world/fields/geometry/files/
+Maximum chunk size: 300 lines
+Text files documented: 10
+Binary/unreadable files skipped: 0
+
+Each source file has its own documentation directory.
+INDEX.txt identifies the original file and maps every
+numbered part to its exact original source line range.
+
+SOURCE: src/world/fields/geometry/euclidean-geometry.js
+  Lines: 34
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/euclidean-geometry.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/euclidean-geometry.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/geodesic-solver.js
+  Lines: 134
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/geodesic-solver.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/geodesic-solver.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/geometry-model.js
+  Lines: 29
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/geometry-model.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/geometry-model.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/geometry-renderer.js
+  Lines: 474
+  Parts: 2
+  Index: docs/summaries/src/world/fields/geometry/files/geometry-renderer.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/geometry-renderer.js/PART-001.txt
+    docs/summaries/src/world/fields/geometry/files/geometry-renderer.js/PART-002.txt
+
+SOURCE: src/world/fields/geometry/geometry-shader-manager.js
+  Lines: 454
+  Parts: 2
+  Index: docs/summaries/src/world/fields/geometry/files/geometry-shader-manager.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/geometry-shader-manager.js/PART-001.txt
+    docs/summaries/src/world/fields/geometry/files/geometry-shader-manager.js/PART-002.txt
+
+SOURCE: src/world/fields/geometry/hyperbolic-camera-controller.js
+  Lines: 265
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/hyperbolic-camera-controller.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/hyperbolic-camera-controller.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/poincare-geometry.js
+  Lines: 128
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/poincare-geometry.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/poincare-geometry.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/poincare-metric.js
+  Lines: 379
+  Parts: 2
+  Index: docs/summaries/src/world/fields/geometry/files/poincare-metric.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/poincare-metric.js/PART-001.txt
+    docs/summaries/src/world/fields/geometry/files/poincare-metric.js/PART-002.txt
+
+SOURCE: src/world/fields/geometry/poincare-projection.js
+  Lines: 313
+  Parts: 2
+  Index: docs/summaries/src/world/fields/geometry/files/poincare-projection.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/poincare-projection.js/PART-001.txt
+    docs/summaries/src/world/fields/geometry/files/poincare-projection.js/PART-002.txt
+
+SOURCE: src/world/fields/geometry/spatial-transform.js
+  Lines: 343
+  Parts: 2
+  Index: docs/summaries/src/world/fields/geometry/files/spatial-transform.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/spatial-transform.js/PART-001.txt
+    docs/summaries/src/world/fields/geometry/files/spatial-transform.js/PART-002.txt
+
+RECURSIVE SOURCE DUMP
+----------------------------------------------------------------
+- SOURCE.txt contains recursively collected text files.
+- Individual files are available under files/.
+- Individual PART files contain at most 300 lines.
+- Binary files are excluded from both representations.
+
+NOTES
+----------------------------------------------------------------
+- Dependencies are extracted from relative JavaScript imports.
+- External packages and browser globals are not represented.
+- Dynamic imports using computed paths may not be detected.
+- This inventory does not establish runtime initialization order.
+- Generated documentation is not authoritative application state.

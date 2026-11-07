@@ -1,0 +1,144 @@
+    // HEIGHTMAP DIAGNOSTICS
+    // ------------------------------------------------
+
+    getDiagnostics(gridSize = 32) {
+        if (!this.ready || !this.pixels) {
+            return {
+                ready: false,
+                message: "Heightmap has not finished loading."
+            };
+        }
+
+        gridSize = Math.max(
+            1,
+            Math.floor(gridSize)
+        );
+
+        let minimum = Infinity;
+        let maximum = -Infinity;
+        let sum = 0;
+        let count = 0;
+
+        const samples = [];
+
+        for (let z = 0; z <= gridSize; z++) {
+            for (let x = 0; x <= gridSize; x++) {
+                const wx = this.min.x +
+                    (x / gridSize) * this.worldSize;
+
+                const wz = this.min.z +
+                    (z / gridSize) * this.worldSize;
+
+                const height = this.sampleHeight(
+                    wx,
+                    wz
+                );
+
+                minimum = Math.min(minimum, height);
+                maximum = Math.max(maximum, height);
+
+                sum += height;
+                count++;
+
+                if (
+                    (
+                        x === 0 ||
+                        x === Math.floor(gridSize / 2) ||
+                        x === gridSize
+                    ) &&
+                    (
+                        z === 0 ||
+                        z === Math.floor(gridSize / 2) ||
+                        z === gridSize
+                    )
+                ) {
+                    samples.push({
+                        x: wx,
+                        z: wz,
+                        height
+                    });
+                }
+            }
+        }
+
+        return {
+            ready: true,
+
+            image: {
+                width: this.width,
+                height: this.height
+            },
+
+            worldSize: this.worldSize,
+
+            heightChannel: this.heightChannel,
+
+            configuredHeightRange: {
+                min: this.minHeight,
+                max: this.maxHeight
+            },
+
+            sampledHeightRange: {
+                min: minimum,
+                max: maximum,
+                variation: maximum - minimum
+            },
+
+            averageHeight: sum / count,
+
+            sampleCount: count,
+            samples
+        };
+    }
+
+    dispose() {
+        this.pixels = null;
+        this.ready = false;
+        this.diagnostics = null;
+    }
+
+	sampleMapValue(x, z) {
+    if (!this.ready || !this.pixels) {
+        return null;
+    }
+
+    if (
+        x < this.min.x ||
+        x > this.max.x ||
+        z < this.min.z ||
+        z > this.max.z
+    ) {
+        return null;
+    }
+
+    const { u, v } = this.getNormalizedCoordinates(x, z);
+
+    const px = u * (this.width - 1);
+    const pz = v * (this.height - 1);
+
+    const x0 = Math.floor(px);
+    const z0 = Math.floor(pz);
+
+    const x1 = Math.min(x0 + 1, this.width - 1);
+    const z1 = Math.min(z0 + 1, this.height - 1);
+
+    const tx = px - x0;
+    const tz = pz - z0;
+
+    const a = BABYLON.Scalar.Lerp(
+        this.getPixelValue(x0, z0),
+        this.getPixelValue(x1, z0),
+        tx
+    );
+
+    const b = BABYLON.Scalar.Lerp(
+        this.getPixelValue(x0, z1),
+        this.getPixelValue(x1, z1),
+        tx
+    );
+
+    return BABYLON.Scalar.Lerp(a, b, tz);
+}
+
+}
+

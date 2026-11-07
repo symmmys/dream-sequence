@@ -1,0 +1,47 @@
+        }))
+);
+
+            }
+        }
+
+        for (const item of edges.values()) {
+            this.generateWall(
+                output,
+                item.edge,
+                item.openings,
+                item.floorY,
+                item.height,
+                item.thickness
+            );
+        }
+
+        // Explicitly placed modular objects.
+        const components = [
+            ...building.components,
+            ...building.furniture,
+            ...building.fixtures
+        ];
+
+        for (const component of components) {
+            const kind = component.kind === "furniture"
+                ? "furniture"
+                : component.kind === "fixture"
+                    ? "fixtures"
+                    : component.kind;
+
+            this.createBox(
+                output,
+                kind,
+                component.position,
+                component.dimensions,
+                component.rotation,
+                component.material
+            );
+        }
+
+        return output;
+    }
+}
+
+export { BuildingGenerator };
+

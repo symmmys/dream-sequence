@@ -1,0 +1,233 @@
+SOMNIUM — AI DEVELOPMENT ENTRYPOINT
+
+Version: 1.0 Last updated: November 6, 2026
+
+1. Purpose
+
+This document is the primary navigation and orientation guide for AI-assisted development of Somnium.
+
+It explains how to inspect the project, understand its architecture, retrieve complete source files, and implement changes without violating established architectural requirements.
+
+This document should be read at the beginning of every new development session.
+
+2. Mandatory Documentation
+
+Before modifying application code, consult:
+
+docs/PROJECT-STATE.txt
+docs/STYLE-GUIDE.txt
+docs/STYLE-CONFORMANCE.md
+docs/DEPENDENCY-GRAPH.md
+The relevant subsystem's SUMMARY.txt
+
+The project state describes what currently exists and what remains unfinished.
+
+The style guide establishes mandatory architectural and development standards.
+The style-conformance ledger tracks reviewed source files and refactoring priorities; update it
+whenever a source file is inspected.
+
+The dependency graph describes statically identifiable relationships between source modules.
+
+Subsystem summaries identify module responsibilities and source relationships.
+
+3. Documentation Architecture
+
+The documentation generator is maintained in:
+
+write_summary.sh
+
+It generates:
+
+docs/summaries/src/**/SUMMARY.txt
+docs/summaries/src/**/SOURCE.txt
+docs/summaries/src/**/files/**/INDEX.txt
+docs/summaries/src/**/files/**/PART-NNN.txt
+docs/DEPENDENCY-GRAPH.md
+tree.txt
+source.txt
+3.1 Directory summaries
+
+Each source directory has a corresponding documentation directory.
+
+For example:
+
+Source: src/game/
+
+Documentation: docs/summaries/src/game/
+
+3.2 Recursive source dumps
+
+Each directory's SOURCE.txt contains recursively collected UTF-8 text files.
+
+These dumps are useful for understanding subsystem contents and locating implementations.
+
+They should not be treated as a substitute for individual source files when generating complete replacements.
+
+3.3 Individual source documentation
+
+Every readable source file has its own documentation directory.
+
+Example:
+
+docs/summaries/src/game/files/dnd-mode.js/
+
+This contains:
+
+INDEX.txt
+PART-001.txt
+PART-002.txt
+Additional parts as necessary.
+3.4 Source chunk conventions
+
+Individual source files are divided into chunks of no more than 300 original lines.
+
+The index specifies:
+
+Original source path.
+Total source line count.
+Number of chunks.
+Original starting and ending line numbers.
+Corresponding part filenames.
+
+Chunks must be read in ascending numerical order.
+
+When reconstructing a file, concatenate the chunk contents without inserting additional separator lines.
+
+Do not omit, duplicate, or independently rewrite source lines during reconstruction.
+
+The original source files remain authoritative.
+
+4. Public Documentation URL Structure
+
+The project documentation is published at:
+
+https://theinfinitycorporation.com/somniumsunrise/openthedooropenitwide/
+
+Examples:
+
+Project tree:
+
+tree.txt
+
+Master source:
+
+source.txt
+
+Project state:
+
+docs/PROJECT-STATE.txt
+
+Style guide:
+
+docs/STYLE-GUIDE.txt
+
+Dependency graph:
+
+docs/DEPENDENCY-GRAPH.md
+
+Game subsystem summary:
+
+docs/summaries/src/game/SUMMARY.txt
+
+Game subsystem source dump:
+
+docs/summaries/src/game/SOURCE.txt
+
+Individual D&D mode index:
+
+docs/summaries/src/game/files/dnd-mode.js/INDEX.txt
+
+Individual D&D tactical UI index:
+
+docs/summaries/src/game/files/dnd-tactical-ui.js/INDEX.txt
+
+Individual source parts follow the same URL structure.
+
+For example:
+
+docs/summaries/src/game/files/dnd-mode.js/PART-001.txt
+
+5. Development Requirements
+
+All substantial modifications must follow docs/STYLE-GUIDE.txt.
+
+In particular:
+
+Preserve separation between domain state and rendering.
+Maintain explicit resource ownership.
+Prefer composition over inheritance.
+Avoid dependency cycles.
+Keep transformations explicit.
+Prefer pure, independently testable algorithms.
+Preserve persistence compatibility.
+Implement explicit migration strategies for changed data models.
+Avoid unnecessary allocations and duplicated computations.
+Preserve existing behavior unless a deliberate change is authorized.
+
+Do not invent existing methods, interfaces, or dependencies.
+
+Read the actual implementation before generating replacements.
+
+Avoid wholesale rewrites when focused architectural improvements are sufficient.
+
+6. Source Modification and Delivery
+
+When modifying existing modules:
+
+Inspect the complete original source.
+Identify existing public interfaces.
+Identify consumers and dependencies.
+Identify authoritative and derived data.
+Preserve existing functionality.
+Implement the requested changes.
+Check related integration points.
+Provide complete replacement files wherever practical.
+Keep individual code blocks below 300 lines where practical.
+Identify any additional files requiring modification.
+
+Do not claim that code has been tested unless it has actually been executed.
+
+Do not claim that files have been modified in the repository unless that action has actually occurred.
+
+7. Documentation Maintenance
+
+Substantial architectural changes should be reflected in PROJECT-STATE.txt.
+
+Changes to documentation-generation behavior should be reflected in write_summary.sh.
+
+Regenerate documentation after source changes:
+
+./write_summary.sh
+
+Generated documentation must not become authoritative application state.
+
+The source tree remains the authoritative implementation.
+
+8. Current Development Priorities
+
+The active tactical-system work includes:
+
+Repairing D&D character rendering.
+Repairing movement previews.
+Supporting independently configurable rectangular battlefield dimensions.
+Increasing the maximum grid dimensions to 300 × 300.
+Consolidating grid configuration and persistence.
+Introducing centralized logging with configurable verbosity.
+Investigating world-worker failures.
+Reducing unnecessary chunk-system diagnostic output.
+
+These priorities should be checked against the latest PROJECT-STATE documentation before implementation.
+
+9. Final Principle
+
+Treat Somnium as an evolving architectural system rather than a collection of unrelated code files.
+
+Understand the existing implementation before changing it.
+
+Preserve working behavior.
+
+Prefer composable, testable transformations.
+
+Make architectural boundaries clearer with each substantial modification.
+
+The goal is a continuously extensible, maintainable, mathematically coherent world system.

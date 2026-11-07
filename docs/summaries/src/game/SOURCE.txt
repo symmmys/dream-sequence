@@ -1,0 +1,4598 @@
+SOMNIUM — DIRECTORY SOURCE DUMP
+========================================================================
+
+Directory: src/game/
+Generated: 2026-11-07T06:14:04
+
+This file contains recursively collected UTF-8 text files.
+Binary files and excluded directories are omitted.
+File paths are relative to the project root.
+
+
+========================================================================
+FILE: src/game/camera-controller.js
+========================================================================
+
+
+class CharacterCameraController {
+    constructor(
+        scene,
+        camera,
+        character,
+        spatialTransform,
+        options = {}
+    ) {
+        this.scene = scene;
+        this.camera = camera;
+        this.character = character;
+        this.transform = spatialTransform;
+
+        // Initial camera framing.
+        this.distance = options.distance ?? 24;
+        this.height = options.height ?? 8;
+
+        // Zoom constraints.
+        this.minDistance = options.minDistance ?? 6;
+        this.maxDistance = options.maxDistance ?? 120;
+        this.zoomSensitivity = options.zoomSensitivity ?? 0.001;
+
+        // Camera smoothing.
+        this.smoothing = options.smoothing ?? 8;
+
+        this.enabled = false;
+        this.disposed = false;
+
+        this.onWheel = event => {
+            if (!this.enabled || this.disposed) return;
+
+            event.preventDefault();
+
+            // Normalize zoom according to wheel movement.
+            const zoomFactor = Math.exp(
+                event.deltaY * this.zoomSensitivity
+            );
+
+            this.distance = BABYLON.Scalar.Clamp(
+                this.distance * zoomFactor,
+                this.minDistance,
+                this.maxDistance
+            );
+        };
+
+        this.canvas = scene.getEngine().getRenderingCanvas();
+
+        if (this.canvas) {
+            this.canvas.addEventListener(
+                "wheel",
+                this.onWheel,
+                { passive: false }
+            );
+        }
+    }
+
+    // -----------------------------------------
+    // CAMERA POSITION
+    // -----------------------------------------
+
+    getDesiredPosition() {
+        const player = this.character.worldPosition;
+        const yaw = this.character.yaw;
+
+        const desiredWorld = {
+            x: player.x - Math.sin(yaw) * this.distance,
+            y: player.y + this.height,
+            z: player.z - Math.cos(yaw) * this.distance
+        };
+
+        return this.transform.worldToRender(desiredWorld);
+    }
+
+    getTargetPosition() {
+        const player = this.character.worldPosition;
+
+        return this.transform.worldToRender({
+            x: player.x,
+            y: player.y + 1.3,
+            z: player.z
+        });
+    }
+
+    // -----------------------------------------
+    // UPDATE
+    // -----------------------------------------
+
+    update(deltaSeconds) {
+        if (!this.enabled || this.disposed) return;
+
+        const desired = this.getDesiredPosition();
+        const target = this.getTargetPosition();
+
+        const alpha = 1 - Math.exp(
+            -this.smoothing * Math.max(0, deltaSeconds)
+        );
+
+        const desiredVector = new BABYLON.Vector3(
+            desired.x,
+            desired.y,
+            desired.z
+        );
+
+        BABYLON.Vector3.LerpToRef(
+            this.camera.position,
+            desiredVector,
+            alpha,
+            this.camera.position
+        );
+
+        this.camera.setTarget(
+            new BABYLON.Vector3(
+                target.x,
+                target.y,
+                target.z
+            )
+        );
+    }
+
+    // -----------------------------------------
+    // ENABLE / DISABLE
+    // -----------------------------------------
+
+    setEnabled(enabled) {
+        this.enabled = !!enabled && !this.disposed;
+
+        if (this.enabled) {
+            // Immediately initialize the camera position
+            // when entering third-person mode.
+            const desired = this.getDesiredPosition();
+
+            this.camera.position.set(
+                desired.x,
+                desired.y,
+                desired.z
+            );
+
+            const target = this.getTargetPosition();
+
+            this.camera.setTarget(
+                new BABYLON.Vector3(
+                    target.x,
+                    target.y,
+                    target.z
+                )
+            );
+        }
+    }
+
+    // -----------------------------------------
+    // ZOOM CONFIGURATION
+    // -----------------------------------------
+
+    setDistance(distance) {
+        this.distance = BABYLON.Scalar.Clamp(
+            distance,
+            this.minDistance,
+            this.maxDistance
+        );
+    }
+
+    getZoomInfo() {
+        return {
+            distance: this.distance,
+            height: this.height,
+            minDistance: this.minDistance,
+            maxDistance: this.maxDistance
+        };
+    }
+
+    // -----------------------------------------
+    // CLEANUP
+    // -----------------------------------------
+
+    dispose() {
+        if (this.disposed) return;
+
+        this.disposed = true;
+        this.enabled = false;
+
+        if (this.canvas) {
+            this.canvas.removeEventListener(
+                "wheel",
+                this.onWheel
+            );
+        }
+
+        this.camera = null;
+        this.character = null;
+    }
+}
+
+export { CharacterCameraController };
+
+
+========================================================================
+FILE: src/game/dnd-action-registry.js
+========================================================================
+
+
+class DnDActionRegistry {
+    constructor() {
+        this.handlers = new Map();
+    }
+
+    register(type, handler) {
+        if (
+            typeof type !== "string" ||
+            !type.trim()
+        ) {
+            throw new Error(
+                "Handler type is required."
+            );
+        }
+
+        if (typeof handler !== "function") {
+            throw new Error(
+                "Handler must be a function."
+            );
+        }
+
+        if (this.handlers.has(type)) {
+            throw new Error(
+                `Handler already registered: ${type}`
+            );
+        }
+
+        this.handlers.set(type, handler);
+
+        return () => this.unregister(type);
+    }
+
+    unregister(type) {
+        return this.handlers.delete(type);
+    }
+
+    has(type) {
+        return this.handlers.has(type) ||
+            this.handlers.has("*");
+    }
+
+    async dispatch(context, payload) {
+        if (
+            !payload ||
+            typeof payload !== "object" ||
+            Array.isArray(payload)
+        ) {
+            throw new Error(
+                "Action payload must be a JSON object."
+            );
+        }
+
+        const type = payload.type;
+
+        if (
+            typeof type !== "string" ||
+            !type.trim()
+        ) {
+            throw new Error(
+                "Generic actions require a type field."
+            );
+        }
+
+        const handler =
+            this.handlers.get(type) ||
+            this.handlers.get("*");
+
+        if (!handler) {
+            throw new Error(
+                `No handler registered for: ${type}`
+            );
+        }
+
+        const safePayload = JSON.parse(
+            JSON.stringify(payload)
+        );
+
+        return handler({
+            ...context,
+            payload: safePayload
+        });
+    }
+}
+
+export { DnDActionRegistry };
+
+
+========================================================================
+FILE: src/game/dnd-battle.js
+========================================================================
+
+
+const SAVE_VERSION = 2;
+
+function compareInitiative(first, second) {
+    return getInitiativeScore(second) - getInitiativeScore(first);
+}
+
+function getInitiativeScore(character) {
+    return character.initiative + character.getModifier("dexterity");
+}
+
+function getCharacterId(character) {
+    return character.id;
+}
+
+function isDashAction(description) {
+    return typeof description === "string" &&
+        description.trim().toLowerCase() === "dash";
+}
+
+function cloneData(value) {
+    if (value === undefined) return undefined;
+    return JSON.parse(JSON.stringify(value));
+}
+
+class DnDBattle {
+    constructor(options = {}) {
+        this.id = options.id || crypto.randomUUID();
+        this.name = options.name || "Untitled Battle";
+
+        this.characterIds = [...(options.characterIds || [])];
+        this.turnOrder = [...(options.turnOrder || [])];
+
+        this.currentTurn = options.currentTurn ?? 0;
+        this.round = options.round ?? 1;
+
+        this.actions = cloneData(options.actions || []);
+        this.active = options.active ?? false;
+
+        this.createdAt = options.createdAt || Date.now();
+        this.updatedAt = options.updatedAt || this.createdAt;
+
+        this.turnResources = cloneData(
+            options.turnResources || {}
+        );
+
+        this.metadata = cloneData(options.metadata || {});
+    }
+
+    addCharacter(character) {
+        if (!this.characterIds.includes(character.id)) {
+            this.characterIds.push(character.id);
+        }
+    }
+
+    start(characters) {
+        const eligibleCharacters = [];
+        for (const character of characters) {
+            if (this.characterIds.includes(character.id)) {
+                eligibleCharacters.push(character);
+            }
+        }
+
+        eligibleCharacters.sort(compareInitiative);
+        this.turnOrder = eligibleCharacters.map(getCharacterId);
+
+        if (!this.turnOrder.length) {
+            throw new Error(
+                "A battle needs at least one character."
+            );
+        }
+
+        this.currentTurn = 0;
+        this.round = 1;
+        this.active = true;
+
+        this.beginCharacterTurn(this.activeCharacterId);
+
+        this.record("battle-start", {
+            round: this.round,
+            turnOrder: [...this.turnOrder]
+        });
+    }
+
+    get activeCharacterId() {
+        return this.active
+            ? this.turnOrder[this.currentTurn] ?? null
+            : null;
+    }
+
+    get currentResources() {
+        return this.turnResources[this.activeCharacterId] || null;
+    }
+
+    beginCharacterTurn(characterId) {
+        this.turnResources[characterId] = {
+            actionUsed: false,
+            bonusActionUsed: false,
+            dashUsed: false,
+            movementUsed: 0,
+            speechCount: 0
+        };
+
+        this.record("turn-start", {
+            characterId,
+            round: this.round
+        });
+    }
+
+    assertActiveCharacter(character) {
+        if (!this.active) {
+            throw new Error("Battle is not active.");
+        }
+
+        if (
+            !character ||
+            character.id !== this.activeCharacterId
+        ) {
+            throw new Error(
+                "It is not this character's turn."
+            );
+        }
+    }
+
+    record(type, data = {}) {
+        const event = {
+            id: crypto.randomUUID(),
+            index: this.actions.length,
+            round: this.round,
+            turn: this.currentTurn,
+            characterId: this.activeCharacterId,
+            timestamp: Date.now(),
+            type,
+            data: cloneData(data)
+        };
+
+        this.actions.push(event);
+        this.updatedAt = event.timestamp;
+
+        return event;
+    }
+
+    useAction(character, payload = {}) {
+        this.assertActiveCharacter(character);
+
+        const resources = this.currentResources;
+
+        if (resources.actionUsed) {
+            throw new Error(
+                "This character has already used their action."
+            );
+        }
+
+        resources.actionUsed = true;
+
+        resources.dashUsed = isDashAction(payload.description);
+
+        return this.record("action", {
+            characterId: character.id,
+            ...cloneData(payload)
+        });
+    }
+
+    useBonusAction(character, payload = {}) {
+        this.assertActiveCharacter(character);
+
+        const resources = this.currentResources;
+
+        if (resources.bonusActionUsed) {
+            throw new Error(
+                "This character has already used their bonus action."
+            );
+        }
+
+        resources.bonusActionUsed = true;
+
+        return this.record("bonus-action", {
+            characterId: character.id,
+            ...cloneData(payload)
+        });
+    }
+
+    move(character, position, distance) {
+        this.assertActiveCharacter(character);
+
+        const resources = this.currentResources;
+
+        if (!Number.isFinite(distance) || distance < 0) {
+            throw new Error("Invalid movement distance.");
+        }
+
+        const allowance = character.movement *
+            (resources.dashUsed ? 2 : 1);
+
+        const remaining = Math.max(
+            0,
+            allowance - resources.movementUsed
+        );
+
+        if (distance > remaining) {
+            throw new Error(
+                "Movement exceeds remaining allowance."
+            );
+        }
+
+        const from = { ...character.position };
+
+        character.position = { ...position };
+        resources.movementUsed += distance;
+
+        return this.record("move", {
+            characterId: character.id,
+            from,
+            to: { ...position },
+            distance,
+            remainingMovement:
+                allowance - resources.movementUsed,
+            dashUsed: resources.dashUsed
+        });
+    }
+
+    speak(character, text) {
+        this.assertActiveCharacter(character);
+
+        if (typeof text !== "string" || !text.trim()) {
+            throw new Error("Speech cannot be empty.");
+        }
+
+        this.currentResources.speechCount++;
+
+        return this.record("speech", {
+            characterId: character.id,
+            text: text.trim()
+        });
+    }
+
+    useOther(character, payload) {
+        this.assertActiveCharacter(character);
+
+        if (
+            !payload ||
+            typeof payload !== "object" ||
+            Array.isArray(payload)
+        ) {
+            throw new Error(
+                "Other actions require a JSON object."
+            );
+        }
+
+        return this.record("other", {
+            characterId: character.id,
+            payload: cloneData(payload)
+        });
+    }
+
+    advanceTurn() {
+        if (!this.active) return;
+
+        this.currentTurn++;
+
+        if (this.currentTurn >= this.turnOrder.length) {
+            this.currentTurn = 0;
+            this.round++;
+        }
+
+        this.beginCharacterTurn(this.activeCharacterId);
+
+        this.record("turn-advance", {
+            characterId: this.activeCharacterId,
+            round: this.round
+        });
+    }
+
+    stop() {
+        if (!this.active) return;
+
+        this.record("battle-end");
+        this.active = false;
+    }
+
+    toJSON() {
+        return {
+            version: SAVE_VERSION,
+            id: this.id,
+            name: this.name,
+            characterIds: [...this.characterIds],
+            turnOrder: [...this.turnOrder],
+            currentTurn: this.currentTurn,
+            round: this.round,
+            actions: cloneData(this.actions),
+            active: this.active,
+            createdAt: this.createdAt,
+            updatedAt: this.updatedAt,
+            turnResources: cloneData(this.turnResources),
+            metadata: cloneData(this.metadata)
+        };
+    }
+
+    static fromJSON(data) {
+        if (!data || typeof data !== "object") {
+            throw new Error("Invalid battle save.");
+        }
+
+        const battle = new DnDBattle(data);
+
+        if (
+            !Number.isInteger(battle.currentTurn) ||
+            battle.currentTurn < 0 ||
+            (
+                battle.turnOrder.length > 0 &&
+                battle.currentTurn >= battle.turnOrder.length
+            )
+        ) {
+            throw new Error(
+                "Invalid saved initiative position."
+            );
+        }
+
+        if (
+            !Number.isInteger(battle.round) ||
+            battle.round < 1
+        ) {
+            throw new Error("Invalid saved battle round.");
+        }
+
+        for (const id of battle.turnOrder) {
+            const resources = battle.turnResources[id];
+
+            if (!resources) {
+                battle.turnResources[id] = {
+                    actionUsed: false,
+                    bonusActionUsed: false,
+                    dashUsed: false,
+                    movementUsed: 0,
+                    speechCount: 0
+                };
+            } else {
+                resources.dashUsed ??= false;
+            }
+        }
+
+        return battle;
+    }
+}
+
+export { DnDBattle };
+
+
+========================================================================
+FILE: src/game/dnd-character.js
+========================================================================
+
+
+const DEFAULT_STATS = {
+    strength: 10,
+    dexterity: 10,
+    constitution: 10,
+    intelligence: 10,
+    wisdom: 10,
+    charisma: 10
+};
+
+function cloneData(value) {
+    if (value === undefined || value === null) {
+        return value;
+    }
+
+    return JSON.parse(JSON.stringify(value));
+}
+
+class DnDCharacter {
+    constructor(options = {}) {
+        this.id = options.id || crypto.randomUUID();
+        this.name = options.name || "Adventurer";
+        this.race = options.race || "Unknown";
+        this.className = options.className || "Adventurer";
+        this.level = options.level || 1;
+
+        this.stats = {
+            ...DEFAULT_STATS,
+            ...(options.stats || {})
+        };
+
+        this.hitPoints = options.hitPoints ?? 12;
+        this.maxHitPoints = options.maxHitPoints ?? 12;
+        this.armorClass = options.armorClass ?? 10;
+        this.initiative = options.initiative ?? 0;
+        this.movement = options.movement ?? 30;
+
+        this.position = {
+            x: options.position?.x ?? 0,
+            y: options.position?.y ?? 0,
+            z: options.position?.z ?? 0,
+            row: options.position?.row ?? 0,
+            col: options.position?.col ?? 0,
+            altitude: Math.max(
+                0,
+                Number.isFinite(options.position?.altitude)
+                    ? options.position.altitude
+                    : 0
+            )
+        };
+
+        this.genetics = {
+            genome: cloneData(options.genetics?.genome) ?? {},
+            ancestry: cloneData(options.genetics?.ancestry) ?? [],
+            mutations: cloneData(options.genetics?.mutations) ?? []
+        };
+
+        this.materialProperties = {
+            density: options.materialProperties?.density ?? 1,
+            hardness: options.materialProperties?.hardness ?? 1,
+            elasticity: options.materialProperties?.elasticity ?? 1,
+            thermalConductivity:
+                options.materialProperties?.thermalConductivity ?? 1,
+            composition:
+                options.materialProperties?.composition ?? "organic"
+        };
+
+        this.equipment = cloneData(options.equipment) ?? [];
+        this.conditions = cloneData(options.conditions) ?? [];
+    }
+
+    getModifier(attribute) {
+        const score = this.stats[attribute];
+
+        if (typeof score !== "number") {
+            throw new Error(`Unknown attribute: ${attribute}`);
+        }
+
+        return Math.floor((score - 10) / 2);
+    }
+
+    takeDamage(amount) {
+        this.hitPoints = Math.max(
+            0,
+            this.hitPoints - Math.max(0, amount)
+        );
+    }
+
+    heal(amount) {
+        this.hitPoints = Math.min(
+            this.maxHitPoints,
+            this.hitPoints + Math.max(0, amount)
+        );
+    }
+
+    // Explicit serialization avoids calling toJSON recursively.
+    toJSON() {
+        return {
+            id: this.id,
+            name: this.name,
+            race: this.race,
+            className: this.className,
+            level: this.level,
+
+            stats: { ...this.stats },
+
+            hitPoints: this.hitPoints,
+            maxHitPoints: this.maxHitPoints,
+            armorClass: this.armorClass,
+            initiative: this.initiative,
+            movement: this.movement,
+
+            position: { ...this.position },
+
+            genetics: cloneData(this.genetics),
+            materialProperties: cloneData(this.materialProperties),
+
+            equipment: cloneData(this.equipment),
+            conditions: cloneData(this.conditions)
+        };
+    }
+
+    static fromJSON(data) {
+        return new DnDCharacter(data);
+    }
+}
+
+export { DnDCharacter };
+
+
+========================================================================
+FILE: src/game/dnd-mode.js
+========================================================================
+
+
+import { DnDCharacter } from "./dnd-character.js";
+import { DnDBattle } from "./dnd-battle.js";
+import { DnDActionRegistry } from "./dnd-action-registry.js";
+import { DnDTacticalUI } from "./dnd-tactical-ui.js";
+
+const GRID_SETTINGS_KEY = "somnium-dnd-grid-settings";
+const MIN_GRID_DIMENSION = 2;
+const MAX_GRID_DIMENSION = 300;
+const MIN_CELL_SIZE = 0.5;
+const MAX_CELL_SIZE = 1000;
+const INITIAL_CAMERA_RADIUS = 30;
+const FOCUS_CAMERA_RADIUS_FACTOR = 2;
+const MIN_CAMERA_RADIUS = 8;
+const MAX_CHARACTER_ALTITUDE = 1000;
+const CHARACTER_MODEL_DIAMETER = 0.8;
+const REPLAY_STEP_DELAY = 450;
+
+function resolveDelay(milliseconds, resolve) {
+    setTimeout(resolve, milliseconds);
+}
+
+function waitFor(milliseconds) {
+    return new Promise(resolveDelay.bind(null, milliseconds));
+}
+
+function serializeBattle(battle) {
+    return battle.toJSON();
+}
+
+function serializeCharacter(character) {
+    return character.toJSON();
+}
+
+function restoreBattle(data) {
+    return DnDBattle.fromJSON(data);
+}
+
+function isMovementAction(action) {
+    return action.type === "move";
+}
+
+function isMatchingCharacter(character, candidate) {
+    return candidate.id === character.id;
+}
+
+class DnDMode {
+    constructor(scene, terrain, spatialTransform) {
+        this.initializeDomainState(scene, terrain, spatialTransform);
+        this.initializeRenderingState();
+        this.initializeRuntimeState(scene);
+        this.restoreGridOriginPreference();
+        this.restoreGridConfiguration();
+        this.initializeBattlefield();
+        this.restoreBattles();
+        this.logRestorationSummary();
+        this.initializeTacticalInterface();
+        this.bindSceneInput();
+        this.refreshUI();
+    }
+
+    initializeDomainState(scene, terrain, spatialTransform) {
+        this.scene = scene;
+        this.terrain = terrain;
+        this.transform = spatialTransform;
+        this.characters = new Map();
+        this.battles = [];
+        this.activeBattle = null;
+        this.selectedCharacter = null;
+        this.gridRows = 20;
+        this.gridColumns = 20;
+        this.cellSize = 10;
+        this.maxGridRows = MAX_GRID_DIMENSION;
+        this.maxGridColumns = MAX_GRID_DIMENSION;
+        this.gridOrigin = { x: -100, z: -100 };
+    }
+
+    initializeRenderingState() {
+        this.gridMeshes = [];
+        this.characterMeshes = new Map();
+        this.movementMeshes = [];
+        this.movementPreview = false;
+        this.movementColors = { movement: "#25d9a0", dash: "#e9a33c" };
+        this.movementMaterials = {};
+        this.targetMovementMesh = null;
+        this.hoveredMovementCell = null;
+        this.initializeMovementTargetMaterial();
+    }
+
+    initializeMovementTargetMaterial() {
+        this.targetMovementMaterial = new BABYLON.StandardMaterial(
+            "dnd-movement-target-material",
+            this.scene
+        );
+        this.targetMovementMaterial.diffuseColor = new BABYLON.Color3(0.15, 0.55, 1.0);
+        this.targetMovementMaterial.emissiveColor = new BABYLON.Color3(0.1, 0.35, 0.9);
+        this.targetMovementMaterial.alpha = 0.3;
+        this.targetMovementMaterial.disableLighting = true;
+        this.targetMovementMaterial.backFaceCulling = false;
+    }
+
+    initializeRuntimeState(scene) {
+        this.disposed = false;
+        this.replaying = false;
+        this.gamepadState = new Map();
+        this.gamepadDeadzone = 0.5;
+        this.gamepadRepeatDelay = 180;
+        this.lastGamepadNavigation = 0;
+        this.actionRegistry = new DnDActionRegistry();
+        this.registerDefaultActionHandlers();
+        this.previousCamera = scene.activeCamera;
+        this.camera = null;
+    }
+
+    restoreGridOriginPreference() {
+        try {
+            const savedOrigin = JSON.parse(
+                localStorage.getItem("somnium-dnd-grid-origin") || "null"
+            );
+            if (this.isValidGridOrigin(savedOrigin?.x, savedOrigin?.z)) {
+                this.gridOrigin = savedOrigin;
+            }
+        } catch (error) {
+            console.warn("[DnD] Unable to restore grid origin.", error);
+        }
+    }
+
+    initializeBattlefield() {
+        this.createMovementMaterials();
+        this.createCamera();
+        this.createGrid();
+    }
+
+    logRestorationSummary() {
+        console.info(
+            "[DnD] Character restoration complete:",
+            this.characters.size,
+            "characters"
+        );
+    }
+
+    initializeTacticalInterface() {
+        try {
+            this.createUI();
+            console.info("[DnD] Tactical UI initialized.");
+        } catch (error) {
+            this.handleInterfaceInitializationFailure(error);
+        }
+    }
+
+    handleInterfaceInitializationFailure(error) {
+        console.error("[DnD] Tactical UI initialization failed:", error);
+        this.ui = null;
+        this.panel = null;
+    }
+
+    bindSceneInput() {
+        this.onKeyDown = this.handleKeyDown.bind(this);
+        this.onPointerObservable = this.handlePointerObservable.bind(this);
+        this.scene.onPointerObservable.add(this.onPointerObservable);
+        this.onGamepadUpdate = this.updateGamepad.bind(this);
+        this.gamepadObserver = this.scene.onBeforeRenderObservable.add(
+            this.onGamepadUpdate
+        );
+    }
+
+    handleKeyDown(event) {
+        if (this.disposed) return;
+        if (this.isFormInput(event.target)) return;
+
+        if (event.code === "ArrowLeft") {
+            event.preventDefault();
+            this.selectAdjacentCharacter(-1);
+        }
+
+        if (event.code === "ArrowRight") {
+            event.preventDefault();
+            this.selectAdjacentCharacter(1);
+        }
+    }
+
+    isFormInput(target) {
+        return (
+            target instanceof HTMLElement &&
+            ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)
+        );
+    }
+
+    handlePointerObservable(pointerInfo) {
+        if (this.disposed) return;
+
+        if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERMOVE) {
+            this.handleMovementPointerMove();
+            return;
+        }
+
+        if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERPICK) {
+            this.handlePointerPick();
+        }
+    }
+
+    isMovementCellMesh(mesh) {
+        return Boolean(mesh.metadata?.dndMovementCell);
+    }
+
+    isSelectableBattlefieldMesh(mesh) {
+        return Boolean(
+            mesh.metadata?.dndMovementCell ||
+            mesh.metadata?.dndCharacterId
+        );
+    }
+
+    handleMovementPointerMove() {
+        if (!this.movementPreview) {
+            this.setTargetMovementCell(null);
+            return;
+        }
+
+        const pick = this.scene.pick(
+            this.scene.pointerX,
+            this.scene.pointerY,
+            this.isMovementCellMesh.bind(this),
+            false,
+            this.camera
+        );
+
+        const cell = pick?.hit
+            ? pick.pickedMesh?.metadata?.dndMovementCell
+            : null;
+
+        this.setTargetMovementCell(cell || null);
+    }
+
+    handlePointerPick() {
+        const pick = this.scene.pick(
+            this.scene.pointerX,
+            this.scene.pointerY,
+            this.isSelectableBattlefieldMesh.bind(this),
+            false,
+            this.camera
+        );
+
+        if (!pick?.hit || !pick.pickedMesh) return;
+
+        const movementCell =
+            pick.pickedMesh.metadata?.dndMovementCell;
+
+        if (movementCell && this.movementPreview) {
+            this.handleMovementCellPick(movementCell);
+            return;
+        }
+
+        const characterId = pick.pickedMesh.metadata?.dndCharacterId;
+
+        if (characterId) this.selectCharacter(characterId);
+    }
+
+    handleMovementCellPick(cell) {
+        const character = this.getActiveCharacter();
+        if (!character) return;
+
+        try {
+            this.moveCharacter(character, cell.row, cell.col, cell.type);
+            this.setTargetMovementCell(null);
+        } catch (error) {
+            this.showMessage(error.message);
+        }
+    }
+
+    createMovementMaterials() {
+        for (const type of ["movement", "dash"]) {
+            const material = new BABYLON.StandardMaterial(
+                `dnd-${type}-range-material`,
+                this.scene
+            );
+
+            const color = BABYLON.Color3.FromHexString(
+                this.movementColors[type]
+            );
+
+            material.diffuseColor = color;
+
+            material.emissiveColor = color.scale(0.65);
+
+            // More transparent battlefield overlays.
+            material.alpha = 0.22;
+
+            material.disableLighting = true;
+            material.backFaceCulling = false;
+
+            // Keep overlays visible without depth-writing.
+            material.needDepthPrePass = true;
+
+            this.movementMaterials[type] = material;
+        }
+    }
+
+    setMovementColors(colors) {
+        for (const type of ["movement", "dash"]) {
+            if (!/^#[0-9a-f]{6}$/i.test(colors[type] || "")) {
+                continue;
+            }
+
+            this.movementColors[type] = colors[type];
+
+            const color = BABYLON.Color3.FromHexString(
+                colors[type]
+            );
+
+            const material = this.movementMaterials[type];
+
+            material.diffuseColor = color;
+            material.emissiveColor = color.scale(0.55);
+        }
+
+        if (this.movementPreview) {
+            this.refreshMovementPreview();
+        }
+    }
+
+    restoreGridConfiguration() {
+        try {
+            const saved = JSON.parse(
+                localStorage.getItem(GRID_SETTINGS_KEY) || "null"
+            );
+
+            if (!saved || typeof saved !== "object") return;
+
+            // Accept both the current rectangular schema and legacy saves.
+            const rows = saved.rows ?? saved.gridRows ?? saved.gridSize;
+            const columns = saved.columns ?? saved.gridColumns ?? saved.gridSize;
+            const cellSize = saved.cellSize ?? this.cellSize;
+
+            if (
+                !this.validateGridDimensions(rows, columns) ||
+                !this.isValidCellSize(cellSize)
+            ) {
+                console.warn(
+                    "[DnD] Ignoring invalid saved grid configuration."
+                );
+                return;
+            }
+
+            this.gridRows = rows;
+            this.gridColumns = columns;
+            this.cellSize = cellSize;
+        } catch (error) {
+            console.warn(
+                "[DnD] Unable to restore grid configuration.",
+                error
+            );
+        }
+    }
+
+    saveGridConfiguration() {
+        try {
+            localStorage.setItem(
+                GRID_SETTINGS_KEY,
+                JSON.stringify({
+                    version: 2,
+                    rows: this.gridRows,
+                    columns: this.gridColumns,
+                    cellSize: this.cellSize
+                })
+            );
+            return true;
+        } catch (error) {
+            console.warn(
+                "[DnD] Grid configuration could not be persisted.",
+                error
+            );
+            return false;
+        }
+    }
+
+    createCamera() {
+        const canvas =
+            this.scene.getEngine().getRenderingCanvas();
+
+        this.camera = new BABYLON.ArcRotateCamera(
+            "dndTacticalCamera",
+            -Math.PI / 2,
+            Math.PI / 3,
+            BABYLON.Scalar.Clamp(
+                this.cellSize * 3,
+                MIN_CAMERA_RADIUS * 2,
+                INITIAL_CAMERA_RADIUS
+            ),
+            BABYLON.Vector3.Zero(),
+            this.scene
+        );
+
+        this.camera.lowerRadiusLimit = MIN_CAMERA_RADIUS;
+        this.camera.upperRadiusLimit = 1500;
+        this.camera.wheelPrecision = 30;
+
+        this.camera.panningSensibility = 0;
+        this.camera.inertia = 0.8;
+
+        this.camera.attachControl(canvas, true);
+
+        this.scene.activeCamera = this.camera;
+
+        this.centerCameraOnActiveCharacter();
+    }
+
+    getCameraFocusCharacter() {
+        return this.getActiveCharacter() || this.selectedCharacter;
+    }
+
+    centerCameraOnActiveCharacter() {
+        if (!this.camera) return false;
+        const character = this.getCameraFocusCharacter();
+        if (character) return this.centerCameraOnCharacter(character);
+        return this.centerCameraOnGridCenter();
+    }
+
+    centerCameraOnGridCenter() {
+        const row = (this.gridRows - 1) / 2;
+        const col = (this.gridColumns - 1) / 2;
+        const position = this.samplePosition(row, col);
+        const projected = this.transform.worldToRender({
+            x: position.x,
+            y: position.y + 1,
+            z: position.z
+        });
+        this.camera.setTarget(new BABYLON.Vector3(
+            projected.x,
+            projected.y,
+            projected.z
+        ));
+        return true;
+    }
+
+    centerCameraOnSelectedCharacter() {
+        if (!this.selectedCharacter || !this.camera) return false;
+        return this.centerCameraOnCharacter(this.selectedCharacter);
+    }
+
+    centerCameraOnCharacter(character) {
+        if (!character || !this.camera) return false;
+
+        const meshes = this.characterMeshes.get(character.id);
+        if (!meshes) return false;
+
+        this.syncCharacter(character);
+        const target = meshes.root.position.add(
+            new BABYLON.Vector3(0, 1, 0)
+        );
+        this.camera.setTarget(target);
+        return true;
+    }
+
+    zoomToActiveCharacter() {
+        const character = this.getCameraFocusCharacter();
+
+        if (!character || !this.camera) {
+            this.showMessage("Select a character or start a battle first.");
+            return false;
+        }
+
+        this.centerCameraOnCharacter(character);
+        this.clearCameraInertia();
+        this.camera.lowerRadiusLimit = MIN_CAMERA_RADIUS;
+        this.camera.radius = BABYLON.Scalar.Clamp(
+            this.cellSize * FOCUS_CAMERA_RADIUS_FACTOR,
+            MIN_CAMERA_RADIUS,
+            32
+        );
+
+        return true;
+    }
+
+    clearCameraInertia() {
+        if (!this.camera) return;
+
+        this.camera.inertialRadiusOffset = 0;
+        this.camera.inertialAlphaOffset = 0;
+        this.camera.inertialBetaOffset = 0;
+        this.camera.inertialPanningX = 0;
+        this.camera.inertialPanningY = 0;
+    }
+
+    // Retained for compatibility with earlier UI integrations.
+    zoomToGrid() {
+        return this.zoomToActiveCharacter();
+    }
+
+    worldPosition(row, col) {
+        return {
+            x: this.gridOrigin.x + (col + 0.5) * this.cellSize,
+            z: this.gridOrigin.z + (row + 0.5) * this.cellSize
+        };
+    }
+
+    samplePosition(row, col) {
+        const position = this.worldPosition(row, col);
+
+        const sample = this.terrain.sampleAt(
+            position.x,
+            position.z
+        );
+
+        if (!sample) {
+            throw new Error(
+                "Unable to sample battlefield terrain."
+            );
+        }
+
+        return {
+            ...position,
+            y: sample.y,
+            row,
+            col
+        };
+    }
+
+    projectTerrainPoint(point) {
+        const sample = this.terrain.sampleAt(
+            point.x,
+            point.z
+        );
+
+        if (!sample) return null;
+
+        const projected = this.transform.worldToRender({
+            x: point.x,
+            y: sample.y + 0.5,
+            z: point.z
+        });
+
+        return new BABYLON.Vector3(
+            projected.x,
+            projected.y,
+            projected.z
+        );
+    }
+
+    createGrid() {
+        this.disposeGridMeshes();
+
+        const largeGrid =
+            this.gridRows * this.gridColumns > 10000;
+
+        const divisions = largeGrid
+            ? 1
+            : Math.min(
+                6,
+                Math.max(2, Math.ceil(this.cellSize / 2))
+            );
+
+        const horizontalExtent =
+            this.gridColumns * this.cellSize;
+
+        const verticalExtent =
+            this.gridRows * this.cellSize;
+
+        this.createGridAxis({
+            count: this.gridColumns,
+            subdivisions: divisions,
+            fixedAxis: "x",
+            extent: verticalExtent
+        });
+
+        this.createGridAxis({
+            count: this.gridRows,
+            subdivisions: divisions,
+            fixedAxis: "z",
+            extent: horizontalExtent
+        });
+    }
+
+    createGridAxis({
+        count,
+        subdivisions,
+        fixedAxis,
+        extent
+    }) {
+        for (let index = 0; index <= count; index++) {
+            const offset = index * this.cellSize;
+            const points = [];
+
+            for (
+                let step = 0;
+                step <= subdivisions *
+                    Math.ceil(extent / this.cellSize);
+                step++
+            ) {
+                const distance =
+                    Math.min(
+                        step * this.cellSize / subdivisions,
+                        extent
+                    );
+
+                const worldPoint = fixedAxis === "x"
+                    ? {
+                        x: this.gridOrigin.x + offset,
+                        z: this.gridOrigin.z + distance
+                    }
+                    : {
+                        x: this.gridOrigin.x + distance,
+                        z: this.gridOrigin.z + offset
+                    };
+
+                const projected =
+                    this.projectTerrainPoint(worldPoint);
+
+                if (!projected) {
+                    points.length = 0;
+                    break;
+                }
+
+                points.push(projected);
+            }
+
+            if (points.length > 1) {
+                this.createGridLine(points);
+            }
+        }
+    }
+
+    createGridLine(points) {
+        const mesh = BABYLON.MeshBuilder.CreateLines(
+            "dndGridLine",
+            { points },
+            this.scene
+        );
+
+        mesh.color = new BABYLON.Color3(
+            0.3, 0.8, 0.95
+        );
+
+        mesh.alpha = 0.65;
+        mesh.isPickable = false;
+
+        this.gridMeshes.push(mesh);
+    }
+
+    disposeGridMeshes() {
+        for (const mesh of this.gridMeshes) {
+            mesh.dispose();
+        }
+
+        this.gridMeshes = [];
+    }
+
+    moveGrid(dx, dz) {
+        if (
+            !Number.isFinite(dx) ||
+            !Number.isFinite(dz)
+        ) return false;
+
+        return this.setGridOrigin(
+            this.gridOrigin.x + dx,
+            this.gridOrigin.z + dz
+        );
+    }
+
+    setGridOrigin(x, z) {
+        if (!this.isValidGridOrigin(x, z)) return this.rejectGridOrigin();
+        const previous = this.captureGridOriginState();
+        try {
+            this.applyGridOrigin({ x, z }, previous);
+            return true;
+        } catch (error) {
+            this.rollbackGridOrigin(previous);
+            return this.reportGridOriginError(error);
+        }
+    }
+
+    isValidGridOrigin(x, z) {
+        return Number.isSafeInteger(x) && Number.isSafeInteger(z);
+    }
+
+    rejectGridOrigin() {
+        this.showMessage("Grid coordinates must be integers.");
+        return false;
+    }
+
+    captureGridOriginState() {
+        return {
+            origin: { ...this.gridOrigin },
+            camera: this.captureCameraOrbit()
+        };
+    }
+
+    captureCameraOrbit() {
+        if (!this.camera) return null;
+        return {
+            radius: this.camera.radius,
+            alpha: this.camera.alpha,
+            beta: this.camera.beta
+        };
+    }
+
+    applyGridOrigin(origin, previous) {
+        this.validateGridOriginTerrain(origin);
+        this.gridOrigin = origin;
+        this.validateCharactersAtGridOrigin();
+        this.createGrid();
+        this.syncAllCharacters();
+        this.persistGridOrigin();
+        this.recenterCameraPreservingOrbit(previous.camera);
+        this.refreshGridDependents();
+    }
+
+    validateGridOriginTerrain(origin) {
+        const valid = this.validateTerrainCoverage(
+            this.gridRows,
+            this.gridColumns,
+            this.cellSize,
+            origin
+        );
+        if (!valid) throw new Error(
+            "The requested grid exceeds available terrain."
+        );
+    }
+
+    validateCharactersAtGridOrigin() {
+        for (const character of this.characters.values()) {
+            this.samplePosition(
+                character.position.row,
+                character.position.col
+            );
+        }
+    }
+
+    persistGridOrigin() {
+        try {
+            localStorage.setItem(
+                "somnium-dnd-grid-origin",
+                JSON.stringify(this.gridOrigin)
+            );
+        } catch (error) {
+            console.warn("[DnD] Grid origin could not be persisted.", error);
+        }
+    }
+
+    refreshGridDependents() {
+        this.refreshMovementPreview();
+        this.saveCharacters();
+        this.refreshUI();
+    }
+
+    rollbackGridOrigin(previous) {
+        this.gridOrigin = previous.origin;
+        this.createGrid();
+        this.syncAllCharacters();
+        this.recenterCameraPreservingOrbit(previous.camera);
+    }
+
+    recenterCameraPreservingOrbit(cameraState) {
+        if (!this.camera || !cameraState) return;
+        this.centerCameraOnActiveCharacter();
+        this.restoreCameraOrbit(cameraState);
+    }
+
+    reportGridOriginError(error) {
+        console.warn("[DnD] Grid repositioning rejected.", error);
+        this.showMessage(error.message);
+        return false;
+    }
+
+    addCharacter(name, row, col) {
+        const position = this.samplePosition(row, col);
+
+        const character = new DnDCharacter({
+            name,
+            position
+        });
+
+        this.characters.set(character.id, character);
+
+        this.createCharacterMesh(character);
+        this.syncAllCharacters();
+        this.selectCharacter(character.id);
+
+        this.saveCharacters();
+
+        return character;
+    }
+
+    createCharacterMesh(character) {
+        const meshes = this.createCharacterGeometry(character);
+        this.assignCharacterMaterials(meshes, character.id);
+        this.configureCharacterPicking(meshes, character.id);
+        this.characterMeshes.set(character.id, meshes);
+        this.syncCharacter(character);
+    }
+
+    createCharacterGeometry(character) {
+        const root = new BABYLON.TransformNode(
+            `dnd-character-${character.id}`,
+            this.scene
+        );
+        return {
+            root,
+            body: this.createCharacterBody(character.id, root),
+            head: this.createCharacterHead(character.id, root)
+        };
+    }
+
+    createCharacterBody(characterId, root) {
+        const body = BABYLON.MeshBuilder.CreateCapsule(
+            `dnd-body-${characterId}`,
+            { height: 1.8, radius: 0.35 },
+            this.scene
+        );
+        body.parent = root;
+        body.position.y = 0.9;
+        return body;
+    }
+
+    createCharacterHead(characterId, root) {
+        const head = BABYLON.MeshBuilder.CreateSphere(
+            `dnd-head-${characterId}`,
+            { diameter: 0.48 },
+            this.scene
+        );
+        head.parent = root;
+        head.position.y = 1.95;
+        return head;
+    }
+
+    assignCharacterMaterials(meshes, characterId) {
+        meshes.material = this.createCharacterMaterial(
+            `dnd-material-${characterId}`,
+            new BABYLON.Color3(0.2, 0.65, 0.9)
+        );
+        meshes.headMaterial = this.createCharacterMaterial(
+            `dnd-head-material-${characterId}`,
+            new BABYLON.Color3(0.82, 0.69, 0.55)
+        );
+        meshes.body.material = meshes.material;
+        meshes.head.material = meshes.headMaterial;
+    }
+
+    createCharacterMaterial(name, color) {
+        const material = new BABYLON.StandardMaterial(name, this.scene);
+        material.diffuseColor = color;
+        return material;
+    }
+
+    configureCharacterPicking(meshes, characterId) {
+        meshes.body.metadata = { dndCharacterId: characterId };
+        meshes.head.metadata = { dndCharacterId: characterId };
+        meshes.body.isPickable = true;
+        meshes.head.isPickable = true;
+    }
+
+    syncCharacter(character) {
+        const meshes = this.characterMeshes.get(character.id);
+        if (!meshes) return;
+
+        const layout = this.getCharacterCellLayout(character);
+        const position = this.getCharacterWorldPosition(character, layout);
+        const projected = this.transform.worldToRender(position);
+
+        this.updateCharacterPosition(character, position);
+        this.updateCharacterMeshTransform(meshes, projected, layout);
+    }
+
+    getCharacterWorldPosition(character, layout) {
+        const center = this.samplePosition(
+            character.position.row,
+            character.position.col
+        );
+        const x = center.x + layout.offsetX;
+        const z = center.z + layout.offsetZ;
+        const sample = this.terrain.sampleAt(x, z);
+        if (!sample) throw new Error("Unable to sample character terrain.");
+
+        return {
+            x,
+            y: sample.y + this.getCharacterAltitude(character),
+            z
+        };
+    }
+
+    getCharacterCellLayout(character) {
+        const occupants = this.getCellOccupants(
+            character.position.row,
+            character.position.col
+        );
+        if (occupants.length <= 1) return this.getCenteredCharacterLayout();
+
+        const index = this.getCharacterOccupancyIndex(occupants, character);
+        return this.createCharacterFormationLayout(index, occupants.length);
+    }
+
+    getCenteredCharacterLayout() {
+        return { offsetX: 0, offsetZ: 0, scale: 1 };
+    }
+
+    getCharacterOccupancyIndex(occupants, character) {
+        return Math.max(0, occupants.findIndex(
+            isMatchingCharacter.bind(null, character)
+        ));
+    }
+
+    createCharacterFormationLayout(index, count) {
+        const radius = this.getCharacterFormationRadius(count);
+        const angle = (Math.PI * 2 * index) / count;
+        const spacing = 2 * radius * Math.sin(Math.PI / count);
+        const boundaryDiameter = this.cellSize - 2 * radius;
+        const scale = this.getCharacterFormationScale(
+            spacing,
+            boundaryDiameter
+        );
+
+        return {
+            offsetX: Math.cos(angle) * radius,
+            offsetZ: Math.sin(angle) * radius,
+            scale
+        };
+    }
+
+    getCharacterFormationRadius(count) {
+        const requiredRadius = CHARACTER_MODEL_DIAMETER /
+            (2 * Math.sin(Math.PI / count));
+        return Math.min(this.cellSize * 0.25, requiredRadius);
+    }
+
+    getCharacterFormationScale(spacing, boundaryDiameter) {
+        return Math.min(
+            1,
+            spacing / CHARACTER_MODEL_DIAMETER,
+            boundaryDiameter / CHARACTER_MODEL_DIAMETER
+        );
+    }
+
+    getCellOccupants(row, col) {
+        const occupants = [];
+        for (const character of this.characters.values()) {
+            if (
+                character.position.row === row &&
+                character.position.col === col
+            ) {
+                occupants.push(character);
+            }
+        }
+        return occupants;
+    }
+
+    getCharacterAltitude(character) {
+        const altitude = character.position.altitude;
+        if (!Number.isFinite(altitude)) return 0;
+        return Math.min(MAX_CHARACTER_ALTITUDE, Math.max(0, altitude));
+    }
+
+    updateCharacterPosition(character, position) {
+        character.position.x = position.x;
+        character.position.y = position.y;
+        character.position.z = position.z;
+        character.position.altitude = this.getCharacterAltitude(character);
+    }
+
+    updateCharacterMeshTransform(meshes, projected, layout) {
+        meshes.root.position.set(projected.x, projected.y, projected.z);
+        meshes.root.scaling.set(layout.scale, layout.scale, layout.scale);
+    }
+
+    setCharacterAltitude(character, altitude) {
+        this.validateCharacterAltitude(character, altitude);
+        character.position.altitude = altitude;
+        this.syncCharacter(character);
+        this.saveCharacters();
+        this.refreshUI();
+        return true;
+    }
+
+    validateCharacterAltitude(character, altitude) {
+        if (!this.characters.has(character?.id)) {
+            throw new Error("Select a character before changing altitude.");
+        }
+        if (
+            !Number.isFinite(altitude) ||
+            altitude < 0 ||
+            altitude > MAX_CHARACTER_ALTITUDE
+        ) {
+            throw new Error(`Altitude must be between 0 and ${MAX_CHARACTER_ALTITUDE} world units.`);
+        }
+    }
+
+    removeCharacter(characterId) {
+        const character = this.characters.get(characterId);
+        if (!character) return false;
+        this.validateCharacterRemoval(characterId);
+        this.disposeCharacterMeshes(characterId);
+        this.characters.delete(characterId);
+        this.clearCharacterSelection(characterId);
+        this.syncAllCharacters();
+        this.updateCharacterHighlight();
+        this.saveCharacters();
+        this.refreshUI();
+        return true;
+    }
+
+    validateCharacterRemoval(characterId) {
+        if (this.activeBattle?.characterIds.includes(characterId)) {
+            throw new Error("Cannot remove a character participating in the active battle.");
+        }
+    }
+
+    disposeCharacterMeshes(characterId) {
+        const meshes = this.characterMeshes.get(characterId);
+        if (!meshes) return;
+        meshes.root.dispose(false, true);
+        meshes.material.dispose();
+        meshes.headMaterial.dispose();
+        this.characterMeshes.delete(characterId);
+    }
+
+    clearCharacterSelection(characterId) {
+        if (this.selectedCharacter?.id === characterId) {
+            this.selectedCharacter = null;
+        }
+    }
+
+    updateCharacterHighlight() {
+        for (const [id, meshes] of this.characterMeshes) {
+            const selected =
+                id === this.selectedCharacter?.id;
+
+            meshes.material.diffuseColor = selected
+                ? new BABYLON.Color3(1, 0.78, 0.15)
+                : new BABYLON.Color3(0.2, 0.65, 0.9);
+
+            meshes.material.emissiveColor = selected
+                ? new BABYLON.Color3(0.25, 0.12, 0)
+                : BABYLON.Color3.Black();
+        }
+    }
+
+    selectCharacter(id) {
+        const character = this.characters.get(id);
+
+        if (!character) return;
+
+        this.selectedCharacter = character;
+
+        this.updateCharacterHighlight();
+
+        if (!this.activeBattle) {
+            this.centerCameraOnActiveCharacter();
+        }
+
+        this.refreshMovementPreview();
+        this.refreshUI();
+    }
+
+    selectAdjacentCharacter(direction) {
+        const characters = [...this.characters.values()];
+
+        if (!characters.length) return;
+
+        let index = -1;
+        for (let cursor = 0; cursor < characters.length; cursor++) {
+            if (characters[cursor].id === this.selectedCharacter?.id) {
+                index = cursor;
+                break;
+            }
+        }
+
+        index = index < 0
+            ? 0
+            : (index + direction + characters.length) %
+                characters.length;
+
+        this.selectCharacter(characters[index].id);
+    }
+
+    updateGamepad() {
+        if (this.disposed) return;
+
+        const gamepads = navigator.getGamepads?.();
+
+        if (!gamepads) return;
+
+        for (const gamepad of gamepads) {
+            if (!gamepad || !gamepad.connected) continue;
+
+            const left = gamepad.buttons[14]?.pressed;
+            const right = gamepad.buttons[15]?.pressed;
+
+            const shoulderLeft =
+                gamepad.buttons[4]?.pressed;
+
+            const shoulderRight =
+                gamepad.buttons[5]?.pressed;
+
+            const axis = gamepad.axes[0] || 0;
+
+            const direction =
+                left || shoulderLeft ||
+                axis < -this.gamepadDeadzone
+                    ? -1
+                    : right || shoulderRight ||
+                        axis > this.gamepadDeadzone
+                        ? 1
+                        : 0;
+
+            const previous =
+                this.gamepadState.get(gamepad.index) || 0;
+
+            const now = performance.now();
+
+            if (
+                direction !== 0 &&
+                (
+                    direction !== previous ||
+                    now - this.lastGamepadNavigation >
+                        this.gamepadRepeatDelay
+                )
+            ) {
+                this.selectAdjacentCharacter(direction);
+                this.lastGamepadNavigation = now;
+            }
+
+            this.gamepadState.set(
+                gamepad.index,
+                direction
+            );
+        }
+    }
+
+    startBattle() {
+        if (this.activeBattle?.active) {
+            this.showMessage("A battle is already in progress.");
+            return;
+        }
+
+        if (!this.characters.size) {
+            this.showMessage(
+                "Add characters before starting a battle."
+            );
+            return;
+        }
+
+        const battle = new DnDBattle({
+            name: `Battle ${this.battles.length + 1}`,
+            characterIds: [...this.characters.keys()]
+        });
+
+        battle.start([...this.characters.values()]);
+
+        this.activeBattle = battle;
+        this.battles.push(battle);
+
+        this.setMovementPreview(false);
+        this.selectCharacter(battle.activeCharacterId);
+        this.centerCameraOnActiveCharacter();
+
+        this.saveBattle();
+        this.refreshUI();
+    }
+
+    advanceTurn() {
+        if (!this.activeBattle?.active) return;
+
+        this.setMovementPreview(false);
+
+        this.activeBattle.advanceTurn();
+
+        const activeId =
+            this.activeBattle.activeCharacterId;
+
+        this.selectCharacter(activeId);
+        this.centerCameraOnActiveCharacter();
+
+        this.saveBattle();
+        this.refreshUI();
+    }
+
+    endBattle() {
+        if (!this.activeBattle) return;
+
+        this.setMovementPreview(false);
+
+        this.activeBattle.stop();
+        this.saveBattle();
+
+        this.activeBattle = null;
+
+        this.refreshUI();
+        this.centerCameraOnActiveCharacter();
+    }
+
+    moveCharacter(character, row, col, movementType = null) {
+        this.validateMovementRequest(character, row, col);
+        const destination = this.createMovementDestination(
+            character,
+            row,
+            col,
+            movementType
+        );
+        this.activeBattle.move(
+            character,
+            destination.position,
+            destination.distance
+        );
+        this.completeCharacterMovement();
+    }
+
+    validateMovementRequest(character, row, col) {
+        if (!this.activeBattle?.active) {
+            throw new Error("Start a battle first.");
+        }
+        this.activeBattle.assertActiveCharacter(character);
+        this.validateMovementCoordinates(row, col);
+    }
+
+    validateMovementCoordinates(row, col) {
+        const valid = Number.isInteger(row) &&
+            Number.isInteger(col) &&
+            row >= 0 && col >= 0 &&
+            this.isValidGridCoordinate(row, col);
+        if (!valid) throw new Error("Invalid grid coordinates.");
+    }
+
+    createMovementDestination(character, row, col, movementType) {
+        const position = this.samplePosition(row, col);
+        position.altitude = this.getCharacterAltitude(character);
+        const distance = this.getMovementDistance(character, row, col);
+        this.consumeDashWhenRequired(character, distance, movementType);
+        return { position, distance };
+    }
+
+    completeCharacterMovement() {
+        this.syncAllCharacters();
+        this.centerCameraOnActiveCharacter();
+        this.saveBattle();
+        this.refreshMovementPreview();
+        this.refreshUI();
+    }
+
+    getMovementDistance(character, row, col) {
+        const rowDistance = Math.abs(row - character.position.row);
+        const columnDistance = Math.abs(col - character.position.col);
+        return (rowDistance + columnDistance) * this.cellSize;
+    }
+
+    consumeDashWhenRequired(character, distance, movementType = null) {
+        const resources = this.activeBattle.currentResources;
+        const baseRemaining = character.movement - resources.movementUsed;
+        const selectedDashRegion = movementType === "dash";
+        if (
+            (!selectedDashRegion && distance <= baseRemaining) ||
+            resources.dashUsed
+        ) return;
+        this.validateDashAvailability(character, distance, resources);
+        this.activeBattle.useAction(character, { description: "Dash" });
+    }
+
+    validateDashAvailability(character, distance, resources) {
+        if (resources.actionUsed) {
+            throw new Error("Dash requires an unused action.");
+        }
+        const dashAllowance = character.movement * 2 - resources.movementUsed;
+        if (distance > dashAllowance) {
+            throw new Error("Movement exceeds the Dash allowance.");
+        }
+    }
+
+    getActiveCharacter() {
+        if (!this.activeBattle?.active) return null;
+
+        return this.characters.get(
+            this.activeBattle.activeCharacterId
+        ) || null;
+    }
+
+    
+    setMovementPreview(enabled) {
+        this.movementPreview = Boolean(enabled);
+
+        if (this.movementPreview) {
+            this.refreshMovementPreview();
+        } else {
+            this.clearMovementMeshes();
+        }
+    }
+
+
+    refreshMovementPreview() {
+        this.clearMovementMeshes();
+        if (!this.movementPreview) return;
+
+        const character = this.getActiveCharacter();
+        if (!character || !this.activeBattle?.active) return;
+
+        const resources = this.activeBattle.currentResources;
+        if (!resources) return;
+
+        this.createMovementPreview(character, resources);
+    }
+
+    createMovementPreview(character, resources) {
+        const range = this.getMovementPreviewRange(character, resources);
+        for (let row = 0; row < this.gridRows; row++) {
+            this.createMovementPreviewRow(row, character, range);
+        }
+    }
+
+    getMovementPreviewRange(character, resources) {
+        const normalRemaining = this.getNormalMovementRemaining(character, resources);
+        const mayUseDash = this.canExtendMovement(resources);
+        const totalRemaining = this.getTotalMovementRemaining(
+            character,
+            resources,
+            mayUseDash
+        );
+        return this.createMovementPreviewRange(
+            normalRemaining,
+            totalRemaining,
+            mayUseDash
+        );
+    }
+
+    getNormalMovementRemaining(character, resources) {
+        return Math.max(0, character.movement - resources.movementUsed);
+    }
+
+    canExtendMovement(resources) {
+        return resources.dashUsed || !resources.actionUsed;
+    }
+
+    getTotalMovementRemaining(character, resources, mayUseDash) {
+        const multiplier = mayUseDash ? 2 : 1;
+        return Math.max(
+            0,
+            character.movement * multiplier - resources.movementUsed
+        );
+    }
+
+    createMovementPreviewRange(normalRemaining, totalRemaining, mayUseDash) {
+        return {
+            normalCells: Math.floor(normalRemaining / this.cellSize),
+            extendedCells: Math.floor(totalRemaining / this.cellSize),
+            mayUseDash
+        };
+    }
+
+    createMovementPreviewRow(row, character, range) {
+        for (let col = 0; col < this.gridColumns; col++) {
+            this.createMovementPreviewCell(row, col, character, range);
+        }
+    }
+
+    createMovementPreviewCell(row, col, character, range) {
+        if (!this.isValidGridCoordinate(row, col)) return;
+        const distance = this.getMovementDistance(character, row, col);
+        const type = this.getMovementCellType(distance, range);
+        if (type) this.createMovementCell(row, col, type);
+    }
+
+    getMovementCellType(distance, range) {
+        if (distance === 0) return null;
+        if (distance <= range.normalCells * this.cellSize) {
+            return "movement";
+        }
+        if (
+            range.mayUseDash &&
+            distance <= range.extendedCells * this.cellSize
+        ) {
+            return "dash";
+        }
+        return null;
+    }
+
+    createMovementCell(row, col, type) {
+        if (
+            row < 0 ||
+            col < 0 ||
+            !this.isValidGridCoordinate(row, col)
+        ) {
+            return;
+        }
+
+        const mesh = this.createProjectedCellMesh({
+            name: `dnd-movement-${row}-${col}`,
+            row,
+            col,
+            material: this.movementMaterials[type],
+            verticalOffset: 0.8,
+            pickable: true,
+            metadata: {
+                dndMovementCell: {
+                    row,
+                    col,
+                    type
+                }
+            }
+        });
+
+        if (!mesh) return;
+
+        this.movementMeshes.push(mesh);
+    }
+
+    setTargetMovementCell(cell) {
+        if (
+            cell &&
+            this.hoveredMovementCell &&
+            this.hoveredMovementCell.row === cell.row &&
+            this.hoveredMovementCell.col === cell.col
+        ) {
+            return;
+        }
+
+        this.hoveredMovementCell = cell
+            ? { ...cell }
+            : null;
+
+        this.targetMovementMesh?.dispose();
+        this.targetMovementMesh = null;
+
+        if (!cell || !this.movementPreview) return;
+
+        if (
+            cell.row < 0 ||
+            cell.col < 0 ||
+            !this.isValidGridCoordinate(cell.row, cell.col)
+        ) {
+            return;
+        }
+
+        this.targetMovementMesh = this.createProjectedCellMesh({
+            name: "dnd-movement-target",
+            row: cell.row,
+            col: cell.col,
+            material: this.targetMovementMaterial,
+            verticalOffset: 1.0,
+            pickable: false,
+            metadata: {
+                dndMovementTarget: true,
+                row: cell.row,
+                col: cell.col
+            }
+        });
+    }
+
+    clearMovementMeshes() {
+        this.setTargetMovementCell(null);
+
+        for (const mesh of this.movementMeshes) {
+            mesh.dispose();
+        }
+
+        this.movementMeshes = [];
+    }
+
+    performAction(character, description = "") {
+        if (!this.activeBattle?.active) {
+            throw new Error("Start a battle first.");
+        }
+
+        const event = this.activeBattle.useAction(
+            character,
+            { description }
+        );
+
+        this.saveBattle();
+        this.refreshMovementPreview();
+        this.refreshUI();
+
+        return event;
+    }
+
+    performBonusAction(character, description = "") {
+        if (!this.activeBattle?.active) {
+            throw new Error("Start a battle first.");
+        }
+
+        const event = this.activeBattle.useBonusAction(
+            character,
+            { description }
+        );
+
+        this.saveBattle();
+        this.refreshUI();
+
+        return event;
+    }
+
+    speakAsCharacter(character, text) {
+        if (!this.activeBattle?.active) {
+            throw new Error("Start a battle first.");
+        }
+
+        const event = this.activeBattle.speak(
+            character,
+            text
+        );
+
+        this.saveBattle();
+        this.refreshUI();
+
+        return event;
+    }
+
+    registerDefaultActionHandlers() {
+        this.registerActionHandler(
+            "*",
+            this.handleDefaultAction.bind(this)
+        );
+    }
+
+    async handleDefaultAction({ character, payload }) {
+        return {
+            accepted: true,
+            characterId: character.id,
+            actionType: payload.type,
+            processedAt: Date.now()
+        };
+    }
+
+    registerActionHandler(type, handler) {
+        return this.actionRegistry.register(type, handler);
+    }
+
+    async dispatchOtherAction(character, payload) {
+        if (!this.activeBattle?.active) {
+            throw new Error("Start a battle first.");
+        }
+
+        this.activeBattle.assertActiveCharacter(character);
+
+        const event = this.activeBattle.useOther(
+            character,
+            payload
+        );
+
+        this.saveBattle();
+
+        try {
+            const result = await this.actionRegistry.dispatch(
+                {
+                    mode: this,
+                    battle: this.activeBattle,
+                    character
+                },
+                payload
+            );
+
+            event.data.result = result === undefined
+                ? null
+                : JSON.parse(JSON.stringify(result));
+
+            this.saveBattle();
+            this.refreshUI();
+
+            return result;
+        } catch (error) {
+            event.data.handlerError = error.message;
+
+            this.saveBattle();
+            this.refreshUI();
+
+            throw error;
+        }
+    }
+
+    saveBattle() {
+        try {
+            this.saveCharacters();
+
+            const data = {
+                version: 2,
+                activeBattleId:
+                    this.activeBattle?.id ?? null,
+                battles: this.battles.map(serializeBattle)
+            };
+
+            localStorage.setItem(
+                "somnium-dnd-battles",
+                JSON.stringify(data)
+            );
+
+            return true;
+        } catch (error) {
+            console.error(
+                "[DnD] Battle save failed.",
+                error
+            );
+
+            this.showMessage("Unable to save battle.");
+
+            return false;
+        }
+    }
+
+    saveCharacters() {
+        try {
+            localStorage.setItem(
+                "somnium-dnd-characters",
+                JSON.stringify(
+                    [...this.characters.values()].map(serializeCharacter)
+                )
+            );
+
+            return true;
+        } catch (error) {
+            console.error(
+                "[DnD] Character save failed.",
+                error
+            );
+
+            return false;
+        }
+    }
+
+    restoreBattles() {
+        try {
+            this.restoreSavedCharacters();
+            const saved = this.loadSavedBattles();
+            this.restoreBattleRecords(saved);
+            this.selectRestoredCharacter();
+            this.centerCameraOnActiveCharacter();
+            this.refreshUI();
+        } catch (error) {
+            this.handleRestoreFailure(error);
+        }
+    }
+
+    restoreSavedCharacters() {
+        for (const data of this.readSavedCharacters()) {
+            const character = DnDCharacter.fromJSON(data);
+            this.characters.set(character.id, character);
+            this.createCharacterMesh(character);
+        }
+        this.syncAllCharacters();
+    }
+
+    readSavedCharacters() {
+        return JSON.parse(
+            localStorage.getItem("somnium-dnd-characters") || "[]"
+        );
+    }
+
+    loadSavedBattles() {
+        return JSON.parse(
+            localStorage.getItem("somnium-dnd-battles") || "null"
+        );
+    }
+
+    restoreBattleRecords(saved) {
+        if (!saved) {
+            this.battles = [];
+            this.activeBattle = null;
+            return;
+        }
+        const records = Array.isArray(saved) ? saved : saved.battles || [];
+        this.battles = records.map(restoreBattle);
+        const activeId = Array.isArray(saved) ? null : saved.activeBattleId;
+        this.activeBattle = this.findRestorableBattle(activeId);
+    }
+
+    selectRestoredCharacter() {
+        if (this.activeBattle) {
+            this.selectCharacter(this.activeBattle.activeCharacterId);
+            return;
+        }
+        const first = this.characters.values().next().value;
+        if (first) this.selectCharacter(first.id);
+    }
+
+    handleRestoreFailure(error) {
+        console.warn("[DnD] Unable to restore saved data.", error);
+        this.battles = [];
+        this.activeBattle = null;
+        this.refreshUI();
+    }
+
+    findRestorableBattle(activeBattleId) {
+        for (const battle of this.battles) {
+            if (
+                battle.id === activeBattleId &&
+                this.isRestorableBattle(battle)
+            ) return battle;
+        }
+        for (const battle of this.battles) {
+            if (this.isRestorableBattle(battle)) return battle;
+        }
+        return null;
+    }
+
+    isRestorableBattle(battle) {
+        if (!battle.active || !battle.turnOrder.length) return false;
+        for (const id of battle.turnOrder) {
+            if (!this.characters.has(id)) return false;
+        }
+        return true;
+    }
+
+    async replayBattle(battle) {
+        if (!battle || this.replaying) return;
+        this.replaying = true;
+        try {
+            await this.replayBattleMoves(battle);
+            if (!this.disposed) this.saveCharacters();
+        } catch (error) {
+            this.reportReplayFailure(error);
+        } finally {
+            this.replaying = false;
+        }
+    }
+
+    async replayBattleMoves(battle) {
+        const moves = battle.actions.filter(isMovementAction);
+        for (const action of moves) {
+            if (this.disposed) break;
+            await this.replayBattleMove(action);
+        }
+    }
+
+    async replayBattleMove(action) {
+        const data = action.data || action;
+        const character = this.characters.get(data.characterId);
+        if (!character || !data.from || !data.to) return;
+        await this.replayCharacterPosition(character, data.from);
+        if (!this.disposed) await this.replayCharacterPosition(character, data.to);
+    }
+
+    async replayCharacterPosition(character, position) {
+        character.position = { ...position };
+        this.syncCharacter(character);
+        this.centerCameraOnActiveCharacter();
+        await waitFor(REPLAY_STEP_DELAY);
+    }
+
+    reportReplayFailure(error) {
+        console.error("[DnD] Battle replay failed.", error);
+    }
+
+    createUI() {
+        this.ui = new DnDTacticalUI(this);
+        this.panel = this.ui.panel;
+    }
+
+    refreshUI() {
+        this.ui?.refresh();
+    }
+
+    showMessage(message) {
+        this.ui?.showMessage(message);
+    }
+
+    dispose() {
+        if (this.disposed) return;
+
+        this.disposed = true;
+
+        window.removeEventListener(
+            "keydown",
+            this.onKeyDown
+        );
+
+        this.scene.onPointerObservable.remove(
+            this.onPointerObservable
+        );
+
+        this.scene.onBeforeRenderObservable.remove(
+            this.gamepadObserver
+        );
+
+        this.clearMovementMeshes();
+        this.disposeGridMeshes();
+
+        for (const meshes of this.characterMeshes.values()) {
+            meshes.root.dispose(false, true);
+            meshes.material.dispose();
+            meshes.headMaterial.dispose();
+        }
+
+        this.characterMeshes.clear();
+        this.gamepadState.clear();
+
+        this.ui?.dispose();
+        this.ui = null;
+
+        for (const material of Object.values(
+            this.movementMaterials
+        )) {
+            material.dispose();
+        }
+
+        this.movementMaterials = {};
+
+        if (this.camera) {
+            this.camera.detachControl();
+
+            if (
+                this.previousCamera &&
+                !this.previousCamera.isDisposed()
+            ) {
+                this.scene.activeCamera = this.previousCamera;
+            } else {
+                this.scene.activeCamera = null;
+            }
+
+            this.camera.dispose();
+            this.camera = null;
+        }
+
+
+        this.targetMovementMesh?.dispose();
+        this.targetMovementMesh = null;
+
+        this.targetMovementMaterial?.dispose();
+
+        this.clearMovementMeshes();
+    }
+
+    createProjectedCellMesh({
+        name,
+        row,
+        col,
+        material,
+        verticalOffset = 0.8,
+        pickable = false,
+        metadata = null
+    }) {
+        // Exact world-space boundaries of this grid cell.
+        const x0 = this.gridOrigin.x + col * this.cellSize;
+        const x1 = x0 + this.cellSize;
+
+        const z0 = this.gridOrigin.z + row * this.cellSize;
+        const z1 = z0 + this.cellSize;
+
+        const worldCorners = [
+            { x: x0, z: z0 },
+            { x: x1, z: z0 },
+            { x: x1, z: z1 },
+            { x: x0, z: z1 }
+        ];
+
+        // Project every corner independently. This is important
+        // for nonlinear spatial transformations.
+        const positions = [];
+
+        for (const corner of worldCorners) {
+            const sample = this.terrain.sampleAt(
+                corner.x,
+                corner.z
+            );
+
+            if (!sample) return null;
+
+            const projected = this.transform.worldToRender({
+                x: corner.x,
+                y: sample.y + verticalOffset,
+                z: corner.z
+            });
+
+            if (
+                !Number.isFinite(projected.x) ||
+                !Number.isFinite(projected.y) ||
+                !Number.isFinite(projected.z)
+            ) {
+                return null;
+            }
+
+            positions.push(
+                projected.x,
+                projected.y,
+                projected.z
+            );
+        }
+
+        const mesh = new BABYLON.Mesh(name, this.scene);
+
+        const vertexData = new BABYLON.VertexData();
+
+        vertexData.positions = positions;
+
+        vertexData.indices = [
+            0, 1, 2,
+            0, 2, 3
+        ];
+
+        const normals = [];
+
+        BABYLON.VertexData.ComputeNormals(
+            positions,
+            vertexData.indices,
+            normals
+        );
+
+        vertexData.normals = normals;
+
+        vertexData.applyToMesh(mesh);
+
+        mesh.material = material;
+        mesh.isPickable = pickable;
+        mesh.renderingGroupId = 1;
+
+        mesh.metadata = metadata;
+
+        return mesh;
+    }
+
+    setGridConfiguration(rows, columns, cellSize) {
+        const configuration = this.normalizeGridConfiguration(
+            rows,
+            columns,
+            cellSize
+        );
+
+        if (!configuration) return false;
+        if (!this.charactersFitGrid(configuration)) return false;
+
+        const previous = this.captureGridConfiguration();
+
+        try {
+            this.applyGridConfiguration(configuration, previous);
+            this.refreshUI();
+
+            const saved = this.saveGridConfiguration();
+            this.saveCharacters();
+
+            this.showMessage(saved
+                ? this.formatGridConfigurationMessage(configuration)
+                : "Grid updated, but settings could not be saved."
+            );
+
+            return true;
+        } catch (error) {
+            this.restoreGridConfigurationState(previous);
+            this.reportGridConfigurationError(error);
+            return false;
+        }
+    }
+
+    normalizeGridConfiguration(rows, columns, cellSize) {
+        // Preserve integrations using the former (size, cellSize) API.
+        if (cellSize === undefined) {
+            cellSize = columns;
+            columns = rows;
+        }
+
+        if (!this.validateGridDimensions(rows, columns)) {
+            this.showMessage(
+                `Grid rows and columns must each be between ${MIN_GRID_DIMENSION} and ${MAX_GRID_DIMENSION}.`
+            );
+            return null;
+        }
+
+        if (!this.isValidCellSize(cellSize)) {
+            this.showMessage(
+                `Cell size must be between ${MIN_CELL_SIZE} and ${MAX_CELL_SIZE} world units.`
+            );
+            return null;
+        }
+
+        const configuration = { rows, columns, cellSize };
+
+        if (!this.validateTerrainCoverage(
+            rows,
+            columns,
+            cellSize,
+            this.gridOrigin
+        )) {
+            this.showMessage(
+                "The proposed grid extends beyond available terrain."
+            );
+            return null;
+        }
+
+        return configuration;
+    }
+
+    charactersFitGrid({ rows, columns }) {
+        for (const character of this.characters.values()) {
+            const { row, col } = character.position;
+
+            if (row >= rows || col >= columns || row < 0 || col < 0) {
+                this.showMessage(
+                    `Grid resize would exclude ${character.name}.`
+                );
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    captureGridConfiguration() {
+        return {
+            rows: this.gridRows,
+            columns: this.gridColumns,
+            cellSize: this.cellSize,
+            radius: this.camera?.radius,
+            alpha: this.camera?.alpha,
+            beta: this.camera?.beta
+        };
+    }
+
+    applyGridConfiguration(configuration, previous) {
+        this.gridRows = configuration.rows;
+        this.gridColumns = configuration.columns;
+        this.cellSize = configuration.cellSize;
+
+        this.createGrid();
+        this.syncAllCharacters();
+        this.refreshMovementPreview();
+
+        this.recenterCameraPreservingOrbit(previous);
+    }
+
+    restoreGridConfigurationState(previous) {
+        this.gridRows = previous.rows;
+        this.gridColumns = previous.columns;
+        this.cellSize = previous.cellSize;
+
+        this.createGrid();
+        this.syncAllCharacters();
+        this.refreshMovementPreview();
+
+        this.recenterCameraPreservingOrbit(previous);
+    }
+
+    formatGridConfigurationMessage({ rows, columns, cellSize }) {
+        return (
+            `Grid updated: ${rows} rows × ${columns} columns; ` +
+            `${cellSize} world units per cell.`
+        );
+    }
+
+    reportGridConfigurationError(error) {
+        console.warn("[DnD] Grid configuration rejected.", error);
+        this.showMessage(error.message);
+    }
+
+    setGridDimensions(rows, columns, cellSize) {
+        return this.setGridConfiguration(rows, columns, cellSize);
+    }
+
+    validateTerrainCoverage(rows, columns, cellSize, origin) {
+        for (let row = 0; row <= rows; row++) {
+            for (let col = 0; col <= columns; col++) {
+                const x = origin.x + col * cellSize;
+                const z = origin.z + row * cellSize;
+
+                if (!this.terrain.sampleAt(x, z)) return false;
+            }
+        }
+
+        return true;
+    }
+
+    syncAllCharacters() {
+        for (const character of this.characters.values()) {
+            this.syncCharacter(character);
+        }
+    }
+
+    restoreCameraOrbit(previous) {
+        if (!this.camera || !previous) return;
+
+        if (Number.isFinite(previous.radius)) {
+            this.camera.radius = previous.radius;
+        }
+        if (Number.isFinite(previous.alpha)) {
+            this.camera.alpha = previous.alpha;
+        }
+        if (Number.isFinite(previous.beta)) {
+            this.camera.beta = previous.beta;
+        }
+    }
+
+    isValidCellSize(cellSize) {
+        return (
+            Number.isFinite(cellSize) &&
+            cellSize >= MIN_CELL_SIZE &&
+            cellSize <= MAX_CELL_SIZE
+        );
+    }
+
+
+    get gridSize() {
+        // Legacy read-only alias; rectangular grids deliberately return null.
+        return this.gridRows === this.gridColumns
+            ? this.gridRows
+            : null;
+    }
+
+    isValidGridCoordinate(row, col) {
+        return (
+            Number.isInteger(row) &&
+            Number.isInteger(col) &&
+            row >= 0 &&
+            col >= 0 &&
+            row < this.gridRows &&
+            col < this.gridColumns
+        );
+    }
+
+    validateGridDimensions(rows, columns) {
+        return (
+            Number.isInteger(rows) &&
+            Number.isInteger(columns) &&
+            rows >= MIN_GRID_DIMENSION &&
+            columns >= MIN_GRID_DIMENSION &&
+            rows <= this.maxGridRows &&
+            columns <= this.maxGridColumns
+        );
+    }
+
+}
+
+export { DnDMode };
+
+
+========================================================================
+FILE: src/game/dnd-tactical-ui.js
+========================================================================
+
+
+const ACTION_OPTIONS = [
+    ["attack", "Attack"],
+    ["cast-spell", "Cast a Spell"],
+    ["dash", "Dash"],
+    ["disengage", "Disengage"],
+    ["dodge", "Dodge"],
+    ["help", "Help"],
+    ["hide", "Hide"],
+    ["ready", "Ready"],
+    ["search", "Search"],
+    ["use-object", "Use an Object"],
+    ["grapple", "Grapple"],
+    ["shove", "Shove"],
+    ["improvise", "Improvise"]
+];
+
+const BONUS_OPTIONS = [
+    ["bonus-spell", "Cast a Bonus Action Spell"],
+    ["two-weapon-fighting", "Two-Weapon Fighting"],
+    ["class-feature", "Use a Class Feature"],
+    ["bonus-ability", "Use an Ability"]
+];
+
+const DEFAULT_COLORS = {
+    movement: "#25d9a0",
+    dash: "#e9a33c"
+};
+
+const ALTITUDE_MIN = 0;
+const ALTITUDE_MAX = 1000;
+
+function findOptionByValue(options, value) {
+    for (const option of options) {
+        if (option[0] === value) return option;
+    }
+    return null;
+}
+
+class DnDTacticalUI {
+
+    constructor(mode) {
+        this.mode = mode;
+        this.visible = false;
+        this.activeTab = "battle";
+        this.colors = {
+            ...DEFAULT_COLORS,
+            ...this.loadColors()
+        };
+
+        this.createInterface();
+    }
+    loadColors() {
+        try {
+            return JSON.parse(
+                localStorage.getItem("somnium-dnd-colors") || "{}"
+            );
+        } catch {
+            return {};
+        }
+    }
+
+    saveColors() {
+        localStorage.setItem(
+            "somnium-dnd-colors",
+            JSON.stringify(this.colors)
+        );
+
+        this.mode.setMovementColors(this.colors);
+    }
+
+    createInterface() {
+        this.createFloatingButtons();
+        this.createPanelShell();
+        this.createPanelHeader();
+        this.createTabNavigation();
+        this.buildTabContents();
+        this.mountPanel();
+        this.bindKeyboard();
+        this.refresh();
+    }
+
+    createFloatingButtons() {
+        this.createMenuToggleButton();
+        this.createFocusButton();
+    }
+
+    createMenuToggleButton() {
+        this.toggleButton = this.createButton(
+            "☰ D&D MENU",
+            this.handleToggleMenu.bind(this)
+        );
+        Object.assign(this.toggleButton.style, {
+            position: "fixed",
+            top: "15px",
+            left: "15px",
+            zIndex: "2100",
+            width: "125px",
+            background: "#193b55"
+        });
+        document.body.appendChild(this.toggleButton);
+    }
+
+    createFocusButton() {
+        this.focusButton = this.createButton(
+            "◎ FOCUS ACTIVE",
+            this.handleFocusActiveCharacter.bind(this)
+        );
+        Object.assign(this.focusButton.style, {
+            position: "fixed",
+            top: "15px",
+            right: "15px",
+            zIndex: "10003",
+            width: "auto",
+            minWidth: "150px",
+            margin: "0",
+            background: "#72551b",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.45)"
+        });
+        this.focusButton.title = "Center and zoom the camera on the active character";
+        this.focusButton.setAttribute("aria-label", "Focus camera on active character");
+        document.body.appendChild(this.focusButton);
+    }
+
+    createPanelShell() {
+        this.panel = document.createElement("div");
+        Object.assign(this.panel.style, {
+            position: "fixed",
+            top: "58px",
+            left: "15px",
+            zIndex: "10002",
+            width: "340px",
+            maxWidth: "calc(100vw - 30px)",
+            maxHeight: "calc(100vh - 75px)",
+            overflowY: "auto",
+            boxSizing: "border-box",
+            padding: "13px",
+            color: "#eaf4fa",
+            background: "rgba(8,20,34,0.97)",
+            border: "1px solid #54758d",
+            borderRadius: "9px",
+            fontFamily: "Arial, sans-serif",
+            fontSize: "13px",
+            display: "none",
+            visibility: "visible",
+            pointerEvents: "auto"
+        });
+    }
+
+    createPanelHeader() {
+        const heading = this.element("h2", "TACTICAL MODE");
+        heading.style.color = "#9dd8ed";
+        this.panel.appendChild(heading);
+        this.status = this.appendPanelText("div");
+        this.battleStatus = this.appendPanelText("p");
+        this.message = this.appendPanelText("p");
+        this.message.style.color = "#9dd8ed";
+    }
+
+    appendPanelText(tag) {
+        const element = this.element(tag);
+        this.panel.appendChild(element);
+        return element;
+    }
+
+    createTabNavigation() {
+        this.tabBar = document.createElement("div");
+        Object.assign(this.tabBar.style, {
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: "4px",
+            margin: "12px 0"
+        });
+        this.panel.appendChild(this.tabBar);
+        this.tabContents = {};
+        this.appendTab("battle", "Battle");
+        this.appendTab("characters", "Characters");
+        this.appendTab("battlefield", "Grid");
+        this.appendTab("settings", "Settings");
+    }
+
+    appendTab(id, label) {
+        const button = this.createButton(label, this.handleTabButtonClick.bind(this));
+        button.dataset.tabId = id;
+        button.style.padding = "8px 3px";
+        button.style.fontSize = "11px";
+        this.tabBar.appendChild(button);
+        const content = document.createElement("div");
+        this.tabContents[id] = content;
+        this.panel.appendChild(content);
+    }
+
+    buildTabContents() {
+        this.buildBattleTab();
+        this.buildCharactersTab();
+        this.buildBattlefieldTab();
+        this.buildSettingsTab();
+    }
+
+    mountPanel() {
+        document.body.appendChild(this.panel);
+        this.setVisible(false);
+        this.selectTab("battle");
+    }
+
+    bindKeyboard() {
+        this.onKeyDown = this.handleKeyDown.bind(this);
+        window.addEventListener("keydown", this.onKeyDown);
+    }
+
+    handleToggleMenu() {
+        this.toggle();
+    }
+
+    handleTabButtonClick(event) {
+        this.selectTab(event.currentTarget.dataset.tabId);
+    }
+
+    handleKeyDown(event) {
+        if (
+            event.target instanceof HTMLElement &&
+            ["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName)
+        ) return;
+
+        if (event.code === "Escape") this.setVisible(false);
+        if (event.code === "KeyM") this.toggle();
+    }
+
+    element(tag, content = "") {
+        const element = document.createElement(tag);
+        element.textContent = content;
+        return element;
+    }
+
+    createButton(label, callback) {
+        const button = this.element("button", label);
+
+        Object.assign(button.style, {
+            display: "block",
+            width: "100%",
+            margin: "5px 0",
+            padding: "9px",
+            color: "white",
+            background: "#193b55",
+            border: "1px solid #54758d",
+            borderRadius: "4px",
+            cursor: "pointer"
+        });
+
+        button.addEventListener("click", callback);
+
+        return button;
+    }
+
+    addSection(parent, label) {
+        const heading = this.element("h3", label);
+
+        Object.assign(heading.style, {
+            marginTop: "15px",
+            paddingBottom: "5px",
+            color: "#9dd8ed",
+            borderBottom: "1px solid #54758d"
+        });
+
+        parent.appendChild(heading);
+    }
+
+    selectTab(id) {
+        this.activeTab = id;
+
+        for (const [key, content] of
+            Object.entries(this.tabContents)) {
+            content.style.display =
+                key === id ? "block" : "none";
+        }
+
+        for (const button of this.tabBar.children) {
+            const selected =
+                button.textContent.toLowerCase() ===
+                (id === "battlefield" ? "grid" : id);
+
+            button.style.background = selected
+                ? "#72551b"
+                : "#193b55";
+        }
+    }
+
+    createInput(parent, label, type = "text") {
+        const wrapper = document.createElement("div");
+
+        wrapper.style.margin = "8px 0";
+
+        const caption = this.element("label", label);
+        caption.style.display = "block";
+        caption.style.marginBottom = "4px";
+
+        const input = document.createElement("input");
+        input.type = type;
+
+        Object.assign(input.style, {
+            width: "100%",
+            boxSizing: "border-box",
+            padding: "8px",
+            color: "white",
+            background: "#193b55",
+            border: "1px solid #54758d",
+            borderRadius: "4px"
+        });
+
+        wrapper.appendChild(caption);
+        wrapper.appendChild(input);
+        parent.appendChild(wrapper);
+
+        return input;
+    }
+
+    createSelect(parent, label, options) {
+        const wrapper = document.createElement("div");
+
+        wrapper.style.margin = "8px 0";
+
+        const caption = this.element("label", label);
+        caption.style.display = "block";
+        caption.style.marginBottom = "4px";
+
+        const select = document.createElement("select");
+
+        Object.assign(select.style, {
+            width: "100%",
+            padding: "9px",
+            color: "white",
+            background: "#193b55",
+            border: "1px solid #54758d",
+            borderRadius: "4px"
+        });
+
+        for (const [value, labelText] of options) {
+            const option = this.element("option", labelText);
+            option.value = value;
+            select.appendChild(option);
+        }
+
+        wrapper.appendChild(caption);
+        wrapper.appendChild(select);
+        parent.appendChild(wrapper);
+
+        return select;
+    }
+
+    createTextarea(parent, placeholder, rows = 3) {
+        const textarea = document.createElement("textarea");
+
+        textarea.placeholder = placeholder;
+        textarea.rows = rows;
+
+        Object.assign(textarea.style, {
+            width: "100%",
+            boxSizing: "border-box",
+            padding: "9px",
+            margin: "7px 0",
+            color: "white",
+            background: "#193b55",
+            border: "1px solid #54758d",
+            borderRadius: "4px",
+            fontFamily: "monospace",
+            resize: "vertical"
+        });
+
+        parent.appendChild(textarea);
+
+        return textarea;
+    }
+
+    buildBattlefieldTab() {
+        const parent = this.tabContents.battlefield;
+        this.buildGridOriginControls(parent);
+        this.buildGridDimensionControls(parent);
+        this.buildCameraControls(parent);
+    }
+
+    buildGridOriginControls(parent) {
+        this.addSection(parent, "BATTLEFIELD GRID");
+        this.gridX = this.createInput(parent, "World X origin", "number");
+        this.gridZ = this.createInput(parent, "World Z origin", "number");
+        this.gridX.value = String(this.mode.gridOrigin.x);
+        this.gridZ.value = String(this.mode.gridOrigin.z);
+        parent.appendChild(this.createButton(
+            "APPLY GRID ORIGIN",
+            this.handleApplyGridOrigin.bind(this)
+        ));
+    }
+
+    buildGridDimensionControls(parent) {
+        this.addSection(parent, "GRID DIMENSIONS");
+        this.gridRowsInput = this.createGridDimensionInput(parent, "Rows (2–300)", this.mode.gridRows);
+        this.gridColumnsInput = this.createGridDimensionInput(parent, "Columns (2–300)", this.mode.gridColumns);
+        this.cellSizeInput = this.createInput(parent, "Cell size (world units; square cells)", "number");
+        this.configureNumericInput(this.cellSizeInput, 0.5, 1000, 0.5, this.mode.cellSize);
+        parent.appendChild(this.createButton(
+            "APPLY GRID SETTINGS",
+            this.handleApplyGridConfiguration.bind(this)
+        ));
+        this.gridInfo = this.element("div");
+        Object.assign(this.gridInfo.style, {
+            marginTop: "10px",
+            padding: "9px",
+            background: "rgba(40,80,110,0.3)",
+            borderRadius: "5px",
+            lineHeight: "1.7",
+            whiteSpace: "pre-line"
+        });
+        parent.appendChild(this.gridInfo);
+    }
+
+    createGridDimensionInput(parent, label, value) {
+        const input = this.createInput(parent, label, "number");
+        this.configureNumericInput(input, 2, 300, 1, value);
+        return input;
+    }
+
+    configureNumericInput(input, min, max, step, value) {
+        input.min = String(min);
+        input.max = String(max);
+        input.step = String(step);
+        input.value = String(value);
+    }
+
+    buildCameraControls(parent) {
+        this.addSection(parent, "CAMERA");
+        parent.appendChild(this.createButton(
+            "ZOOM TO ACTIVE CHARACTER",
+            this.handleFocusActiveCharacter.bind(this)
+        ));
+        parent.appendChild(this.createButton(
+            "CENTER ON SELECTED CHARACTER",
+            this.handleCenterSelectedCharacter.bind(this)
+        ));
+    }
+
+    handleApplyGridOrigin() {
+        this.run(this.applyGridOrigin.bind(this));
+    }
+
+    applyGridOrigin() {
+        const x = Number(this.gridX.value);
+        const z = Number(this.gridZ.value);
+        if (!Number.isSafeInteger(x) || !Number.isSafeInteger(z)) {
+            throw new Error("World coordinates must be safe integers.");
+        }
+        if (!this.mode.setGridOrigin(x, z)) {
+            throw new Error("Unable to reposition battlefield.");
+        }
+    }
+
+    handleApplyGridConfiguration() {
+        this.run(this.applyGridConfiguration.bind(this));
+    }
+
+    handleCenterSelectedCharacter() {
+        this.mode.centerCameraOnSelectedCharacter();
+    }
+
+    buildBattleTab() {
+        const parent = this.tabContents.battle;
+        this.buildEncounterControls(parent);
+        this.buildInitiativeControls(parent);
+        this.buildMovementControls(parent);
+        this.buildActionControls(parent);
+        this.buildBonusActionControls(parent);
+        this.buildSpeechControls(parent);
+        this.buildBattleHistoryControls(parent);
+    }
+
+    buildEncounterControls(parent) {
+        this.addSection(parent, "ENCOUNTER MANAGEMENT");
+        this.startBattleButton = this.createButton("START BATTLE", this.handleStartBattle.bind(this));
+        this.advanceButton = this.createButton("ADVANCE INITIATIVE", this.handleAdvanceTurn.bind(this));
+        this.endBattleButton = this.createButton("END BATTLE", this.handleEndBattle.bind(this));
+        this.endBattleButton.style.background = "#713b40";
+        parent.append(this.startBattleButton, this.advanceButton, this.endBattleButton);
+    }
+
+    buildInitiativeControls(parent) {
+        this.addSection(parent, "INITIATIVE ORDER");
+        this.initiativeList = this.element("div");
+        parent.appendChild(this.initiativeList);
+    }
+
+    buildMovementControls(parent) {
+        this.addSection(parent, "MOVEMENT (SEPARATE FROM ACTIONS)");
+        this.previewButton = this.createButton(
+            "ENABLE MOVEMENT PREVIEW",
+            this.handleToggleMovementPreview.bind(this)
+        );
+        parent.appendChild(this.previewButton);
+        this.movementHelp = this.element(
+            "p",
+            "Green: remaining movement. Amber: additional movement available by using Dash (your action)."
+        );
+        this.movementHelp.style.color = "#b7cbd8";
+        parent.appendChild(this.movementHelp);
+    }
+
+    buildActionControls(parent) {
+        this.addSection(parent, "ACTION");
+        this.actionSelect = this.createSelect(parent, "Available actions", ACTION_OPTIONS);
+        this.actionButton = this.createButton("USE ACTION", this.handleUseAction.bind(this));
+        parent.appendChild(this.actionButton);
+    }
+
+    buildBonusActionControls(parent) {
+        this.addSection(parent, "BONUS ACTION");
+        this.bonusSelect = this.createSelect(parent, "Available bonus actions", BONUS_OPTIONS);
+        this.bonusButton = this.createButton("USE BONUS ACTION", this.handleUseBonusAction.bind(this));
+        parent.appendChild(this.bonusButton);
+    }
+
+    buildSpeechControls(parent) {
+        this.addSection(parent, "CHARACTER SPEECH");
+        this.speechInput = this.createTextarea(parent, "Enter character dialogue...");
+        parent.appendChild(this.createButton("RECORD SPEECH", this.handleRecordSpeech.bind(this)));
+    }
+
+    buildBattleHistoryControls(parent) {
+        this.addSection(parent, "BATTLE HISTORY");
+        this.historyList = this.element("div");
+        parent.appendChild(this.historyList);
+    }
+
+    handleStartBattle() {
+        this.run(this.mode.startBattle.bind(this.mode));
+    }
+
+    handleAdvanceTurn() {
+        this.run(this.mode.advanceTurn.bind(this.mode));
+    }
+
+    handleEndBattle() {
+        this.run(this.mode.endBattle.bind(this.mode));
+    }
+
+    handleToggleMovementPreview() {
+        this.mode.setMovementPreview(!this.mode.movementPreview);
+        this.refresh();
+    }
+
+    handleUseAction() {
+        this.run(this.executeSelectedAction.bind(this));
+    }
+
+    executeSelectedAction() {
+        const character = this.requireActiveCharacter();
+        const selected = findOptionByValue(ACTION_OPTIONS, this.actionSelect.value);
+        if (!selected) throw new Error("Select a valid action.");
+        this.mode.performAction(character, selected[1]);
+    }
+
+    handleUseBonusAction() {
+        this.run(this.executeSelectedBonusAction.bind(this));
+    }
+
+    executeSelectedBonusAction() {
+        const character = this.requireActiveCharacter();
+        const selected = findOptionByValue(BONUS_OPTIONS, this.bonusSelect.value);
+        if (!selected) throw new Error("Select a valid bonus action.");
+        this.mode.performBonusAction(character, selected[1]);
+    }
+
+    requireActiveCharacter() {
+        const character = this.mode.getActiveCharacter();
+        if (!character) throw new Error("There is no active character.");
+        return character;
+    }
+
+    handleRecordSpeech() {
+        this.run(this.recordCharacterSpeech.bind(this));
+    }
+
+    recordCharacterSpeech() {
+        const character = this.requireActiveCharacter();
+        const speech = this.speechInput.value.trim();
+        if (!speech) throw new Error("Enter dialogue before recording.");
+        this.mode.speakAsCharacter(character, speech);
+        this.speechInput.value = "";
+    }
+
+    buildCharactersTab() {
+        const parent = this.tabContents.characters;
+        this.buildCharacterCreationForm(parent);
+        this.buildAltitudeControls(parent);
+        this.buildCharacterRoster(parent);
+        this.buildSelectedCharacterDetails(parent);
+    }
+
+    buildCharacterCreationForm(parent) {
+        this.addSection(parent, "CREATE CHARACTER");
+        this.characterName = this.createInput(parent, "Character name");
+        this.characterRace = this.createInput(parent, "Race");
+        this.characterClass = this.createInput(parent, "Class");
+        this.characterLevel = this.createInput(parent, "Level", "number");
+        this.characterHP = this.createInput(parent, "Hit points", "number");
+        this.characterAC = this.createInput(parent, "Armor class", "number");
+        this.characterInitiative = this.createInput(parent, "Initiative bonus", "number");
+        this.characterMovement = this.createInput(parent, "Movement allowance", "number");
+        this.characterAltitude = this.createInput(parent, "Starting altitude above ground", "number");
+        this.configureCharacterDefaults();
+        parent.appendChild(this.createButton(
+            "CREATE CHARACTER",
+            this.handleCreateCharacter.bind(this)
+        ));
+    }
+
+    configureCharacterDefaults() {
+        this.characterLevel.value = "1";
+        this.characterHP.value = "12";
+        this.characterAC.value = "10";
+        this.characterInitiative.value = "0";
+        this.characterMovement.value = "30";
+        this.configureNumericInput(this.characterAltitude, ALTITUDE_MIN, ALTITUDE_MAX, 0.5, 0);
+    }
+
+    handleCreateCharacter() {
+        this.run(this.createCharacterFromForm.bind(this));
+    }
+
+    createCharacterFromForm() {
+        const values = this.readCharacterForm();
+        const row = Math.floor(this.mode.gridRows / 2);
+        const col = Math.floor(this.mode.gridColumns / 2);
+        const character = this.mode.addCharacter(values.name, row, col);
+        this.applyCharacterForm(character, values);
+        this.mode.setCharacterAltitude(character, values.altitude);
+        this.mode.saveCharacters();
+        this.mode.refreshUI();
+        this.characterName.value = "";
+    }
+
+    readCharacterForm() {
+        const values = {
+            name: this.characterName.value.trim(),
+            level: Number(this.characterLevel.value),
+            hitPoints: Number(this.characterHP.value),
+            armorClass: Number(this.characterAC.value),
+            initiative: Number(this.characterInitiative.value),
+            movement: Number(this.characterMovement.value),
+            altitude: Number(this.characterAltitude.value)
+        };
+        this.validateCharacterForm(values);
+        return values;
+    }
+
+    validateCharacterForm(values) {
+        if (!values.name) throw new Error("Enter a character name.");
+        if (
+            !Number.isInteger(values.level) || values.level < 1 ||
+            !Number.isFinite(values.hitPoints) || values.hitPoints < 1 ||
+            !Number.isFinite(values.armorClass) || values.armorClass < 0 ||
+            !Number.isFinite(values.initiative) ||
+            !Number.isFinite(values.movement) || values.movement < 0 ||
+            !Number.isFinite(values.altitude) ||
+            values.altitude < ALTITUDE_MIN || values.altitude > ALTITUDE_MAX
+        ) throw new Error("Check the character statistics and altitude.");
+    }
+
+    applyCharacterForm(character, values) {
+        character.race = this.characterRace.value.trim() || "Unknown";
+        character.className = this.characterClass.value.trim() || "Adventurer";
+        character.level = values.level;
+        character.hitPoints = values.hitPoints;
+        character.maxHitPoints = values.hitPoints;
+        character.armorClass = values.armorClass;
+        character.initiative = values.initiative;
+        character.movement = values.movement;
+    }
+
+    buildAltitudeControls(parent) {
+        this.addSection(parent, "FLIGHT & ALTITUDE");
+        this.selectedAltitudeInput = this.createInput(
+            parent,
+            "Selected character altitude above ground (world units)",
+            "number"
+        );
+        this.configureNumericInput(this.selectedAltitudeInput, ALTITUDE_MIN, ALTITUDE_MAX, 0.5, 0);
+        parent.appendChild(this.createButton(
+            "APPLY ALTITUDE TO SELECTED CHARACTER",
+            this.handleApplySelectedAltitude.bind(this)
+        ));
+        this.altitudeHelp = this.element(
+            "p",
+            "Altitude is measured vertically above the sampled terrain surface. Set 0 to place a character on the ground."
+        );
+        this.altitudeHelp.style.color = "#b7cbd8";
+        parent.appendChild(this.altitudeHelp);
+    }
+
+    handleApplySelectedAltitude() {
+        this.run(this.applySelectedAltitude.bind(this));
+    }
+
+    applySelectedAltitude() {
+        const character = this.mode.selectedCharacter;
+        if (!character) throw new Error("Select a character first.");
+        this.mode.setCharacterAltitude(
+            character,
+            Number(this.selectedAltitudeInput.value)
+        );
+    }
+
+    buildCharacterRoster(parent) {
+        this.addSection(parent, "CHARACTER ROSTER");
+        this.characterList = this.element("div");
+        parent.appendChild(this.characterList);
+    }
+
+    buildSelectedCharacterDetails(parent) {
+        this.addSection(parent, "SELECTED CHARACTER");
+        this.characterDetails = this.element("div");
+        parent.appendChild(this.characterDetails);
+    }
+
+    buildSettingsTab() {
+        const parent = this.tabContents.settings;
+        this.buildMovementColorSettings(parent);
+        this.buildInterfaceSettings(parent);
+        this.buildControlHelp(parent);
+    }
+
+    buildMovementColorSettings(parent) {
+        this.addSection(parent, "MOVEMENT COLORS");
+        this.movementColor = this.createInput(parent, "Normal movement", "color");
+        this.dashColor = this.createInput(parent, "Extended / Dash movement", "color");
+        this.movementColor.value = this.colors.movement;
+        this.dashColor.value = this.colors.dash;
+        parent.appendChild(this.createButton(
+            "SAVE MOVEMENT COLORS",
+            this.handleSaveMovementColors.bind(this)
+        ));
+    }
+
+    buildInterfaceSettings(parent) {
+        this.addSection(parent, "INTERFACE");
+        parent.appendChild(this.createButton("HIDE TACTICAL MENU", this.handleHideMenu.bind(this)));
+        parent.appendChild(this.createButton("SHOW TACTICAL MENU", this.handleShowMenu.bind(this)));
+    }
+
+    buildControlHelp(parent) {
+        this.addSection(parent, "CONTROLS");
+        const controls = [
+            "M — Toggle tactical menu",
+            "ESC — Hide tactical menu",
+            "Arrow Left — Previous character",
+            "Arrow Right — Next character",
+            "Mouse wheel — Zoom camera",
+            "Left mouse drag — Camera interaction"
+        ];
+        for (const description of controls) {
+            const item = this.element("p", description);
+            item.style.color = "#b7cbd8";
+            parent.appendChild(item);
+        }
+    }
+
+    handleSaveMovementColors() {
+        this.colors.movement = this.movementColor.value;
+        this.colors.dash = this.dashColor.value;
+        this.saveColors();
+        this.showMessage("Movement colors saved.");
+    }
+
+    handleHideMenu() {
+        this.setVisible(false);
+    }
+
+    handleShowMenu() {
+        this.setVisible(true);
+    }
+
+    handleFocusActiveCharacter() {
+        this.run(this.zoomToActiveCharacter.bind(this));
+    }
+
+    zoomToActiveCharacter() {
+        return this.mode.zoomToActiveCharacter();
+    }
+
+    applyGridConfiguration() {
+        const rows = Number(this.gridRowsInput.value);
+        const columns = Number(this.gridColumnsInput.value);
+        const cellSize = Number(this.cellSizeInput.value);
+
+        this.mode.setGridConfiguration(rows, columns, cellSize);
+    }
+
+    run(callback) {
+        try {
+            const result = callback();
+
+            if (result && typeof result.then === "function") {
+                result.then(
+                    this.handleRunSuccess.bind(this),
+                    this.handleRunFailure.bind(this)
+                );
+            } else {
+                this.refresh();
+            }
+
+            return result;
+        } catch (error) {
+            this.showMessage(error.message);
+            console.error("[DnD UI]", error);
+            return null;
+        }
+    }
+
+    handleRunSuccess() {
+        this.refresh();
+    }
+
+    handleRunFailure(error) {
+        this.showMessage(error.message);
+        console.error("[DnD UI]", error);
+    }
+
+    createTextRow(parent, label, value) {
+        const row = this.element("div");
+
+        Object.assign(row.style, {
+            display: "flex",
+            justifyContent: "space-between",
+            gap: "8px",
+            padding: "5px 2px",
+            borderBottom: "1px solid rgba(120,160,185,0.2)"
+        });
+
+        const left = this.element("span", label);
+        const right = this.element(
+            "span",
+            String(value ?? "—")
+        );
+
+        right.style.color = "#9dd8ed";
+
+        row.appendChild(left);
+        row.appendChild(right);
+        parent.appendChild(row);
+
+        return row;
+    }
+
+    refreshInitiative() {
+        const list = this.initiativeList;
+        list.replaceChildren();
+
+        const battle = this.mode.activeBattle;
+
+        if (!battle?.active) {
+            list.textContent = "No active encounter.";
+            return;
+        }
+
+        for (let index = 0; index < battle.turnOrder.length; index++) {
+            this.appendInitiativeEntry(list, battle.turnOrder[index], index, battle);
+        }
+    }
+
+    appendInitiativeEntry(list, characterId, index, battle) {
+        const character = this.mode.characters.get(characterId);
+        if (!character) return;
+        const active = index === battle.currentTurn;
+        const item = this.createButton(
+            `${active ? "▶ " : ""}${character.name}`,
+            this.handleCharacterSelect.bind(this)
+        );
+        item.dataset.characterId = characterId;
+        item.style.textAlign = "left";
+        item.style.background = active ? "#72551b" : "#193b55";
+        item.style.color = active ? "#fff0b5" : "#d6e6ef";
+        list.appendChild(item);
+    }
+
+    handleCharacterSelect(event) {
+        const characterId = event.currentTarget.dataset.characterId;
+        this.mode.selectCharacter(characterId);
+        this.refresh();
+    }
+
+    handleRemoveCharacter(event) {
+        const characterId = event.currentTarget.dataset.characterId;
+        this.run(this.mode.removeCharacter.bind(this.mode, characterId));
+    }
+
+    refreshCharacters() {
+        const list = this.characterList;
+        list.replaceChildren();
+
+        for (const character of this.mode.characters.values()) {
+            this.appendCharacterRosterRow(list, character);
+        }
+
+        if (!this.mode.characters.size) {
+            list.textContent = "No characters created.";
+        }
+
+        this.refreshCharacterDetails();
+    }
+
+    appendCharacterRosterRow(list, character) {
+        const item = document.createElement("div");
+        Object.assign(item.style, {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "5px",
+            padding: "7px",
+            margin: "4px 0",
+            background: character.id === this.mode.selectedCharacter?.id ? "#72551b" : "#193b55",
+            borderRadius: "4px"
+        });
+        const select = this.createButton(character.name, this.handleCharacterSelect.bind(this));
+        select.dataset.characterId = character.id;
+        select.style.flex = "1";
+        const remove = this.createButton("×", this.handleRemoveCharacter.bind(this));
+        remove.dataset.characterId = character.id;
+        remove.style.width = "40px";
+        remove.style.background = "#713b40";
+        item.append(select, remove);
+        list.appendChild(item);
+    }
+
+    refreshCharacterDetails() {
+        const parent = this.characterDetails;
+        parent.replaceChildren();
+        const character = this.mode.selectedCharacter;
+        if (!character) {
+            parent.textContent = "Select a character to view details.";
+            return;
+        }
+        this.appendCharacterSummary(parent, character);
+        this.appendCharacterAbilityScores(parent, character);
+    }
+
+    appendCharacterSummary(parent, character) {
+        this.createTextRow(parent, "Name", character.name);
+        this.createTextRow(parent, "Race", character.race);
+        this.createTextRow(parent, "Class", character.className);
+        this.createTextRow(parent, "Level", character.level);
+        this.createTextRow(parent, "Hit points", `${character.hitPoints}/${character.maxHitPoints}`);
+        this.createTextRow(parent, "Armor class", character.armorClass);
+        this.createTextRow(parent, "Initiative", character.initiative);
+        this.createTextRow(parent, "Movement", character.movement);
+        this.createTextRow(parent, "Altitude above ground", `${character.position.altitude ?? 0} world units`);
+        this.createTextRow(parent, "Grid row", character.position.row);
+        this.createTextRow(parent, "Grid column", character.position.col);
+    }
+
+    appendCharacterAbilityScores(parent, character) {
+        this.addSection(parent, "ABILITY SCORES");
+        for (const [ability, score] of Object.entries(character.stats)) {
+            this.appendAbilityScore(parent, character, ability, score);
+        }
+    }
+
+    appendAbilityScore(parent, character, ability, score) {
+        const modifier = character.getModifier(ability);
+        const sign = modifier >= 0 ? "+" : "";
+        this.createTextRow(parent, ability.toUpperCase(), `${score} (${sign}${modifier})`);
+    }
+
+    refreshHistory() {
+        const parent = this.historyList;
+        parent.replaceChildren();
+        const battle = this.mode.activeBattle;
+        if (!battle || !battle.actions.length) {
+            parent.textContent = "No recorded battle events.";
+            return;
+        }
+        const events = battle.actions.slice(-30).reverse();
+        for (const event of events) this.appendHistoryEntry(parent, event);
+    }
+
+    appendHistoryEntry(parent, event) {
+        const character = this.mode.characters.get(event.characterId);
+        const timestamp = new Date(event.timestamp).toLocaleTimeString();
+        const entry = this.createHistoryEntry();
+        const heading = this.element("div", `${timestamp} — ${character?.name || "System"}`);
+        heading.style.color = "#9dd8ed";
+        entry.append(heading, this.element("div", this.describeHistoryEvent(event)));
+        parent.appendChild(entry);
+    }
+
+    createHistoryEntry() {
+        const entry = this.element("div");
+        Object.assign(entry.style, {
+            padding: "7px",
+            margin: "4px 0",
+            background: "#193b55",
+            borderRadius: "4px",
+            overflowWrap: "anywhere"
+        });
+        return entry;
+    }
+
+    describeHistoryEvent(event) {
+        if (event.type === "move") return "Movement";
+        if (event.type === "action") return `Action: ${event.data.description || "Other"}`;
+        if (event.type === "bonus-action") return `Bonus: ${event.data.description || "Other"}`;
+        if (event.type === "speech") return `Speech: ${event.data.text}`;
+        if (event.type === "other") return `Custom: ${event.data.payload?.type || "Action"}`;
+        return event.type;
+    }
+
+    refreshBattleStatus() {
+        const battle = this.mode.activeBattle;
+        const character = this.mode.getActiveCharacter();
+
+        if (!battle?.active) {
+            this.battleStatus.textContent =
+                "Encounter inactive. Create characters and start a battle.";
+            return;
+        }
+
+        const resources = battle.currentResources;
+
+        const allowance = (character?.movement ?? 0) * (resources?.dashUsed ? 2 : 1);
+        this.battleStatus.textContent = [
+            `ROUND ${battle.round}`,
+            `ACTIVE: ${character?.name || "Unknown"}`,
+            `MOVEMENT: ${resources?.movementUsed || 0}/${allowance}`,
+            `ACTION: ${resources?.actionUsed ? "USED" : "AVAILABLE"}`,
+            `BONUS: ${resources?.bonusActionUsed ? "USED" : "AVAILABLE"}`,
+            `DASH: ${resources?.dashUsed ? "USED" : "AVAILABLE"}`
+        ].join("  |  ");
+    }
+
+    refresh() {
+        if (!this.panel || !this.mode) return;
+        this.refreshRegistrationStatus();
+        this.refreshBattleControls();
+        this.refreshBattleStatus();
+        this.refreshInitiative();
+        this.refreshCharacters();
+        this.refreshHistory();
+        this.refreshGridInformation();
+        this.refreshAltitudeControl();
+    }
+
+    refreshRegistrationStatus() {
+        this.status.textContent = `${this.mode.characters.size} characters registered`;
+    }
+
+    refreshBattleControls() {
+        const battle = this.mode.activeBattle;
+        const active = Boolean(battle?.active);
+        const resources = battle?.currentResources;
+        this.setButtonDisabled(this.startBattleButton, active || !this.mode.characters.size);
+        this.setButtonDisabled(this.advanceButton, !active);
+        this.setButtonDisabled(this.endBattleButton, !active);
+        this.setButtonDisabled(this.actionButton, !active || Boolean(resources?.actionUsed));
+        this.setButtonDisabled(this.bonusButton, !active || Boolean(resources?.bonusActionUsed));
+        this.previewButton.disabled = !active;
+        this.previewButton.style.opacity = active ? "1" : "0.45";
+    }
+
+    setButtonDisabled(button, disabled) {
+        button.disabled = disabled;
+        button.style.opacity = disabled ? "0.45" : "1";
+    }
+
+    refreshGridInformation() {
+        this.gridInfo.textContent = [
+            `Dimensions: ${this.mode.gridRows} rows × ${this.mode.gridColumns} columns`,
+            `Cell size: ${this.mode.cellSize} world units`,
+            `Total width: ${this.mode.gridColumns * this.mode.cellSize}`,
+            `Total depth: ${this.mode.gridRows * this.mode.cellSize}`,
+            `Origin: ${this.mode.gridOrigin.x}, ${this.mode.gridOrigin.z}`
+        ].join("\n");
+        this.gridRowsInput.value = String(this.mode.gridRows);
+        this.gridColumnsInput.value = String(this.mode.gridColumns);
+        this.cellSizeInput.value = String(this.mode.cellSize);
+        this.refreshMovementPreviewLabel();
+    }
+
+    refreshMovementPreviewLabel() {
+        this.previewButton.textContent = this.mode.movementPreview
+            ? "DISABLE MOVEMENT PREVIEW"
+            : "ENABLE MOVEMENT PREVIEW";
+    }
+
+    refreshAltitudeControl() {
+        const selected = this.mode.selectedCharacter;
+        this.selectedAltitudeInput.value = String(selected?.position.altitude ?? 0);
+        this.selectedAltitudeInput.disabled = !selected;
+    }
+
+    showMessage(message) {
+        if (!this.message) return;
+
+        this.message.textContent = String(message);
+
+        this.message.style.color = "#ffd27d";
+    }
+
+    toggle() {
+        this.setVisible(!this.visible);
+    }
+
+    setVisible(visible) {
+        this.visible = Boolean(visible);
+
+        if (this.panel) {
+            this.panel.style.display =
+                this.visible ? "block" : "none";
+        }
+
+        if (this.toggleButton) {
+            this.toggleButton.textContent =
+                this.visible ? "× HIDE MENU" : "☰ D&D MENU";
+        }
+    }
+
+    dispose() {
+        if (this.disposed) return;
+
+        this.disposed = true;
+
+        window.removeEventListener(
+            "keydown",
+            this.onKeyDown
+        );
+
+        this.toggleButton?.remove();
+        this.focusButton?.remove();
+        this.panel?.remove();
+
+        this.panel = null;
+        this.toggleButton = null;
+        this.focusButton = null;
+
+        this.tabContents = {};
+        this.tabBar = null;
+    }
+}
+
+export { DnDTacticalUI };
+
+
+========================================================================
+FILE: src/game/game-manager.js
+========================================================================
+
+
+class GameManager {
+    constructor(scene, options = {}) {
+        this.scene = scene;
+        this.canvas = options.canvas;
+
+        this.flightCamera = options.flightCamera;
+        this.thirdPersonCamera = null;
+        this.editorCamera = null;
+
+        this.playerController = null;
+        this.characterCameraController = null;
+
+        this.mode = "menu";
+        this.resumeMode = "flight";
+
+        this.callbacks = new Set();
+        this.disposed = false;
+
+        if (!this.flightCamera) {
+            throw new Error("Flight camera is required.");
+        }
+
+        this.flightCamera.detachControl();
+
+        this.onKeyDown = event => {
+            if (event.repeat) return;
+
+            if (event.code === "KeyV") {
+                if (
+                    this.mode === "flight" ||
+                    this.mode === "thirdPerson"
+                ) {
+                    this.togglePerspective();
+                }
+            }
+
+            if (event.code === "Escape") {
+                if (this.mode === "editor") {
+                    this.exitEditor();
+                } else if (
+                    this.mode === "flight" ||
+                    this.mode === "thirdPerson"
+                ) {
+                    this.pause();
+                } else if (this.mode === "paused") {
+                    this.resume();
+                }
+            }
+        };
+
+        window.addEventListener("keydown", this.onKeyDown);
+    }
+
+    registerThirdPerson(camera, controller, cameraController) {
+        this.thirdPersonCamera = camera;
+        this.playerController = controller;
+        this.characterCameraController = cameraController;
+
+        camera.detachControl();
+        this.applyMode();
+    }
+
+    registerEditor(camera) {
+        this.editorCamera = camera;
+        camera.detachControl();
+    }
+
+    setMode(mode) {
+        const valid = [
+            "menu",
+            "flight",
+            "thirdPerson",
+            "paused",
+            "editor",
+		"dnd"
+        ];
+
+        if (!valid.includes(mode)) {
+            throw new Error(`Invalid game mode: ${mode}`);
+        }
+
+        if (
+            mode === "thirdPerson" &&
+            (!this.thirdPersonCamera || !this.playerController)
+        ) {
+            throw new Error("Third-person systems are not registered.");
+        }
+
+        if (mode === "editor" && !this.editorCamera) {
+            throw new Error("Editor camera is not registered.");
+        }
+
+        if (this.mode === mode) return;
+
+        const previous = this.mode;
+
+        if (
+            previous === "flight" ||
+            previous === "thirdPerson"
+        ) {
+            this.resumeMode = previous;
+        }
+
+        this.mode = mode;
+        this.applyMode();
+
+        for (const callback of this.callbacks) {
+            callback(mode, previous);
+        }
+    }
+
+    applyMode() {
+        this.flightCamera.detachControl();
+        this.thirdPersonCamera?.detachControl();
+        this.editorCamera?.detachControl();
+
+        this.playerController?.setEnabled(false);
+        this.characterCameraController?.setEnabled(false);
+
+        if (this.mode === "flight") {
+            this.scene.activeCamera = this.flightCamera;
+            this.flightCamera.attachControl(this.canvas, true);
+        }
+
+	if (this.mode === "dnd") {
+	    this.scene.activeCamera = this.flightCamera;
+	}
+
+        if (this.mode === "thirdPerson") {
+            this.scene.activeCamera = this.thirdPersonCamera;
+            this.playerController.setEnabled(true);
+            this.characterCameraController.setEnabled(true);
+        }
+
+        if (this.mode === "editor") {
+            this.scene.activeCamera = this.editorCamera;
+            this.editorCamera.attachControl(this.canvas, true);
+        }
+
+        if (this.mode === "menu" || this.mode === "paused") {
+            this.scene.activeCamera = this.flightCamera;
+        }
+    }
+
+    startFlight() {
+        this.setMode("flight");
+    }
+
+    startThirdPerson() {
+        this.setMode("thirdPerson");
+    }
+
+    startEditor() {
+        this.setMode("editor");
+    }
+
+	startDnD() {
+	    this.setMode("dnd");
+	}
+
+    exitEditor() {
+        if (this.mode !== "editor") return;
+
+        this.setMode(this.resumeMode);
+    }
+
+    togglePerspective() {
+        if (this.mode === "flight") {
+            this.startThirdPerson();
+        } else if (this.mode === "thirdPerson") {
+            this.startFlight();
+        }
+    }
+
+    pause() {
+        if (
+            this.mode !== "flight" &&
+            this.mode !== "thirdPerson"
+        ) return;
+
+        this.resumeMode = this.mode;
+        this.setMode("paused");
+    }
+
+    resume() {
+        if (this.mode === "paused") {
+            this.setMode(this.resumeMode);
+        }
+    }
+
+    returnToMenu() {
+        this.setMode("menu");
+    }
+
+    onModeChanged(callback) {
+        this.callbacks.add(callback);
+        return () => this.callbacks.delete(callback);
+    }
+
+    getState() {
+        return {
+            mode: this.mode,
+            resumeMode: this.resumeMode
+        };
+    }
+
+    dispose() {
+        if (this.disposed) return;
+
+        this.disposed = true;
+
+        window.removeEventListener("keydown", this.onKeyDown);
+
+        this.flightCamera.detachControl();
+        this.thirdPersonCamera?.detachControl();
+        this.editorCamera?.detachControl();
+
+        this.callbacks.clear();
+    }
+}
+
+export { GameManager };
+
+
+========================================================================
+FILE: src/game/player-character.js
+========================================================================
+
+class PlayerCharacter {
+    constructor(scene, spatialTransform, options = {}) {
+        this.scene = scene;
+        this.transform = spatialTransform;
+
+        this.worldPosition = {
+            x: options.x ?? 0,
+            y: 0,
+            z: options.z ?? 0
+        };
+
+        this.yaw = 0;
+
+        const sample = options.terrain.sampleAt(
+            this.worldPosition.x,
+            this.worldPosition.z
+        );
+
+        if (!sample) {
+            throw new Error("Unable to sample initial player terrain.");
+        }
+
+        this.worldPosition.y = sample.y;
+
+        this.root = new BABYLON.TransformNode(
+            "somniumPlayer",
+            scene
+        );
+
+        this.body = BABYLON.MeshBuilder.CreateCapsule(
+            "playerBody",
+            {
+                height: 1.8,
+                radius: 0.35,
+                tessellation: 12
+            },
+            scene
+        );
+
+        this.body.parent = this.root;
+        this.body.position.y = 0.9;
+
+        this.head = BABYLON.MeshBuilder.CreateSphere(
+            "playerHead",
+            {
+                diameter: 0.48,
+                segments: 12
+            },
+            scene
+        );
+
+        this.head.parent = this.root;
+        this.head.position.y = 1.95;
+
+        this.material = new BABYLON.StandardMaterial(
+            "playerMaterial",
+            scene
+        );
+
+        this.material.diffuseColor =
+            new BABYLON.Color3(0.18, 0.48, 0.78);
+
+        this.body.material = this.material;
+
+        this.head.material = new BABYLON.StandardMaterial(
+            "playerHeadMaterial",
+            scene
+        );
+
+        this.head.material.diffuseColor =
+            new BABYLON.Color3(0.82, 0.69, 0.55);
+
+        this.syncRenderPosition();
+    }
+
+    syncRenderPosition() {
+        const projected = this.transform.worldToRender(
+            this.worldPosition
+        );
+
+        this.root.position.set(
+            projected.x,
+            projected.y,
+            projected.z
+        );
+
+        this.root.rotation.y = this.yaw;
+    }
+
+    setWorldPosition(position) {
+        this.worldPosition = {
+            x: position.x,
+            y: position.y,
+            z: position.z
+        };
+
+        this.syncRenderPosition();
+    }
+
+    dispose() {
+        this.root.dispose(false, true);
+        this.material.dispose();
+    }
+}
+
+export { PlayerCharacter };
+
+
+========================================================================
+FILE: src/game/player-controller.js
+========================================================================
+
+class PlayerController {
+    constructor(character, terrain, canvas, options = {}) {
+        this.character = character;
+        this.terrain = terrain;
+        this.canvas = canvas;
+
+        this.walkSpeed = options.walkSpeed ?? 180;
+        this.runSpeed = options.runSpeed ?? 360;
+        this.turnSpeed = options.turnSpeed ?? 2.2;
+
+        this.keys = new Set();
+
+        this.enabled = true;
+        this.disposed = false;
+
+        this.mouseSensitivity = 0.004;
+        this.dragging = false;
+        this.previousMouseX = 0;
+
+        this.onKeyDown = event => {
+            this.keys.add(event.code);
+
+            if (
+                ["KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft"]
+                    .includes(event.code)
+            ) {
+                event.preventDefault();
+            }
+        };
+
+        this.onKeyUp = event => {
+            this.keys.delete(event.code);
+        };
+
+        this.onBlur = () => {
+            this.keys.clear();
+            this.dragging = false;
+        };
+
+        this.onPointerDown = event => {
+            if (event.button !== 0) return;
+
+            this.dragging = true;
+            this.previousMouseX = event.clientX;
+        };
+
+        this.onPointerMove = event => {
+            if (!this.dragging || !this.enabled) return;
+
+            const dx = event.clientX - this.previousMouseX;
+
+            this.previousMouseX = event.clientX;
+
+            this.character.yaw +=
+                dx * this.mouseSensitivity;
+        };
+
+        this.onPointerUp = () => {
+            this.dragging = false;
+        };
+
+        window.addEventListener("keydown", this.onKeyDown);
+        window.addEventListener("keyup", this.onKeyUp);
+        window.addEventListener("blur", this.onBlur);
+
+        canvas.addEventListener(
+            "pointerdown",
+            this.onPointerDown
+        );
+
+        window.addEventListener(
+            "pointermove",
+            this.onPointerMove
+        );
+
+        window.addEventListener(
+            "pointerup",
+            this.onPointerUp
+        );
+    }
+
+    setEnabled(enabled) {
+        this.enabled = enabled;
+        this.keys.clear();
+        this.dragging = false;
+    }
+
+    update(deltaSeconds) {
+        if (!this.enabled || this.disposed) return;
+
+        const dt = Math.min(deltaSeconds, 0.05);
+
+        if (dt <= 0) return;
+
+        const forward =
+            (this.keys.has("KeyW") ? 1 : 0) -
+            (this.keys.has("KeyS") ? 1 : 0);
+
+        const turn =
+            (this.keys.has("KeyA") ? 1 : 0) -
+            (this.keys.has("KeyD") ? 1 : 0);
+
+        this.character.yaw +=
+            turn * this.turnSpeed * dt;
+
+        const speed = this.keys.has("ShiftLeft")
+            ? this.runSpeed
+            : this.walkSpeed;
+
+        const yaw = this.character.yaw;
+
+        const dx = Math.sin(yaw) * forward * speed * dt;
+        const dz = Math.cos(yaw) * forward * speed * dt;
+
+        if (dx === 0 && dz === 0) {
+            return;
+        }
+
+        const current = this.character.worldPosition;
+
+        const nextX = current.x + dx;
+        const nextZ = current.z + dz;
+
+        // Respect the authoritative world bounds.
+        if (
+            nextX < this.terrain.min.x ||
+            nextX > this.terrain.max.x ||
+            nextZ < this.terrain.min.z ||
+            nextZ > this.terrain.max.z
+        ) {
+            return;
+        }
+
+        const sample = this.terrain.sampleAt(
+            nextX,
+            nextZ
+        );
+
+        if (!sample) return;
+
+        // Initial terrain-following implementation.
+        // Steep-slope collision will be added separately.
+        this.character.setWorldPosition({
+            x: nextX,
+            y: sample.y,
+            z: nextZ
+        });
+    }
+
+    dispose() {
+        if (this.disposed) return;
+
+        this.disposed = true;
+
+        window.removeEventListener(
+            "keydown",
+            this.onKeyDown
+        );
+
+        window.removeEventListener(
+            "keyup",
+            this.onKeyUp
+        );
+
+        window.removeEventListener(
+            "blur",
+            this.onBlur
+        );
+
+        this.canvas.removeEventListener(
+            "pointerdown",
+            this.onPointerDown
+        );
+
+        window.removeEventListener(
+            "pointermove",
+            this.onPointerMove
+        );
+
+        window.removeEventListener(
+            "pointerup",
+            this.onPointerUp
+        );
+
+        this.keys.clear();
+    }
+}
+
+export { PlayerController };
+
+
+========================================================================
+END OF DIRECTORY SOURCE DUMP
+Files included: 9
+Binary/unreadable files skipped: 0
+========================================================================

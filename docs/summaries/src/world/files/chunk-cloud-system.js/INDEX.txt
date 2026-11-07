@@ -1,0 +1,35 @@
+SOMNIUM — INDIVIDUAL SOURCE FILE INDEX
+================================================================
+
+Source file: src/world/chunk-cloud-system.js
+Source directory: src/world/
+Generated: 2026-11-07T06:14:04
+Total source lines: 1000
+Maximum chunk size: 300 lines
+Number of parts: 4
+
+SOURCE PARTS
+----------------------------------------------------------------
+Part: PART-001.txt
+Original lines: 1-300
+Lines in part: 300
+
+Part: PART-002.txt
+Original lines: 301-600
+Lines in part: 300
+
+Part: PART-003.txt
+Original lines: 601-900
+Lines in part: 300
+
+Part: PART-004.txt
+Original lines: 901-1000
+Lines in part: 100
+
+READING INSTRUCTIONS
+----------------------------------------------------------------
+- Read parts in ascending numerical order.
+- Concatenate parts without adding separator lines.
+- Part contents are original UTF-8 source text.
+- Original source line numbering is preserved.
+- No source lines are intentionally omitted.
