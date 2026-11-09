@@ -1,0 +1,8 @@
+Node tests: 71/71 passed
+JavaScript source syntax: 108/108 passed
+Test-file syntax: 9/9 passed
+Relative import targets: all resolved
+Versioned entry chain: index.html -> main.js -> create-scene.js -> geometry-demo-world.js
+GeometryDemoWorld unsafe direct setVisible call: absent
+WorldManager.setVisible: present, pre-init safe, resident mesh updates tested
+Browser/WebGL startup: not executed in this environment

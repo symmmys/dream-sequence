@@ -1,0 +1,71 @@
+SOMNIUM — GEOMETRY PHASE 12 TEST RESULTS
+Build: somnium-20261108-anomaly-influence-1
+Date: 2026-11-08
+
+AUTOMATED TEST SUITE
+Command:
+  node --test tests/*.test.mjs
+
+Result: PASS
+Tests: 156
+Passed: 156
+Failed: 0
+Skipped: 0
+
+JAVASCRIPT SYNTAX
+Commands:
+  find src -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+  find tests -type f -name '*.mjs' -print0 | xargs -0 -n1 node --check
+
+Result: PASS
+Source modules checked: 116
+Test modules checked: 20
+
+RELATIVE MODULE REFERENCES
+All statically identifiable relative imports in src/ were resolved after
+stripping browser cache-busting query/hash suffixes.
+
+Total relative references: 181
+Resolved references: 181
+Missing references: 0
+Result: PASS
+
+KEY REGRESSION COVERAGE
+- Ambient 4D distance includes XYZ and W displacement from the anomaly center.
+- The default center is the ambient midpoint of the anomaly's endpoint positions.
+- Default W reach is measured along the source slice's normal, not total endpoint distance.
+- Horizon and inner radii produce zero and full freedom respectively, with a monotonic
+  smootherstep transition and zero first/second derivatives at the endpoints.
+- Per-anomaly W reach, movement scale, freedom multiplier, and reach multiplier are
+  independently configurable and accept runtime player-stat modifiers.
+- W movement begins in the influence shell before formal anomaly entry and becomes
+  unrestricted at the inner radius.
+- Cross-slice chunk reachability evaluates projected destination-slice chunk distance
+  and W distance independently; an explicit traversable topology edge is still required.
+- World chunk addresses remain (sliceId, chunkX, chunkZ); W is not added to chunk identity.
+- Reachable remote-slice chunks enter the existing generation queue and receive a
+  retention window to prevent reachability-boundary flicker.
+- The Poincare-side anomaly portal has a wider aperture and an integration test confirms
+  it can be entered from the Poincare chamber.
+- The existing labeled, bidirectional +5-W 4D-room-to-Main-World anomaly remains intact.
+- Existing Bezier anomaly traversal remains supported.
+- The future optical-metric design is documented separately from player W freedom;
+  no ray tracer or optical propagation behavior is implemented in this phase.
+
+BROWSER / WEBGL VISUAL CHECK
+A headless Chromium visual pass was not completed because the container's graphics
+backend is unavailable. Automated tests, syntax checks, and relative module-reference
+checks passed. Portal framing, transition feel, and remote terrain streaming should be
+confirmed in a local browser.
+
+RECOMMENDED LOCAL SMOKE TEST
+1. Extract the archive into a clean directory.
+2. Start `python3 -m http.server 8081` from the directory containing index.html.
+3. Open http://127.0.0.1:8081 and launch the 4D Geometry Demo.
+4. In the Poincare chamber, approach the Hypercube anomaly aperture and enter it.
+5. Watch W freedom gradually increase before reaching the anomaly interior; move E/Q
+   gently near the horizon, then verify full W movement deeper inside.
+6. Move toward the outer horizon and confirm W movement fades smoothly.
+7. Check that remote destination chunks begin loading only when the field grants
+   sufficient W reach, and that they do not flicker at the reach threshold.
+8. In the 4D chamber, verify the labeled +5-W Main World exit still works in both directions.

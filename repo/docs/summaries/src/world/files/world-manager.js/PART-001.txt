@@ -1,0 +1,300 @@
+
+import { WorldChunk } from "./world-chunk.js?v=somnium-20261108-phase16c-anomaly-optics-2";
+
+export class WorldManager {
+    constructor(scene, terrain, options = {}) {
+        this.scene = scene;
+        this.terrain = terrain;
+        this.sliceId = options.sliceId ?? 'somnium-main';
+        this.chunkGraph = options.chunkGraph ?? null;
+        this.spatialAdapter = options.spatialAdapter ?? null;
+        this.opticalScene = options.opticalScene ?? this.spatialAdapter?.opticalScene ?? null;
+        this.layerMask = options.layerMask;
+        this.visible = options.visible ?? true;
+
+	this.fallbackScheduled = false;
+
+        this.chunkSize = options.chunkSize ?? 2000;
+        if (this.chunkGraph && !this.chunkGraph.hasSlice(this.sliceId)) {
+            this.chunkGraph.registerSlice(this.sliceId, { chunkSize: this.chunkSize });
+        }
+        this.renderRadius = options.renderRadius ?? 14;
+        this.highDetailRadius = options.highDetailRadius ?? 2;
+
+        this.maxChunksPerUpdate =
+            options.maxChunksPerUpdate ?? 6;
+
+        this.chunks = new Map();
+        this.remoteChunkRetention = new Map();
+        this.remoteRetentionFrames = options.remoteRetentionFrames ?? 30;
+        this.lastReachableRemoteChunks = 0;
+
+        this.enabled = true;
+
+        this.stats = {
+            generated: 0,
+            unloaded: 0,
+            loaded: 0,
+            workerCompleted: 0,
+            workerErrors: 0,
+            pendingMeshes: 0
+        };
+
+        this.minChunkX = Math.floor(
+            terrain.min.x / this.chunkSize
+        );
+
+        this.maxChunkX = Math.ceil(
+            terrain.max.x / this.chunkSize
+        ) - 1;
+
+        this.minChunkZ = Math.floor(
+            terrain.min.z / this.chunkSize
+        );
+
+        this.maxChunkZ = Math.ceil(
+            terrain.max.z / this.chunkSize
+        ) - 1;
+
+this.material = new BABYLON.StandardMaterial(
+    "worldTerrainMaterial",
+    scene
+);
+
+this.material.diffuseColor = new BABYLON.Color3(
+    1.0, 1.0, 1.0
+);
+
+this.material.ambientColor = new BABYLON.Color3(
+    1, 1, 1
+);
+
+// Preserve vertex colors, but allow actual illumination.
+this.material.useVertexColors = true;
+this.material.disableLighting = false;
+
+// Small nighttime visibility contribution.
+this.material.emissiveColor = new BABYLON.Color3(
+    0.1, 0.1, 0.1
+);
+
+this.material.backFaceCulling = false;
+
+this.material.specularColor = BABYLON.Color3.Black();
+this.material.roughness = 1.0;
+	
+        this.meshQueue = [];
+        this.worker = null;
+        this.workerReady = false;
+        this.workerBusy = false;
+        this.nextTaskId = 1;
+
+        this.initializeWorker();
+    }
+
+    getKey(x, z) {
+        return JSON.stringify([this.sliceId, x, z]);
+    }
+
+    getChunk(x, z) {
+        return this.chunks.get(this.getKey(x, z)) ?? null;
+    }
+
+    getCoordinates(position) {
+        return {
+            x: Math.floor(position.x / this.chunkSize),
+            z: Math.floor(position.z / this.chunkSize)
+        };
+    }
+
+    isInsideWorld(x, z) {
+        return (
+            x >= this.minChunkX &&
+            x <= this.maxChunkX &&
+            z >= this.minChunkZ &&
+            z <= this.maxChunkZ
+        );
+    }
+
+	initializeWorker() {
+    if (typeof Worker === "undefined") {
+        console.warn(
+            "[WorldManager] Workers unavailable. Using fallback."
+        );
+        return;
+    }
+
+    try {
+        this.worker = new Worker(
+            new URL("./terrain-mesh-worker.js", import.meta.url),
+            { type: "module" }
+        );
+
+        this.worker.onmessage = event => {
+            const message = event.data;
+
+            if (message.type === "ready") {
+                if (this.workerInitTimer) {
+                    clearTimeout(this.workerInitTimer);
+                    this.workerInitTimer = null;
+                }
+
+                this.workerReady = true;
+
+                console.log(
+                    "[WorldManager] Terrain worker ready."
+                );
+
+                this.pumpWorker();
+                return;
+            }
+
+            this.handleWorkerMessage(message);
+        };
+
+        this.worker.onerror = error => {
+            this.failWorker(error);
+        };
+
+        this.worker.onmessageerror = error => {
+            this.failWorker(error);
+        };
+
+        const pixels = this.terrain.pixels.slice();
+
+        this.worker.postMessage({
+            type: "init",
+            terrain: {
+                width: this.terrain.width,
+                height: this.terrain.height,
+                worldSize: this.terrain.worldSize,
+                minX: this.terrain.min.x,
+                minZ: this.terrain.min.z,
+                minHeight: this.terrain.minHeight,
+                maxHeight: this.terrain.maxHeight,
+                heightChannel:
+                    this.terrain.heightChannel ?? "average"
+            },
+            pixels: pixels.buffer
+        }, [pixels.buffer]);
+
+        this.workerInitTimer = setTimeout(() => {
+            if (!this.workerReady && this.worker) {
+                this.failWorker(
+                    "Worker initialization timed out."
+                );
+            }
+        }, 5000);
+
+    } catch (error) {
+        this.failWorker(error);
+    }
+}
+
+    handleWorkerMessage(message) {
+        if (message.type === "ready") {
+            this.workerReady = true;
+            this.pumpWorker();
+            return;
+        }
+
+        if (
+            message.type === "complete" ||
+            message.type === "error"
+        ) {
+            const task = this.currentTask;
+
+            this.workerBusy = false;
+            this.currentTask = null;
+
+            if (
+                task &&
+                task.id === message.id
+            ) {
+                const chunk = this.chunks.get(task.key);
+
+                if (
+                    chunk &&
+                    !chunk.disposed &&
+                    chunk.revision === message.revision
+                ) {
+                    if (message.type === "complete") {
+                        chunk.applyMeshData(
+                            message.data,
+                            task.lod,
+                            this.material
+                        );
+
+                        this.stats.workerCompleted++;
+                    } else {
+                        this.stats.workerErrors++;
+
+                        console.error(
+                            "[WorldManager] Mesh generation failed:",
+                            message.message
+                        );
+
+                        chunk.generateMesh(
+                            task.lod,
+                            this.material
+                        );
+                    }
+                }
+            }
+
+            this.pumpWorker();
+        }
+    }
+
+    scheduleMesh(chunk, lod) {
+        if (!chunk || chunk.disposed) return;
+
+        const neighbors = this.getNeighbors(chunk);
+
+        chunk.setNeighbors(neighbors);
+        chunk.lod = lod;
+        chunk.revision++;
+
+        const job = {
+            id: this.nextTaskId++,
+            key: this.getKey(chunk.x, chunk.z),
+            revision: chunk.revision,
+            lod,
+
+            x: chunk.x,
+            z: chunk.z,
+            size: chunk.size,
+
+            neighborLODs: {
+                north: neighbors.north?.lod ?? lod,
+                south: neighbors.south?.lod ?? lod,
+                east: neighbors.east?.lod ?? lod,
+                west: neighbors.west?.lod ?? lod
+            }
+        };
+
+        this.meshQueue = this.meshQueue.filter(
+            item => item.key !== job.key
+        );
+
+        this.meshQueue.push(job);
+
+        this.stats.pendingMeshes = this.meshQueue.length;
+
+        this.pumpWorker();
+    }
+
+    pumpWorker() {
+        if (
+            !this.worker ||
+            !this.workerReady ||
+            this.workerBusy ||
+            this.meshQueue.length === 0
+        ) {
+            return;
+        }
+
+        const job = this.meshQueue.shift();
+
+        this.stats.pendingMeshes = this.meshQueue.length;
+

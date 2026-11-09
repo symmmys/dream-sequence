@@ -1,0 +1,300 @@
+/**
+ * Slice-aware CPU optical scene registry.
+ *
+ * Geometry is retained in authoritative slice-local coordinates, before any
+ * Babylon/render projection. Static triangle surfaces receive per-registration
+ * BVHs; streamed heightfields use analytic height sampling.
+ */
+
+import { createOpticalMaterial } from './optical-contracts.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { createSliceAddress, getSliceAddressKey } from './world-slice.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+
+const AXES = ['x', 'y', 'z'];
+const DEFAULT_LEAF_SIZE = 8;
+const EPSILON = 1e-10;
+
+class OpticalSceneRegistry {
+    constructor(options = {}) {
+        this.leafSize = options.leafSize ?? DEFAULT_LEAF_SIZE;
+        if (!Number.isSafeInteger(this.leafSize) || this.leafSize < 1 || this.leafSize > 128) {
+            throw new RangeError('Optical BVH leaf size must be an integer from 1 through 128.');
+        }
+        this.triangleMeshes = new Map();
+        this.heightfields = new Map();
+        this.disposed = false;
+        this.statistics = {
+            registeredTriangleMeshes: 0,
+            registeredHeightfields: 0,
+            triangleCount: 0,
+            queries: 0,
+            bvhNodesVisited: 0,
+            trianglesTested: 0,
+            heightfieldSamples: 0,
+            hits: 0
+        };
+    }
+
+    registerTriangleMesh(options = {}) {
+        this.assertActive();
+        const id = requireId(options.id, 'Optical mesh id');
+        const sliceId = requireId(options.sliceId, 'Optical mesh sliceId');
+        const geometry = validateTriangleGeometry(options.positions, options.indices);
+        const chunkAddress = normalizeChunkAddress(options.chunkAddress, sliceId);
+        const material = normalizeMaterial(options.material, id);
+        const revision = requireRevision(options.revision);
+        const enabled = options.enabled ?? true;
+        if (typeof enabled !== 'boolean') throw new TypeError('Optical mesh enabled must be boolean.');
+
+        this.unregister(id);
+        const triangles = buildTriangles(geometry.positions, geometry.indices);
+        const root = triangles.length ? buildBvh(triangles, this.leafSize) : null;
+        const entry = {
+            id, sliceId, chunkAddress, chunkKey: chunkAddress ? getSliceAddressKey(chunkAddress) : null,
+            revision, enabled, material, root, triangleCount: triangles.length,
+            sourceVertexCount: geometry.positions.length / 3
+        };
+        this.triangleMeshes.set(id, entry);
+        this.statistics.registeredTriangleMeshes = this.triangleMeshes.size;
+        this.statistics.triangleCount = countTriangles(this.triangleMeshes);
+        return describeEntry(entry);
+    }
+
+    registerHeightfield(options = {}) {
+        this.assertActive();
+        const id = requireId(options.id, 'Optical heightfield id');
+        const sliceId = requireId(options.sliceId, 'Optical heightfield sliceId');
+        const terrain = options.terrain;
+        if (!terrain || typeof terrain.sampleHeight !== 'function' ||
+            !Number.isSafeInteger(terrain.width) || terrain.width < 2 ||
+            !Number.isSafeInteger(terrain.height) || terrain.height < 2) {
+            throw new TypeError('Optical heightfield requires a sampled terrain with width and height.');
+        }
+        const bounds = normalizeHeightfieldBounds(options.bounds);
+        const chunkAddress = normalizeChunkAddress(options.chunkAddress, sliceId);
+        const material = normalizeMaterial(options.material, id);
+        const revision = requireRevision(options.revision);
+        const enabled = options.enabled ?? true;
+        if (typeof enabled !== 'boolean') throw new TypeError('Optical heightfield enabled must be boolean.');
+
+        this.unregister(id);
+        const entry = {
+            id, sliceId, terrain, bounds, chunkAddress,
+            chunkKey: chunkAddress ? getSliceAddressKey(chunkAddress) : null,
+            material, revision, enabled,
+            kind: 'heightfield'
+        };
+        this.heightfields.set(id, entry);
+        this.statistics.registeredHeightfields = this.heightfields.size;
+        return describeEntry(entry);
+    }
+
+    unregister(id) {
+        this.assertActive();
+        const removedMesh = this.triangleMeshes.delete(id);
+        const removedHeightfield = this.heightfields.delete(id);
+        this.statistics.registeredTriangleMeshes = this.triangleMeshes.size;
+        this.statistics.registeredHeightfields = this.heightfields.size;
+        this.statistics.triangleCount = countTriangles(this.triangleMeshes);
+        return removedMesh || removedHeightfield;
+    }
+
+    intersectSegment(sliceId, from, to, options = {}) {
+        this.assertActive();
+        const normalizedSliceId = requireId(sliceId, 'Optical query sliceId');
+        validatePosition3(from, 'Optical segment start');
+        validatePosition3(to, 'Optical segment end');
+        const segment = createSegment(from, to);
+        if (segment.length <= EPSILON) return null;
+
+        const allowedChunks = options.allowedChunkAddresses
+            ? new Set(options.allowedChunkAddresses.map((address) => getSliceAddressKey(address)))
+            : null;
+        const minimumParameter = options.minimumParameter ?? 1e-7;
+        if (!Number.isFinite(minimumParameter) || minimumParameter < 0 || minimumParameter >= 1) {
+            throw new RangeError('Optical segment minimumParameter must be in [0, 1).');
+        }
+
+        this.statistics.queries++;
+        let best = null;
+        const counters = { bvhNodesVisited: 0, trianglesTested: 0, heightfieldSamples: 0 };
+
+        for (const entry of this.triangleMeshes.values()) {
+            if (!entry.enabled || !entry.material.enabled || entry.sliceId !== normalizedSliceId ||
+                !entry.root || !isAllowedChunk(entry.chunkKey, allowedChunks)) continue;
+            const candidate = intersectBvh(entry.root, segment, minimumParameter, best?.parameter ?? 1, counters);
+            if (candidate && isBetterHit(candidate, best, entry.id)) {
+                best = makeHit(entry, candidate, segment, 'triangle');
+            }
+        }
+
+        for (const entry of this.heightfields.values()) {
+            if (!entry.enabled || !entry.material.enabled || entry.sliceId !== normalizedSliceId ||
+                !isAllowedChunk(entry.chunkKey, allowedChunks)) continue;
+            const candidate = intersectHeightfield(entry, segment, minimumParameter, best?.parameter ?? 1, counters);
+            if (candidate && isBetterHit(candidate, best, entry.id)) {
+                best = makeHit(entry, candidate, segment, 'heightfield');
+            }
+        }
+
+        this.statistics.bvhNodesVisited += counters.bvhNodesVisited;
+        this.statistics.trianglesTested += counters.trianglesTested;
+        this.statistics.heightfieldSamples += counters.heightfieldSamples;
+        if (best) this.statistics.hits++;
+        return best;
+    }
+
+    getStats() {
+        this.assertActive();
+        return {
+            ...this.statistics,
+            registeredTriangleMeshes: this.triangleMeshes.size,
+            registeredHeightfields: this.heightfields.size,
+            triangleCount: countTriangles(this.triangleMeshes),
+            slices: [...new Set([
+                ...[...this.triangleMeshes.values()].map((entry) => entry.sliceId),
+                ...[...this.heightfields.values()].map((entry) => entry.sliceId)
+            ])].sort()
+        };
+    }
+
+    assertActive() {
+        if (this.disposed) throw new Error('OpticalSceneRegistry has been disposed.');
+    }
+
+    dispose() {
+        if (this.disposed) return;
+        this.triangleMeshes.clear();
+        this.heightfields.clear();
+        this.disposed = true;
+        this.statistics.registeredTriangleMeshes = 0;
+        this.statistics.registeredHeightfields = 0;
+        this.statistics.triangleCount = 0;
+    }
+}
+
+function validateTriangleGeometry(positions, indices) {
+    if (!ArrayBuffer.isView(positions) && !Array.isArray(positions)) {
+        throw new TypeError('Optical mesh positions must be an array or typed array.');
+    }
+    if (positions.length === 0 || positions.length % 3 !== 0) {
+        throw new RangeError('Optical mesh positions must contain complete XYZ vertices.');
+    }
+    if (!ArrayBuffer.isView(indices) && !Array.isArray(indices)) {
+        throw new TypeError('Optical mesh indices must be an array or typed array.');
+    }
+    if (indices.length === 0 || indices.length % 3 !== 0) {
+        throw new RangeError('Optical mesh indices must contain complete triangles.');
+    }
+    const positionCopy = Array.from(positions, Number);
+    const indexCopy = Array.from(indices, Number);
+    if (!positionCopy.every(Number.isFinite)) throw new TypeError('Optical mesh positions must be finite.');
+    const vertexCount = positionCopy.length / 3;
+    for (const index of indexCopy) {
+        if (!Number.isSafeInteger(index) || index < 0 || index >= vertexCount) {
+            throw new RangeError('Optical mesh index is outside the vertex buffer.');
+        }
+    }
+    return { positions: positionCopy, indices: indexCopy };
+}
+
+function buildTriangles(positions, indices) {
+    const triangles = [];
+    for (let index = 0; index < indices.length; index += 3) {
+        const a = readVertex(positions, indices[index]);
+        const b = readVertex(positions, indices[index + 1]);
+        const c = readVertex(positions, indices[index + 2]);
+        const normal = cross3(subtract3(b, a), subtract3(c, a));
+        const normalLength = length3(normal);
+        if (normalLength <= EPSILON) continue;
+        const min = componentBounds([a, b, c], 'min');
+        const max = componentBounds([a, b, c], 'max');
+        triangles.push({
+            primitiveIndex: index / 3,
+            a, b, c,
+            min, max,
+            centroid: scale3(add3(add3(a, b), c), 1 / 3),
+            normal: scale3(normal, 1 / normalLength)
+        });
+    }
+    return triangles;
+}
+
+function buildBvh(triangles, leafSize) {
+    const bounds = componentBounds(triangles.flatMap((triangle) => [triangle.min, triangle.max]), 'bounds');
+    if (triangles.length <= leafSize) return { bounds, triangles };
+    const centroidBounds = componentBounds(triangles.map((triangle) => triangle.centroid), 'bounds');
+    const extents = AXES.map((axis) => centroidBounds.max[axis] - centroidBounds.min[axis]);
+    const axisIndex = extents.indexOf(Math.max(...extents));
+    const axis = AXES[axisIndex];
+    if (extents[axisIndex] <= EPSILON) return { bounds, triangles };
+    triangles.sort((left, right) =>
+        left.centroid[axis] - right.centroid[axis] || left.primitiveIndex - right.primitiveIndex
+    );
+    const middle = Math.floor(triangles.length / 2);
+    return {
+        bounds,
+        left: buildBvh(triangles.slice(0, middle), leafSize),
+        right: buildBvh(triangles.slice(middle), leafSize)
+    };
+}
+
+function intersectBvh(node, segment, minParameter, maximumParameter, counters) {
+    if (!intersectAabbSegment(node.bounds, segment, maximumParameter)) return null;
+    counters.bvhNodesVisited++;
+    if (node.triangles) {
+        let best = null;
+        for (const triangle of node.triangles) {
+            if (!intersectAabbSegment({ min: triangle.min, max: triangle.max }, segment, best?.parameter ?? maximumParameter)) continue;
+            counters.trianglesTested++;
+            const parameter = intersectTriangle(segment.from, segment.direction, triangle, minParameter, best?.parameter ?? maximumParameter);
+            if (parameter === null) continue;
+            if (!best || parameter < best.parameter) {
+                best = {
+                    parameter,
+                    primitiveIndex: triangle.primitiveIndex,
+                    point: interpolate3(segment.from, segment.to, parameter),
+                    normal: triangle.normal,
+                    barycentric: triangleBarycentric(segment.from, segment.direction, triangle, parameter)
+                };
+            }
+        }
+        return best;
+    }
+    const left = intersectBvh(node.left, segment, minParameter, maximumParameter, counters);
+    const rightLimit = left ? Math.min(maximumParameter, left.parameter) : maximumParameter;
+    const right = intersectBvh(node.right, segment, minParameter, rightLimit, counters);
+    if (!left) return right;
+    if (!right) return left;
+    return left.parameter <= right.parameter ? left : right;
+}
+
+function intersectTriangle(origin, direction, triangle, minimumParameter, maximumParameter) {
+    const edge1 = subtract3(triangle.b, triangle.a);
+    const edge2 = subtract3(triangle.c, triangle.a);
+    const p = cross3(direction, edge2);
+    const determinant = dot3(edge1, p);
+    if (Math.abs(determinant) <= EPSILON) return null;
+    const inverse = 1 / determinant;
+    const tVector = subtract3(origin, triangle.a);
+    const u = dot3(tVector, p) * inverse;
+    if (u < -EPSILON || u > 1 + EPSILON) return null;
+    const q = cross3(tVector, edge1);
+    const v = dot3(direction, q) * inverse;
+    if (v < -EPSILON || u + v > 1 + EPSILON) return null;
+    const parameter = dot3(edge2, q) * inverse;
+    if (parameter <= minimumParameter || parameter > maximumParameter + EPSILON) return null;
+    return parameter;
+}
+
+function triangleBarycentric(origin, direction, triangle, parameter) {
+    const point = interpolate3(origin, add3(origin, direction), parameter);
+    const v0 = subtract3(triangle.b, triangle.a);
+    const v1 = subtract3(triangle.c, triangle.a);
+    const v2 = subtract3(point, triangle.a);
+    const d00 = dot3(v0, v0);
+    const d01 = dot3(v0, v1);
+    const d11 = dot3(v1, v1);
+    const d20 = dot3(v2, v0);
+    const d21 = dot3(v2, v1);
+    const denominator = d00 * d11 - d01 * d01;
+    if (Math.abs(denominator) <= EPSILON) return { u: 1, v: 0, w: 0 };

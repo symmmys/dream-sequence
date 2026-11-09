@@ -1,0 +1,36 @@
+SOMNIUM — GEOMETRY PHASE 15 TEST RESULTS
+Main-World anomaly re-entry and per-slice metric grid
+
+Automated tests:
+  Command: node --test tests/*.test.mjs
+  Total:   186
+  Passed:  186
+  Failed:  0
+
+New regression coverage:
+  - Ambient position lookup skips synchronized route controllers that do not own
+    the active WorldSlice.
+  - Ambient W movement evaluates only route controllers that own the Main-World
+    slice and selects an available connected anomaly influence.
+  - Main-World W freedom works in both signs and can move back toward the connected
+    slice.
+  - Player can re-enter the direct Hypercube-to-Main-World anomaly after clearing
+    the anti-bounce exit lock.
+  - Main-World HUD reports active W freedom when an owned connected field is present.
+  - Metric-grid visibility preference and active-slice state are independently
+    controlled.
+  - The Main-World grid is registered as a terrain-conformed grid.
+  - G toggles the metric grid, while Ctrl/Meta-modified shortcuts are not intercepted.
+  - Terrain gaps split grid line segments instead of bridging missing samples.
+  - Camera presentation activates only the grid belonging to the current slice.
+
+Static checks:
+  Source JavaScript/MJS syntax checks: 116 / 116 passed
+  Test MJS syntax checks:             22 / 22 passed
+  Relative import references scanned: 248
+  Missing relative import references: 0
+
+Limitations:
+  A live desktop browser/WebGL visual session was not available in this execution
+  environment. Manual browser testing is required for real portal re-entry feel,
+  grid visibility/layering, and terrain-conformed rendering.

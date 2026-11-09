@@ -1,0 +1,133 @@
+
+                this.scheduleMesh(chunk, item.lod);
+                scheduled++;
+            }
+        }
+
+        const unloadRadius = this.renderRadius + 1;
+
+        for (const [key, chunk] of this.chunks) {
+            const dx = chunk.x - center.x;
+            const dz = chunk.z - center.z;
+
+            if (
+                dx * dx + dz * dz > unloadRadius * unloadRadius &&
+                (this.remoteChunkRetention.get(`${chunk.x}:${chunk.z}`) ?? 0) <= 0
+            ) {
+                chunk.dispose();
+                this.chunkGraph?.setChunkLoaded(chunk.address, null);
+                this.chunks.delete(key);
+
+                this.meshQueue = this.meshQueue.filter(
+                    task => task.key !== key
+                );
+
+                this.stats.unloaded++;
+                this.stats.loaded--;
+            }
+        }
+
+        this.stats.pendingMeshes = this.meshQueue.length;
+
+        if (!this.worker) {
+            this.processFallbackQueue();
+        } else {
+            this.pumpWorker();
+        }
+    }
+
+    getMeshes() {
+        return Array.from(this.chunks.values(), function getMesh(chunk) {
+            return chunk.mesh;
+        }).filter(Boolean);
+    }
+
+    setVisible(visible) {
+        this.visible = Boolean(visible);
+        if (!this.chunks || typeof this.chunks.values !== 'function') return;
+        for (const chunk of this.chunks.values()) {
+            if (!chunk) continue;
+            chunk.visible = this.visible;
+            if (chunk.mesh) chunk.mesh.isVisible = this.visible;
+        }
+    }
+
+    getStats() {
+        return {
+            ...this.stats,
+            currentChunks: this.chunks.size,
+            chunkSize: this.chunkSize,
+            renderRadius: this.renderRadius,
+            worldSize: this.terrain.worldSize,
+            workerActive: !!this.worker,
+            workerReady: this.workerReady,
+            reachableRemoteChunks: this.lastReachableRemoteChunks,
+            retainedRemoteChunks: this.remoteChunkRetention.size
+        };
+    }
+
+    dispose() {
+        this.enabled = false;
+
+        if (this.worker) {
+            this.worker.terminate();
+            this.worker = null;
+        }
+
+        for (const chunk of this.chunks.values()) {
+            chunk.dispose();
+            this.chunkGraph?.setChunkLoaded(chunk.address, null);
+        }
+
+        this.chunks.clear();
+        this.remoteChunkRetention.clear();
+        this.meshQueue.length = 0;
+
+        this.material.dispose();
+
+        this.stats.loaded = 0;
+        this.stats.pendingMeshes = 0;
+    }
+
+failWorker(reason) {
+    console.error(
+        "[WorldManager] Worker failure:",
+        reason
+    );
+
+    this.stats.workerErrors++;
+
+    if (this.workerInitTimer) {
+        clearTimeout(this.workerInitTimer);
+        this.workerInitTimer = null;
+    }
+
+    const failedTask = this.currentTask;
+    this.currentTask = null;
+
+    if (this.worker) {
+        this.worker.terminate();
+        this.worker = null;
+    }
+
+    this.workerReady = false;
+    this.workerBusy = false;
+
+    // Retry the outstanding task synchronously.
+    if (failedTask) {
+        const chunk = this.chunks.get(failedTask.key);
+
+        if (
+            chunk &&
+            !chunk.disposed &&
+            chunk.revision === failedTask.revision
+        ) {
+            this.meshQueue.unshift(failedTask);
+        }
+    }
+
+    this.stats.pendingMeshes = this.meshQueue.length;
+    this.processFallbackQueue();
+}
+}
+

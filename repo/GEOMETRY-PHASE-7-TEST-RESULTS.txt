@@ -1,0 +1,25 @@
+SOMNIUM GEOMETRY PHASE 7 — TEST RESULTS
+Build: 2026-11-08-hypercube-chamber-1
+
+Node test suite: 119 passed, 0 failed.
+JavaScript source syntax: 113 passed (node --check).
+JavaScript test syntax: 16 passed (node --check).
+Relative static imports: 202 checked, 0 missing.
+
+Focused new coverage:
+- Tesseract has 16 vertices and 32 edges.
+- XW-plane rotation moves points into the fourth coordinate.
+- Moving the camera along W changes the projected tesseract.
+- 4D perspective denominator remains bounded near its singularity.
+- Babylon line system updates an existing mesh and disposes owned resources.
+- Traversal network exposes both routes from the intermediate Poincare chamber.
+- A traveller can traverse hypercube -> Poincare -> main world one corridor chunk at a time.
+- Only the corridor connected to the current slice starts player transit.
+- New chamber is the default Geometry Demo starting slice with player-follow camera; C/HUD activates free inspection.
+- E/Q changes the free camera's W coordinate within the configured bounds.
+
+Fresh-extracted complete project rerun: 119 passed, 0 failed.
+Both complete-project and replacement-patch ZIP integrity checks: passed.
+
+Browser/WebGL verification: NOT COMPLETED. Headless Chromium stalled before DOM output.
+No live rendering claim is made.

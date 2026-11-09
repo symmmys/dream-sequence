@@ -1,0 +1,24 @@
+SOMNIUM — GEOMETRY PHASE 16A
+OPTICAL MATHEMATICS AND CPU REFERENCE SOLVER
+
+INSTALLATION
+
+1. Extract the complete Phase 16A ZIP into a clean project directory.
+2. Serve from the directory containing index.html, as with previous phases.
+3. Run the automated suite from that directory:
+
+   node --test tests/*.test.mjs
+
+4. Start the existing local Python server from the project root.
+5. Open the application as usual and perform a hard refresh.
+
+IMPORTANT SCOPE NOTE
+
+Phase 16A adds engine-independent optical contracts, optical metric sampling,
+and a CPU Hamiltonian reference ray integrator. It does not yet add visible
+lighting, shadows, ray overlays, mesh intersections, or anomaly optical
+traversal. The application should look and behave as it did in Phase 15.
+
+The optical code can be exercised from tests or imported by later phases.
+Poincare metric domain errors are intentionally strict and are not hidden by
+the ray integrator.

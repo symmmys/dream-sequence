@@ -1,0 +1,300 @@
+
+        if (nearest.offset < 0 || nearest.offset > 1) {
+            this.setStatus("Position is outside the selected wall.");
+            return;
+        }
+
+        const opening = this.system.addOpening(
+            building.id,
+            this.selectedRoom.id,
+            {
+                type,
+                side: nearest.side,
+                offset: nearest.offset,
+                width: type === "door" ? 0.9 : 1.4,
+                height: type === "door" ? 2.1 : 1.2,
+                sill: type === "door" ? 0 : 0.9
+            }
+        );
+
+        this.setStatus(`Added ${type}: ${opening.id}`);
+    }
+
+    placeFurniture(position) {
+        if (!this.activeBuilding) {
+            this.setStatus("Create a building first.");
+            return;
+        }
+
+        this.system.addFurniture(
+            this.activeBuilding.id,
+            {
+                type: "table",
+                position: {
+                    x: position.x - this.activeBuilding.position.x,
+                    y: position.y - this.activeBuilding.position.y + 0.5,
+                    z: position.z - this.activeBuilding.position.z
+                },
+                dimensions: { x: 1.6, y: 0.9, z: 1 },
+                material: "wood"
+            }
+        );
+
+        this.setStatus("Furniture placed.");
+    }
+
+    syncPositionInputs() {
+        if (!this.activeBuilding) return;
+
+        const p = this.activeBuilding.position;
+        const set = (id, value) => {
+            this.container.querySelector(`#${id}`).value = value;
+        };
+
+        set("position-x", p.x);
+        set("position-y", p.y);
+        set("position-z", p.z);
+        set(
+            "position-rotation",
+            this.activeBuilding.rotation * 180 / Math.PI
+        );
+    }
+
+
+updateFloorPlanPosition(dimensions = {}) {
+    if (!this.activeBuilding) return;
+
+    this.floorPlan.updateTransform(
+        this.activeBuilding.position,
+        dimensions,
+        this.activeBuilding.rotation
+    );
+}
+
+    dispose() {
+        this.enabled = false;
+
+        if (this.pointerObserver) {
+            this.scene.onPointerObservable.remove(
+                this.pointerObserver
+            );
+        }
+
+        this.floorPlan.dispose();
+        this.editorCamera.dispose();
+	this.floorPlanHeightControl?.dispose();
+
+        this.container?.remove();
+        this.launcher?.remove();
+
+        this.container = null;
+        this.launcher = null;
+
+	this.unsubscribeMode?.();
+	this.previewRenderer?.dispose();
+    }
+
+worldToBuildingLocal(position) {
+    const building = this.activeBuilding;
+    const dx = position.x - building.position.x;
+    const dz = position.z - building.position.z;
+
+    const angle = building.rotation;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+
+    return {
+        x: dx * cos + dz * sin,
+        y: position.y - building.position.y,
+        z: -dx * sin + dz * cos
+    };
+}
+
+
+ensureBuildingForFloorPlan() {
+    if (this.activeBuilding) return;
+
+    const element = id =>
+        this.container.querySelector(`#${id}`);
+
+    this.activeBuilding = this.system.createBuilding({
+        name: "Floor Plan Building",
+        position: {
+            x: Number(element("position-x").value) || 0,
+            y: Number(element("position-y").value) || 0,
+            z: Number(element("position-z").value) || 0
+        },
+        rotation:
+            Number(element("position-rotation").value || 0) *
+            Math.PI / 180
+    });
+	this.activeBuilding.metadata ??= {};
+
+this.activeBuilding.metadata.editorPreview = true;
+
+    this.placement.select(this.activeBuilding);
+    this.syncPositionInputs();
+}
+
+async buildFloorFromPlan() {
+    try {
+	if (!this.floorPlan.mesh || !this.floorPlan.image) {
+    this.setStatus(
+        "Import a floor-plan image before constructing a building."
+    );
+
+    return null;
+}
+
+        this.ensureBuildingForFloorPlan();
+
+        const element = id =>
+            this.container.querySelector(`#${id}`);
+
+        const imageData = await this.floorPlan.readPixels();
+
+        const result = this.floorPlanBuilder.build(
+            this.activeBuilding,
+            imageData,
+            {
+                width: Number(element("floor-width").value),
+                depth: Number(element("floor-depth").value),
+                floor: 0
+            }
+        );
+
+        this.system.rebuild(this.activeBuilding);
+	this.activeBuilding.metadata ??= {};
+
+this.activeBuilding.metadata.editorPreview = true;
+
+const outlineCount =
+    this.previewRenderer.show(this.activeBuilding);
+
+this.placeButton.disabled = false;
+
+this.setStatus(
+    `Preview ready: ${result.walls} walls, ` +
+    `${result.doors} doors, ${result.windows} windows. ` +
+    `${outlineCount} highlighted components. ` +
+    `Adjust dimensions or place the building.`
+);
+
+
+        return result;
+    } catch (error) {
+        console.error("[BuildingEditor] Floor construction:", error);
+        this.setStatus(error.message);
+        return null;
+    }
+}
+
+
+installFloorPlanWorkflowControls() {
+    const buildButton =
+        this.container.querySelector("#build-floor");
+
+    const placeButton = document.createElement("button");
+
+    placeButton.id = "place-building";
+    placeButton.textContent =
+        "PLACE BUILDING & START NEXT";
+
+    placeButton.disabled = true;
+
+    placeButton.style.width = "100%";
+    placeButton.style.marginTop = "8px";
+
+    buildButton.after(placeButton);
+
+    placeButton.onclick = () => {
+        this.placeCurrentBuilding();
+    };
+
+    this.placeButton = placeButton;
+
+    const depthInput =
+        this.container.querySelector("#floor-depth");
+
+    const aspectLabel = document.createElement("label");
+
+    aspectLabel.style.display = "block";
+    aspectLabel.style.margin = "8px 0";
+
+    this.aspectLock = document.createElement("input");
+    this.aspectLock.type = "checkbox";
+    this.aspectLock.checked = true;
+
+    aspectLabel.append(
+        this.aspectLock,
+        document.createTextNode(
+            " Maintain image aspect ratio"
+        )
+    );
+
+    depthInput.parentElement.after(aspectLabel);
+
+    const updateDimensions = source => {
+        const width = Number(
+            this.container.querySelector("#floor-width").value
+        );
+
+        let depth = Number(depthInput.value);
+
+        if (
+            this.aspectLock.checked &&
+            this.floorPlan.image
+        ) {
+            if (source === "depth") {
+                this.aspectLock.checked = false;
+            } else {
+                depth = width *
+                    this.floorPlan.image.naturalHeight /
+                    this.floorPlan.image.naturalWidth;
+
+                depthInput.value = depth.toFixed(2);
+            }
+        }
+
+        if (
+            !Number.isFinite(width) ||
+            !Number.isFinite(depth) ||
+            width <= 0 ||
+            depth <= 0
+        ) {
+            return;
+        }
+
+        this.updateFloorPlanPosition({
+            width,
+            depth
+        });
+if (
+    this.activeBuilding?.metadata?.editorPreview === true &&
+    this.floorPlan.mesh &&
+    this.floorPlan.image
+) {
+    this.buildFloorFromPlan();
+}
+    };
+
+    this.container.querySelector(
+        "#floor-width"
+    ).onchange = () => updateDimensions("width");
+
+    depthInput.onchange = () => updateDimensions("depth");
+
+    this.aspectLock.onchange = () => {
+        updateDimensions("width");
+    };
+}
+
+placeCurrentBuilding() {
+    const building = this.activeBuilding;
+
+    if (
+        !building ||
+        building.metadata?.editorPreview !== true
+    ) {
+        this.setStatus(
+            "There is no provisional building to place."

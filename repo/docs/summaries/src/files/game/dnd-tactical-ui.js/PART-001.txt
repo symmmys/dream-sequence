@@ -1,0 +1,300 @@
+
+const ACTION_OPTIONS = [
+    ["attack", "Attack"],
+    ["cast-spell", "Cast a Spell"],
+    ["dash", "Dash"],
+    ["disengage", "Disengage"],
+    ["dodge", "Dodge"],
+    ["help", "Help"],
+    ["hide", "Hide"],
+    ["ready", "Ready"],
+    ["search", "Search"],
+    ["use-object", "Use an Object"],
+    ["grapple", "Grapple"],
+    ["shove", "Shove"],
+    ["improvise", "Improvise"]
+];
+
+const BONUS_OPTIONS = [
+    ["bonus-spell", "Cast a Bonus Action Spell"],
+    ["two-weapon-fighting", "Two-Weapon Fighting"],
+    ["class-feature", "Use a Class Feature"],
+    ["bonus-ability", "Use an Ability"]
+];
+
+const DEFAULT_COLORS = {
+    movement: "#25d9a0",
+    dash: "#e9a33c"
+};
+
+const ALTITUDE_MIN = 0;
+const ALTITUDE_MAX = 1000;
+
+function findOptionByValue(options, value) {
+    for (const option of options) {
+        if (option[0] === value) return option;
+    }
+    return null;
+}
+
+class DnDTacticalUI {
+
+    constructor(mode) {
+        this.mode = mode;
+        this.visible = false;
+        this.activeTab = "battle";
+        this.colors = {
+            ...DEFAULT_COLORS,
+            ...this.loadColors()
+        };
+
+        this.createInterface();
+    }
+    loadColors() {
+        try {
+            return JSON.parse(
+                localStorage.getItem("somnium-dnd-colors") || "{}"
+            );
+        } catch {
+            return {};
+        }
+    }
+
+    saveColors() {
+        localStorage.setItem(
+            "somnium-dnd-colors",
+            JSON.stringify(this.colors)
+        );
+
+        this.mode.setMovementColors(this.colors);
+    }
+
+    createInterface() {
+        this.createFloatingButtons();
+        this.createPanelShell();
+        this.createPanelHeader();
+        this.createTabNavigation();
+        this.buildTabContents();
+        this.mountPanel();
+        this.bindKeyboard();
+        this.refresh();
+    }
+
+    createFloatingButtons() {
+        this.createMenuToggleButton();
+        this.createFocusButton();
+    }
+
+    createMenuToggleButton() {
+        this.toggleButton = this.createButton(
+            "☰ D&D MENU",
+            this.handleToggleMenu.bind(this)
+        );
+        Object.assign(this.toggleButton.style, {
+            position: "fixed",
+            top: "15px",
+            left: "15px",
+            zIndex: "2100",
+            width: "125px",
+            background: "#193b55"
+        });
+        document.body.appendChild(this.toggleButton);
+    }
+
+    createFocusButton() {
+        this.focusButton = this.createButton(
+            "◎ FOCUS ACTIVE",
+            this.handleFocusActiveCharacter.bind(this)
+        );
+        Object.assign(this.focusButton.style, {
+            position: "fixed",
+            top: "15px",
+            right: "15px",
+            zIndex: "10003",
+            width: "auto",
+            minWidth: "150px",
+            margin: "0",
+            background: "#72551b",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.45)"
+        });
+        this.focusButton.title = "Center and zoom the camera on the active character";
+        this.focusButton.setAttribute("aria-label", "Focus camera on active character");
+        document.body.appendChild(this.focusButton);
+    }
+
+    createPanelShell() {
+        this.panel = document.createElement("div");
+        Object.assign(this.panel.style, {
+            position: "fixed",
+            top: "58px",
+            left: "15px",
+            zIndex: "10002",
+            width: "340px",
+            maxWidth: "calc(100vw - 30px)",
+            maxHeight: "calc(100vh - 75px)",
+            overflowY: "auto",
+            boxSizing: "border-box",
+            padding: "13px",
+            color: "#eaf4fa",
+            background: "rgba(8,20,34,0.97)",
+            border: "1px solid #54758d",
+            borderRadius: "9px",
+            fontFamily: "Arial, sans-serif",
+            fontSize: "13px",
+            display: "none",
+            visibility: "visible",
+            pointerEvents: "auto"
+        });
+    }
+
+    createPanelHeader() {
+        const heading = this.element("h2", "TACTICAL MODE");
+        heading.style.color = "#9dd8ed";
+        this.panel.appendChild(heading);
+        this.status = this.appendPanelText("div");
+        this.battleStatus = this.appendPanelText("p");
+        this.message = this.appendPanelText("p");
+        this.message.style.color = "#9dd8ed";
+    }
+
+    appendPanelText(tag) {
+        const element = this.element(tag);
+        this.panel.appendChild(element);
+        return element;
+    }
+
+    createTabNavigation() {
+        this.tabBar = document.createElement("div");
+        Object.assign(this.tabBar.style, {
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: "4px",
+            margin: "12px 0"
+        });
+        this.panel.appendChild(this.tabBar);
+        this.tabContents = {};
+        this.appendTab("battle", "Battle");
+        this.appendTab("characters", "Characters");
+        this.appendTab("battlefield", "Grid");
+        this.appendTab("settings", "Settings");
+    }
+
+    appendTab(id, label) {
+        const button = this.createButton(label, this.handleTabButtonClick.bind(this));
+        button.dataset.tabId = id;
+        button.style.padding = "8px 3px";
+        button.style.fontSize = "11px";
+        this.tabBar.appendChild(button);
+        const content = document.createElement("div");
+        this.tabContents[id] = content;
+        this.panel.appendChild(content);
+    }
+
+    buildTabContents() {
+        this.buildBattleTab();
+        this.buildCharactersTab();
+        this.buildBattlefieldTab();
+        this.buildSettingsTab();
+    }
+
+    mountPanel() {
+        document.body.appendChild(this.panel);
+        this.setVisible(false);
+        this.selectTab("battle");
+    }
+
+    bindKeyboard() {
+        this.onKeyDown = this.handleKeyDown.bind(this);
+        window.addEventListener("keydown", this.onKeyDown);
+    }
+
+    handleToggleMenu() {
+        this.toggle();
+    }
+
+    handleTabButtonClick(event) {
+        this.selectTab(event.currentTarget.dataset.tabId);
+    }
+
+    handleKeyDown(event) {
+        if (
+            event.target instanceof HTMLElement &&
+            ["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName)
+        ) return;
+
+        if (event.code === "Escape") this.setVisible(false);
+        if (event.code === "KeyM") this.toggle();
+    }
+
+    element(tag, content = "") {
+        const element = document.createElement(tag);
+        element.textContent = content;
+        return element;
+    }
+
+    createButton(label, callback) {
+        const button = this.element("button", label);
+
+        Object.assign(button.style, {
+            display: "block",
+            width: "100%",
+            margin: "5px 0",
+            padding: "9px",
+            color: "white",
+            background: "#193b55",
+            border: "1px solid #54758d",
+            borderRadius: "4px",
+            cursor: "pointer"
+        });
+
+        button.addEventListener("click", callback);
+
+        return button;
+    }
+
+    addSection(parent, label) {
+        const heading = this.element("h3", label);
+
+        Object.assign(heading.style, {
+            marginTop: "15px",
+            paddingBottom: "5px",
+            color: "#9dd8ed",
+            borderBottom: "1px solid #54758d"
+        });
+
+        parent.appendChild(heading);
+    }
+
+    selectTab(id) {
+        this.activeTab = id;
+
+        for (const [key, content] of
+            Object.entries(this.tabContents)) {
+            content.style.display =
+                key === id ? "block" : "none";
+        }
+
+        for (const button of this.tabBar.children) {
+            const selected =
+                button.textContent.toLowerCase() ===
+                (id === "battlefield" ? "grid" : id);
+
+            button.style.background = selected
+                ? "#72551b"
+                : "#193b55";
+        }
+    }
+
+    createInput(parent, label, type = "text") {
+        const wrapper = document.createElement("div");
+
+        wrapper.style.margin = "8px 0";
+
+        const caption = this.element("label", label);
+        caption.style.display = "block";
+        caption.style.marginBottom = "4px";
+
+        const input = document.createElement("input");
+        input.type = type;
+
+        Object.assign(input.style, {

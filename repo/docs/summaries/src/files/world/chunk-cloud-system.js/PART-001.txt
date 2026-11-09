@@ -1,0 +1,300 @@
+import { Cloud } from "../atmosphere/cloud.js";
+import { CloudSpecies } from "../atmosphere/cloud-species.js";
+import { CloudGenerator } from "../atmosphere/cloud-generator.js";
+import { CloudRenderer } from "../rendering/cloud-renderer.js";
+import { CreateSeededRandom } from "../core/random.js";
+
+export class ChunkCloudSystem {
+    constructor(
+        scene,
+        terrain,
+        waterSystem,
+        hydrology,
+        rainSystem,
+        options = {}
+    ) {
+        this.scene = scene;
+        this.terrain = terrain;
+        this.waterSystem = waterSystem;
+        this.hydrology = hydrology;
+        this.rainSystem = rainSystem;
+
+	this.windTime = 0;
+this.windUpdateInterval = 2.0;
+this.windAccumulator = 0;
+
+        // Chunk configuration.
+        this.chunkSize = options.chunkSize ?? 2000;
+        this.renderRadius = options.renderRadius ?? 4;
+        this.cloudsPerChunk = options.cloudsPerChunk ?? 8;
+        this.maxChunksPerUpdate = options.maxChunksPerUpdate ?? 2;
+        this.worldSeed = options.worldSeed ?? 91827;
+
+        // Update intervals.
+        this.renderInterval = options.renderInterval ?? 0.5;
+        this.simulationInterval = options.simulationInterval ?? 0.25;
+
+        // Storage.
+        this.records = new Map();
+        this.activeChunks = new Set();
+
+        // Rendering.
+        this.renderer = new CloudRenderer(scene);
+
+        // Timing.
+        this.renderAccumulator = 0;
+        this.simulationAccumulator = 0;
+
+        // Diagnostics.
+        this.visibleCloudCount = 0;
+        this.totalGeneratedClouds = 0;
+        this.totalGeneratedStorms = 0;
+
+        // State.
+        this.renderDirty = true;
+        this.disposed = false;
+        this.rainingCloud = null;
+
+        console.log(
+            "[ChunkCloudSystem] Initialized with cumulonimbus support."
+        );
+    }
+
+    getChunkCoordinates(position) {
+        return {
+            x: Math.floor(position.x / this.chunkSize),
+            z: Math.floor(position.z / this.chunkSize)
+        };
+    }
+
+    getChunkKey(x, z) {
+        return `${x},${z}`;
+    }
+
+    getChunkSeed(x, z) {
+        return (
+            this.worldSeed ^
+            Math.imul(x, 73856093) ^
+            Math.imul(z, 19349663)
+        ) >>> 0;
+    }
+
+    // ------------------------------------------------
+    // CLOUD SPECIES DISTRIBUTION
+    // ------------------------------------------------
+
+selectSpecies(random) {
+    const value = random();
+
+    if (value < 0.12 && CloudSpecies.cumulonimbus) {
+        return "cumulonimbus";
+    }
+
+    if (value < 0.32 && CloudSpecies.towering) {
+        return "towering";
+    }
+
+    if (CloudSpecies.cumulus) {
+        return "cumulus";
+    }
+
+    // Fall back to whichever species exists.
+    const availableSpecies =
+        Object.keys(CloudSpecies);
+
+    if (availableSpecies.length === 0) {
+        throw new Error(
+            "[ChunkCloudSystem] No cloud species configured."
+        );
+    }
+
+    return availableSpecies[0];
+}
+
+
+
+
+
+
+
+    // ------------------------------------------------
+    // CHUNK GENERATION
+    // ------------------------------------------------
+
+    generateChunk(chunkX, chunkZ) {
+        const key = this.getChunkKey(
+            chunkX,
+            chunkZ
+        );
+
+        if (this.records.has(key)) {
+            return this.records.get(key);
+        }
+
+        const seed = this.getChunkSeed(
+            chunkX,
+            chunkZ
+        );
+
+        const random = CreateSeededRandom(seed);
+
+        const minX = Math.max(
+            chunkX * this.chunkSize,
+            this.terrain.min.x
+        );
+
+        const maxX = Math.min(
+            (chunkX + 1) * this.chunkSize,
+            this.terrain.max.x
+        );
+
+        const minZ = Math.max(
+            chunkZ * this.chunkSize,
+            this.terrain.min.z
+        );
+
+        const maxZ = Math.min(
+            (chunkZ + 1) * this.chunkSize,
+            this.terrain.max.z
+        );
+
+        const clouds = [];
+
+        if (minX >= maxX || minZ >= maxZ) {
+            const record = {
+                key,
+                chunkX,
+                chunkZ,
+                seed,
+                clouds
+            };
+
+            this.records.set(key, record);
+
+            return record;
+        }
+
+        let attempts = 0;
+
+        const attemptsLimit =
+            this.cloudsPerChunk * 6;
+
+        while (
+            clouds.length < this.cloudsPerChunk &&
+            attempts < attemptsLimit
+        ) {
+            attempts++;
+
+            const x =
+                minX + random() * (maxX - minX);
+
+            const z =
+                minZ + random() * (maxZ - minZ);
+
+            const terrainPosition =
+                this.terrain.sampleAt(x, z);
+
+            if (!terrainPosition) {
+                continue;
+            }
+
+		let speciesName =
+    this.selectSpecies(random);
+
+let config =
+    CloudSpecies[speciesName];
+
+if (!config) {
+    console.error(
+        "[ChunkCloudSystem] Missing cloud species:",
+        speciesName,
+        "Available species:",
+        Object.keys(CloudSpecies)
+    );
+
+    speciesName = "cumulus";
+    config = CloudSpecies.cumulus;
+}
+
+if (!config) {
+    throw new Error(
+        "[ChunkCloudSystem] Cumulus configuration is missing."
+    );
+}
+
+// Give every cloud a substantially different size.
+//
+// Storm systems have a narrower variation range so
+// their already enormous dimensions remain controlled.
+
+const sizeVariation =
+    speciesName === "cumulonimbus"
+        ? 0.78 + random() * 0.62
+        : 0.62 + random() * 1.08;
+
+const scale = config.scale * (0.75 + random() * 0.55);
+
+const altitude = speciesName === "cumulonimbus"
+    ? 4200 + random() * 1800
+    : speciesName === "towering"
+        ? 3400 + random() * 1500
+        : 3000 + random() * 1400;
+            const position =
+                terrainPosition.add(
+                    new BABYLON.Vector3(
+                        0,
+                        altitude,
+                        0
+                    )
+                );
+
+            const cloud = new Cloud(
+                position,
+                speciesName,
+                scale,
+                config
+            );
+
+	
+const wind = this.sampleWind(position, 0);
+
+cloud.velocity.copyFrom(wind);
+cloud.windTarget.copyFrom(wind);
+cloud.waterContent =
+    random() * cloud.maxWaterCapacity * 0.25;
+
+
+            cloud.waterContent =
+                random() *
+                cloud.maxWaterCapacity *
+                0.25;
+
+            cloud.baseScale = scale;
+
+            cloud.geometrySeed =
+                (seed ^ Math.imul(
+                    clouds.length + 1,
+                    2654435761
+                )) >>> 0;
+
+            cloud.moistureAtLastRender = -1;
+
+            clouds.push(cloud);
+
+            if (speciesName === "cumulonimbus") {
+                this.totalGeneratedStorms++;
+            }
+        }
+
+        const record = {
+            key,
+            chunkX,
+            chunkZ,
+            seed,
+            clouds
+        };
+
+        this.records.set(key, record);
+
+        this.totalGeneratedClouds += clouds.length;
+

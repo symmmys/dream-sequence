@@ -1,0 +1,48 @@
+SOMNIUM — GEOMETRY PHASE 16B
+SLICE-NATIVE OPTICAL RAY TRACING
+
+INSTALLATION
+
+1. Extract the complete Phase 16B ZIP into a clean project directory.
+2. Start the local HTTP server from the directory containing index.html:
+
+   python3 -m http.server 8081
+
+3. Open http://127.0.0.1:8081/ in your browser.
+4. Perform a hard refresh (Ctrl+Shift+R) if an earlier build is cached.
+
+No new external packages are required. The project continues to load its existing Babylon.js runtime from the configured CDN scripts in index.html.
+
+WHAT CHANGED
+
+- Added an optical scene registry for authoritative slice-local triangle geometry and terrain heightfields.
+- Registered eligible chamber/demo meshes before non-Euclidean render projection.
+- Registered resident Main World terrain chunks analytically and tied registration cleanup to chunk mesh disposal.
+- Added Euclidean and Poincare slice-native ray tracers using the Phase 16A CPU Hamiltonian integrator.
+- Added a render-space-only debug ray renderer.
+- Exposed the registry, debug renderer, and tracer factory through scene.metadata for development use.
+- No automatic light sources, visible lighting changes, anomaly cross-slice ray transport, or new gameplay controls are enabled in this phase.
+
+DEVELOPMENT API
+
+The running scene exposes:
+
+  scene.metadata.opticalScene
+  scene.metadata.opticalDebugRenderer
+  scene.metadata.createSliceOpticalTracer(sliceId, metricOptions)
+  scene.metadata.getOpticalSceneStats()
+  scene.metadata.getOpticalDebugStats()
+
+Create a tracer for a registered slice, construct an OpticalRayState with a tangent momentum, then call:
+
+  tracer.trace(rayState, { maxPathLength: 30, drawDebug: true })
+
+See GEOMETRY-PHASE-16B-SLICE-NATIVE-RAY-TRACING.md for a complete example and API details.
+
+TESTS
+
+From the project root, run:
+
+  node --test tests/*.test.mjs
+
+The Phase 16B build was verified with 228 passing tests. A live browser/WebGL visual session was not available during automated verification, so inspect the debug overlay locally when exercising the development API.

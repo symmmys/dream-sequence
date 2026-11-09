@@ -1,0 +1,52 @@
+SOMNIUM — GEOMETRY FOUNDATION / PHASE 1
+========================================
+
+This update implements Phase 1 of docs/decisions/ADR-0001-four-dimensional-world-slices.md.
+
+NEW SOURCE MODULES
+------------------
+src/world/fields/geometry/spatial-4d.js
+  Validated R4 vectors, six plane rotations, 3D-in-R4 slice frames, local/ambient conversion,
+  and deterministic perpendicular-frame construction/transport.
+
+src/world/fields/geometry/world-slice.js
+  Versioned serializable WorldSlice records and stable (sliceId, chunkX, chunkZ) addresses.
+
+src/world/fields/geometry/spatial-corridor.js
+  Versioned cubic-Bezier R4 corridors, endpoint records, radius profiles, deterministic samples,
+  and transported 3D cross-section frames.
+
+src/world/fields/geometry/world-topology.js
+  Explicit slice/corridor registry. Visibility and traversal are separate queries. Numeric w
+  proximity never creates adjacency. Corridor revisions and endpoints are validated.
+
+src/world/fields/geometry/poincare-visual-scale.js
+  Pure Poincare metric-factor and bounded conformal visual-scale functions.
+
+TESTS AND DOCUMENTATION
+-----------------------
+tests/geometry-foundation.test.mjs
+  Phase 1 geometry/topology regression tests.
+
+docs/decisions/ADR-0001-four-dimensional-world-slices.md
+  Architecture decision, invariants, contracts, formulas, and Phase 1 boundaries.
+
+docs/STYLE-CONFORMANCE.md
+  Updated review scores and evidence for the new files and inspected geometry foundations.
+
+IMPORTANT SCOPE LIMITS
+----------------------
+- Existing 3D terrain chunks and geometry rendering are not yet connected to WorldSlice.
+- The Poincare scale helper is not yet called by a renderer.
+- Visibility queries are for later render-only previews; they do not schedule or activate work.
+- Traversability queries describe topology; player corridor traversal is a later phase.
+- No performance gains or browser rendering behavior are claimed in this phase.
+
+RUN TESTS
+---------
+From the project root:
+
+  node --test tests/*.test.mjs
+
+The implementation uses native ES modules and Node's built-in test runner. No dependency or
+package manifest was added.

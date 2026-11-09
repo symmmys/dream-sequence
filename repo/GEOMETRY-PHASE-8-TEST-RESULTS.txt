@@ -1,0 +1,19 @@
+SOMNIUM — GEOMETRY PHASE 8 TEST RESULTS
+Build: 2026-11-08-hypercube-visibility-short-corridors-1
+
+Node test suite: 122 passed, 0 failed.
+JavaScript source syntax: 113 passed, 0 failed.
+Test-module syntax: 16 passed, 0 failed.
+Relative static imports: 209 checked, 0 missing.
+
+New/updated regression coverage:
+- Intrinsic corridor metric defaults to coordinate length and rejects invalid scale values.
+- Both demo anomalies have compressed proper lengths while retaining their original W slice coordinates.
+- Babylon renderer creates one persistent tube mesh for 32 edges and 16 vertex markers.
+- Tesseract edge buffers and vertex marker positions update during XW rotation and W-view changes.
+- Renderer disposes all owned meshes and its shared material.
+- Follow camera targets the tesseract in the hypercube slice and still respects corridor render anchors.
+
+The full project ZIP and replacement patch ZIP passed archive integrity checks.
+
+No live browser/WebGL visual test is claimed. Manual verification is still required for browser rendering, camera framing, edge visibility, and corridor traversal feel.

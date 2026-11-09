@@ -1,0 +1,13 @@
+
+            bounds: { ...this.bounds },
+
+            characteristicLength:
+                this.characteristicLength,
+
+            boundaryReachable: false
+        };
+    }
+}
+
+export { PoincareProjection };
+

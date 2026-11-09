@@ -1,0 +1,300 @@
+/**
+ * Cross-slice optical transport through explicitly optically-enabled
+ * slice-transition anomalies. This module is CPU-only and keeps all ray state
+ * in authoritative ambient R4 / slice-local coordinates.
+ *
+ * A slice aperture is represented by a spherical capture boundary in that
+ * slice. At entry, the aperture's metric-normal covector is transferred to
+ * the anomaly's slice-normal covector. At exit the transfer is reversed.
+ * Canonical momentum tangent to the aperture boundary is preserved and the
+ * normal coefficient is solved from the Hamiltonian (frequency) constraint.
+ */
+
+import {
+    add4,
+    ambientToSlice,
+    dot4,
+    norm4,
+    scale4,
+    sliceToAmbient,
+    subtract4
+} from './spatial-4d.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import {
+    createOpticalMetricField,
+    blendScaledPositiveDefiniteMetrics3,
+    geometricMeanMetricScale3
+} from './optical-metric.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import {
+    createOpticalRayState,
+    evaluateOpticalHamiltonian,
+    traceOpticalRay
+} from './optical-ray-integrator.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import {
+    createSliceOpticalField,
+    traceOpticalRayInSlice
+} from './optical-slice-tracer.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import {
+    evaluateOpticalAnomalyCoupling
+} from './optical-contracts.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import {
+    containsAmbientPoint,
+    SLICE_TRANSITION_ANOMALY
+} from './spatial-anomaly.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+
+const AXES4 = ['x', 'y', 'z', 'w'];
+const EPSILON = 1e-8;
+const DEFAULT_MAX_TRANSITIONS = 8;
+
+/**
+ * Builds a positive-definite four-dimensional optical field for one anomaly.
+ * The tangential 3D metric smoothly blends from the source slice to the
+ * destination slice along the common slice normal. W coupling reuses the
+ * anomaly's radial smootherstep envelope but is independent of player stats.
+ */
+function createAnomalyOpticalField(anomaly, sourceBinding, destinationBinding, options = {}) {
+    validateAnomaly(anomaly);
+    validateBinding(sourceBinding, anomaly.source.sliceId, 'source');
+    validateBinding(destinationBinding, anomaly.destination.sliceId, 'destination');
+
+    const sourceFrame = sourceBinding.slice.frame;
+    const destinationFrame = destinationBinding.slice.frame;
+    const normalAlignment = Math.abs(dot4(sourceFrame.normal, destinationFrame.normal));
+    if (normalAlignment < 1 - 1e-7) {
+        throw new RangeError('Optical anomaly fields require parallel or anti-parallel slice normals.');
+    }
+
+    const sourceAmbient = sliceToAmbient(sourceFrame, anomaly.source.position);
+    const destinationAmbient = sliceToAmbient(destinationFrame, anomaly.destination.position);
+    const signedSpan = dot4(subtract4(destinationAmbient, sourceAmbient), sourceFrame.normal);
+    if (Math.abs(signedSpan) <= EPSILON) {
+        throw new RangeError('Optical anomaly endpoints must have non-zero separation along the slice normal.');
+    }
+
+    const sourceAxes = sourceFrame.axes;
+    const destinationAxes = destinationFrame.axes;
+    const sourceTransform = sourceBinding.spatialTransform;
+    const destinationTransform = destinationBinding.spatialTransform;
+    if (typeof sourceTransform?.metricAtWorld !== 'function' ||
+        typeof destinationTransform?.metricAtWorld !== 'function') {
+        throw new TypeError('Both optical anomaly endpoint bindings require SpatialTransform.metricAtWorld().');
+    }
+
+    const refractiveIndexAt = options.refractiveIndexAt ?? anomaly.optics.refractiveIndex;
+    const gradientStep = options.gradientStep;
+    const metricSampling = options.metricSampling ?? anomaly.optics.metricSampling ?? 'endpoint';
+    if (!['endpoint', 'pointwise', 'ambient'].includes(metricSampling)) {
+        throw new RangeError(`Unsupported anomaly metric sampling mode: ${metricSampling}`);
+    }
+    // A 4D bridge connects two different intrinsic 3D metrics. Their tangent
+    // coordinates are not globally identified, so the default bridge uses
+    // aperture metrics and interpolates them only along the bridge normal.
+    // The entry-side endpoint is sampled at the ray's actual aperture hit,
+    // ensuring the 3D/4D interface is metric-continuous even when a curved
+    // Poincare chart varies appreciably across the aperture. The opposite
+    // endpoint remains sampled at its configured centre; pointwise mode is an
+    // explicit opt-in for anomalies whose two charts share a broad domain.
+    const entryOverride = options.endpointMetricOverride;
+    const sourceEndpointMetric = entryOverride?.side === 'source'
+        ? readMetric(entryOverride.metric)
+        : readMetric(sourceTransform.metricAtWorld(anomaly.source.position));
+    const destinationEndpointMetric = entryOverride?.side === 'destination'
+        ? rebaseMetric3(readMetric(entryOverride.metric), destinationAxes, sourceAxes)
+        : rebaseMetric3(
+            readMetric(destinationTransform.metricAtWorld(anomaly.destination.position)),
+            destinationAxes,
+            sourceAxes
+        );
+    const sliceMetricAt = (_sourceLocalPosition, context) => {
+        if (metricSampling === 'ambient') return [1, 0, 0, 0, 1, 0, 0, 0, 1];
+        const ambientPosition = context.ambientPosition;
+        const normalOffset = dot4(subtract4(ambientPosition, sourceFrame.origin), sourceFrame.normal);
+        const normalizedOffset = normalOffset / signedSpan;
+        if (!Number.isFinite(signedSpan) || !Number.isFinite(normalizedOffset)) {
+            throw new RangeError(`Anomaly optical metric received a non-finite bridge coordinate (offset=${normalOffset}, span=${signedSpan}, w=${ambientPosition.w}).`);
+        }
+        const t = smootherstep(clamp(normalizedOffset, 0, 1));
+        if (metricSampling === 'endpoint') {
+            return blendScaledPositiveDefiniteMetrics3(
+                [sourceEndpointMetric, destinationEndpointMetric], [1 - t, t]
+            );
+        }
+
+        const destinationWeight = t;
+        const sourceWeight = 1 - destinationWeight;
+        const sourceLocal = ambientToSlice(sourceFrame, ambientPosition).position;
+        const destinationLocal = ambientToSlice(destinationFrame, ambientPosition).position;
+        if (destinationWeight <= 1e-10) return readMetric(sourceTransform.metricAtWorld(sourceLocal));
+        if (sourceWeight <= 1e-10) {
+            return rebaseMetric3(
+                readMetric(destinationTransform.metricAtWorld(destinationLocal)),
+                destinationAxes,
+                sourceAxes
+            );
+        }
+        const sourceMetric = readMetric(sourceTransform.metricAtWorld(sourceLocal));
+        const destinationMetric = rebaseMetric3(
+            readMetric(destinationTransform.metricAtWorld(destinationLocal)),
+            destinationAxes,
+            sourceAxes
+        );
+        return blendScaledPositiveDefiniteMetrics3(
+            [sourceMetric, destinationMetric], [sourceWeight, destinationWeight]
+        );
+    };
+
+    const field = createOpticalMetricField({
+        sliceFrame: sourceFrame,
+        sliceMetricAt,
+        refractiveIndexAt,
+        wCouplingAt(position) {
+            return evaluateOpticalAnomalyCoupling(anomaly, position).coupling;
+        },
+        normalMetricScaleAt(_position, _context, baseMetric) {
+            return geometricMeanMetricScale3(baseMetric);
+        },
+        containsPosition(position) {
+            if (metricSampling === 'endpoint' || metricSampling === 'ambient') return true;
+            const sourceLocal = ambientToSlice(sourceFrame, position).position;
+            const destinationLocal = ambientToSlice(destinationFrame, position).position;
+            const sourceValid = typeof sourceTransform.containsMetricDomainPosition !== 'function' ||
+                sourceTransform.containsMetricDomainPosition(sourceLocal);
+            const destinationValid = typeof destinationTransform.containsMetricDomainPosition !== 'function' ||
+                destinationTransform.containsMetricDomainPosition(destinationLocal);
+            return sourceValid && destinationValid;
+        },
+        gradientStep
+    });
+
+    return Object.freeze({
+        ...field,
+        anomalyId: anomaly.id,
+        anomalyRevision: anomaly.revision,
+        sourceAmbient,
+        destinationAmbient,
+        signedSpan,
+        metricSampling,
+        sourceBinding,
+        destinationBinding
+    });
+}
+
+/**
+ * Creates a topology-aware optical tracer. Traversal permission is never read:
+ * only WorldTopology's explicit optical-neighbor API can authorize a crossing.
+ */
+function createAnomalyOpticalTracer({
+    topology,
+    sliceRegistry,
+    sceneRegistry,
+    chunkGraph = null,
+    debugRenderer = null
+} = {}) {
+    if (!topology || typeof topology.getCorridor !== 'function' ||
+        typeof topology.getOpticallyConnectedNeighbors !== 'function') {
+        throw new TypeError('Anomaly optical tracing requires a WorldTopology with optical connectivity.');
+    }
+    if (!sliceRegistry || typeof sliceRegistry.require !== 'function') {
+        throw new TypeError('Anomaly optical tracing requires a SliceWorldRegistry.');
+    }
+    if (!sceneRegistry || typeof sceneRegistry.intersectSegment !== 'function') {
+        throw new TypeError('Anomaly optical tracing requires an OpticalSceneRegistry.');
+    }
+
+    const sliceFieldCache = new Map();
+    const anomalyFieldCache = new Map();
+
+    function getSliceField(sliceId, metricOptions = {}) {
+        const binding = sliceRegistry.require(sliceId);
+        const cacheKey = `${sliceId}:${binding.slice.revision ?? 1}:${metricOptions.cacheKey ?? 'default'}`;
+        if (!sliceFieldCache.has(cacheKey)) {
+            sliceFieldCache.set(cacheKey, createSliceOpticalField(
+                binding.slice, binding.spatialTransform, metricOptions
+            ));
+        }
+        return sliceFieldCache.get(cacheKey);
+    }
+
+    function getAnomalyField(anomaly, metricOptions = {}) {
+        if (metricOptions.endpointMetricOverride) {
+            return createAnomalyOpticalField(
+                anomaly,
+                sliceRegistry.require(anomaly.source.sliceId),
+                sliceRegistry.require(anomaly.destination.sliceId),
+                metricOptions
+            );
+        }
+        const cacheKey = `${anomaly.id}:${anomaly.revision}:${metricOptions.cacheKey ?? 'default'}`;
+        if (!anomalyFieldCache.has(cacheKey)) {
+            anomalyFieldCache.set(cacheKey, createAnomalyOpticalField(
+                anomaly,
+                sliceRegistry.require(anomaly.source.sliceId),
+                sliceRegistry.require(anomaly.destination.sliceId),
+                metricOptions
+            ));
+        }
+        return anomalyFieldCache.get(cacheKey);
+    }
+
+    function evaluateReachability(anomalyId, position4, targetSliceId, reachabilityOptions = {}) {
+        const anomaly = topology.getCorridor(anomalyId);
+        validateAnomaly(anomaly, { requireEnabled: false });
+        if (!anomaly.optics.enabled) {
+            return { reachable: false, reason: 'optics-disabled', anomalyId, targetSliceId };
+        }
+
+        const endpoint = resolveEndpoint(anomaly, targetSliceId);
+        const fromSliceId = targetSliceId === anomaly.source.sliceId
+            ? anomaly.destination.sliceId : anomaly.source.sliceId;
+        if (!topology.hasOpticalConnection(fromSliceId, targetSliceId)) {
+            return {
+                reachable: false,
+                reason: 'no-optical-topology-edge',
+                anomalyId,
+                fromSliceId,
+                targetSliceId
+            };
+        }
+
+        const targetBinding = sliceRegistry.require(targetSliceId);
+        const localTarget = ambientToSlice(targetBinding.slice.frame, position4);
+        const endpointDistance = Math.hypot(
+            localTarget.position.x - endpoint.position.x,
+            localTarget.position.y - endpoint.position.y,
+            localTarget.position.z - endpoint.position.z
+        );
+        // Reachability normally uses the local influence field. During initial
+        // aperture entry, callers may supply the anomaly centre as the
+        // coupling reference: this answers whether the configured anomaly can
+        // bridge the complete slice separation at full coupling, while keeping
+        // aperture and chunk-spatial tests anchored to the actual ray position.
+        const couplingPosition = reachabilityOptions.couplingPosition4D ?? position4;
+        const coupling = evaluateOpticalAnomalyCoupling(anomaly, couplingPosition);
+        const targetPlaneDistance = Math.abs(localTarget.normalOffset);
+        const wReachable = targetPlaneDistance <= coupling.opticalWReach + EPSILON;
+        const apertureReachable = endpointDistance <= (anomaly.optics.apertureRadius ?? anomaly.entryRadius) + EPSILON;
+
+        let chunkReachability = null;
+        if (wReachable && apertureReachable && chunkGraph) {
+            if (!chunkGraph.hasSlice(fromSliceId) || !chunkGraph.hasSlice(targetSliceId)) {
+                chunkReachability = {
+                    reachable: false,
+                    reason: 'chunk-graph-slice-unregistered'
+                };
+            } else {
+                const fromBinding = sliceRegistry.require(fromSliceId);
+                const fromLocal = ambientToSlice(fromBinding.slice.frame, position4).position;
+                const sourceAddress = chunkGraph.getAddress(fromSliceId, fromLocal);
+                const targetAddress = chunkGraph.getAddress(targetSliceId, endpoint.position);
+                chunkReachability = chunkGraph.getOpticalReachability(sourceAddress, targetAddress, {
+                    position4D: position4,
+                    couplingPosition4D: couplingPosition,
+                    corridorId: anomaly.id,
+                    // A spherical aperture can straddle one X and one Z chunk
+                    // boundary at once. Include the diagonal Manhattan-2 case
+                    // so the physical aperture and graph test agree.
+                    maxChunkDistance: reachabilityOptions.maxChunkDistance ?? 2
+                });
+            }
+        }
+
+        const reachable = wReachable && apertureReachable &&

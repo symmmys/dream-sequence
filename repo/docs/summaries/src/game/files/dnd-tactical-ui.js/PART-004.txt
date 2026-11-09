@@ -1,0 +1,245 @@
+            list.textContent = "No characters created.";
+        }
+
+        this.refreshCharacterDetails();
+    }
+
+    appendCharacterRosterRow(list, character) {
+        const item = document.createElement("div");
+        Object.assign(item.style, {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "5px",
+            padding: "7px",
+            margin: "4px 0",
+            background: character.id === this.mode.selectedCharacter?.id ? "#72551b" : "#193b55",
+            borderRadius: "4px"
+        });
+        const select = this.createButton(character.name, this.handleCharacterSelect.bind(this));
+        select.dataset.characterId = character.id;
+        select.style.flex = "1";
+        const remove = this.createButton("×", this.handleRemoveCharacter.bind(this));
+        remove.dataset.characterId = character.id;
+        remove.style.width = "40px";
+        remove.style.background = "#713b40";
+        item.append(select, remove);
+        list.appendChild(item);
+    }
+
+    refreshCharacterDetails() {
+        const parent = this.characterDetails;
+        parent.replaceChildren();
+        const character = this.mode.selectedCharacter;
+        if (!character) {
+            parent.textContent = "Select a character to view details.";
+            return;
+        }
+        this.appendCharacterSummary(parent, character);
+        this.appendCharacterAbilityScores(parent, character);
+    }
+
+    appendCharacterSummary(parent, character) {
+        this.createTextRow(parent, "Name", character.name);
+        this.createTextRow(parent, "Race", character.race);
+        this.createTextRow(parent, "Class", character.className);
+        this.createTextRow(parent, "Level", character.level);
+        this.createTextRow(parent, "Hit points", `${character.hitPoints}/${character.maxHitPoints}`);
+        this.createTextRow(parent, "Armor class", character.armorClass);
+        this.createTextRow(parent, "Initiative", character.initiative);
+        this.createTextRow(parent, "Movement", character.movement);
+        this.createTextRow(parent, "Altitude above ground", `${character.position.altitude ?? 0} world units`);
+        this.createTextRow(parent, "Grid row", character.position.row);
+        this.createTextRow(parent, "Grid column", character.position.col);
+    }
+
+    appendCharacterAbilityScores(parent, character) {
+        this.addSection(parent, "ABILITY SCORES");
+        for (const [ability, score] of Object.entries(character.stats)) {
+            this.appendAbilityScore(parent, character, ability, score);
+        }
+    }
+
+    appendAbilityScore(parent, character, ability, score) {
+        const modifier = character.getModifier(ability);
+        const sign = modifier >= 0 ? "+" : "";
+        this.createTextRow(parent, ability.toUpperCase(), `${score} (${sign}${modifier})`);
+    }
+
+    refreshHistory() {
+        const parent = this.historyList;
+        parent.replaceChildren();
+        const battle = this.mode.activeBattle;
+        if (!battle || !battle.actions.length) {
+            parent.textContent = "No recorded battle events.";
+            return;
+        }
+        const events = battle.actions.slice(-30).reverse();
+        for (const event of events) this.appendHistoryEntry(parent, event);
+    }
+
+    appendHistoryEntry(parent, event) {
+        const character = this.mode.characters.get(event.characterId);
+        const timestamp = new Date(event.timestamp).toLocaleTimeString();
+        const entry = this.createHistoryEntry();
+        const heading = this.element("div", `${timestamp} — ${character?.name || "System"}`);
+        heading.style.color = "#9dd8ed";
+        entry.append(heading, this.element("div", this.describeHistoryEvent(event)));
+        parent.appendChild(entry);
+    }
+
+    createHistoryEntry() {
+        const entry = this.element("div");
+        Object.assign(entry.style, {
+            padding: "7px",
+            margin: "4px 0",
+            background: "#193b55",
+            borderRadius: "4px",
+            overflowWrap: "anywhere"
+        });
+        return entry;
+    }
+
+    describeHistoryEvent(event) {
+        if (event.type === "move") return "Movement";
+        if (event.type === "action") return `Action: ${event.data.description || "Other"}`;
+        if (event.type === "bonus-action") return `Bonus: ${event.data.description || "Other"}`;
+        if (event.type === "speech") return `Speech: ${event.data.text}`;
+        if (event.type === "other") return `Custom: ${event.data.payload?.type || "Action"}`;
+        return event.type;
+    }
+
+    refreshBattleStatus() {
+        const battle = this.mode.activeBattle;
+        const character = this.mode.getActiveCharacter();
+
+        if (!battle?.active) {
+            this.battleStatus.textContent =
+                "Encounter inactive. Create characters and start a battle.";
+            return;
+        }
+
+        const resources = battle.currentResources;
+
+        const allowance = (character?.movement ?? 0) * (resources?.dashUsed ? 2 : 1);
+        this.battleStatus.textContent = [
+            `ROUND ${battle.round}`,
+            `ACTIVE: ${character?.name || "Unknown"}`,
+            `MOVEMENT: ${resources?.movementUsed || 0}/${allowance}`,
+            `ACTION: ${resources?.actionUsed ? "USED" : "AVAILABLE"}`,
+            `BONUS: ${resources?.bonusActionUsed ? "USED" : "AVAILABLE"}`,
+            `DASH: ${resources?.dashUsed ? "USED" : "AVAILABLE"}`
+        ].join("  |  ");
+    }
+
+    refresh() {
+        if (!this.panel || !this.mode) return;
+        this.refreshRegistrationStatus();
+        this.refreshBattleControls();
+        this.refreshBattleStatus();
+        this.refreshInitiative();
+        this.refreshCharacters();
+        this.refreshHistory();
+        this.refreshGridInformation();
+        this.refreshAltitudeControl();
+    }
+
+    refreshRegistrationStatus() {
+        this.status.textContent = `${this.mode.characters.size} characters registered`;
+    }
+
+    refreshBattleControls() {
+        const battle = this.mode.activeBattle;
+        const active = Boolean(battle?.active);
+        const resources = battle?.currentResources;
+        this.setButtonDisabled(this.startBattleButton, active || !this.mode.characters.size);
+        this.setButtonDisabled(this.advanceButton, !active);
+        this.setButtonDisabled(this.endBattleButton, !active);
+        this.setButtonDisabled(this.actionButton, !active || Boolean(resources?.actionUsed));
+        this.setButtonDisabled(this.bonusButton, !active || Boolean(resources?.bonusActionUsed));
+        this.previewButton.disabled = !active;
+        this.previewButton.style.opacity = active ? "1" : "0.45";
+    }
+
+    setButtonDisabled(button, disabled) {
+        button.disabled = disabled;
+        button.style.opacity = disabled ? "0.45" : "1";
+    }
+
+    refreshGridInformation() {
+        this.gridInfo.textContent = [
+            `Dimensions: ${this.mode.gridRows} rows × ${this.mode.gridColumns} columns`,
+            `Cell size: ${this.mode.cellSize} world units`,
+            `Total width: ${this.mode.gridColumns * this.mode.cellSize}`,
+            `Total depth: ${this.mode.gridRows * this.mode.cellSize}`,
+            `Origin: ${this.mode.gridOrigin.x}, ${this.mode.gridOrigin.z}`
+        ].join("\n");
+        this.gridRowsInput.value = String(this.mode.gridRows);
+        this.gridColumnsInput.value = String(this.mode.gridColumns);
+        this.cellSizeInput.value = String(this.mode.cellSize);
+        this.refreshMovementPreviewLabel();
+    }
+
+    refreshMovementPreviewLabel() {
+        this.previewButton.textContent = this.mode.movementPreview
+            ? "DISABLE MOVEMENT PREVIEW"
+            : "ENABLE MOVEMENT PREVIEW";
+    }
+
+    refreshAltitudeControl() {
+        const selected = this.mode.selectedCharacter;
+        this.selectedAltitudeInput.value = String(selected?.position.altitude ?? 0);
+        this.selectedAltitudeInput.disabled = !selected;
+    }
+
+    showMessage(message) {
+        if (!this.message) return;
+
+        this.message.textContent = String(message);
+
+        this.message.style.color = "#ffd27d";
+    }
+
+    toggle() {
+        this.setVisible(!this.visible);
+    }
+
+    setVisible(visible) {
+        this.visible = Boolean(visible);
+
+        if (this.panel) {
+            this.panel.style.display =
+                this.visible ? "block" : "none";
+        }
+
+        if (this.toggleButton) {
+            this.toggleButton.textContent =
+                this.visible ? "× HIDE MENU" : "☰ D&D MENU";
+        }
+    }
+
+    dispose() {
+        if (this.disposed) return;
+
+        this.disposed = true;
+
+        window.removeEventListener(
+            "keydown",
+            this.onKeyDown
+        );
+
+        this.toggleButton?.remove();
+        this.focusButton?.remove();
+        this.panel?.remove();
+
+        this.panel = null;
+        this.toggleButton = null;
+        this.focusButton = null;
+
+        this.tabContents = {};
+        this.tabBar = null;
+    }
+}
+
+export { DnDTacticalUI };
+

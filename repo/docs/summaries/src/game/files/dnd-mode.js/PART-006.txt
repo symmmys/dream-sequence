@@ -1,0 +1,300 @@
+
+    registerDefaultActionHandlers() {
+        this.registerActionHandler(
+            "*",
+            this.handleDefaultAction.bind(this)
+        );
+    }
+
+    async handleDefaultAction({ character, payload }) {
+        return {
+            accepted: true,
+            characterId: character.id,
+            actionType: payload.type,
+            processedAt: Date.now()
+        };
+    }
+
+    registerActionHandler(type, handler) {
+        return this.actionRegistry.register(type, handler);
+    }
+
+    async dispatchOtherAction(character, payload) {
+        if (!this.activeBattle?.active) {
+            throw new Error("Start a battle first.");
+        }
+
+        this.activeBattle.assertActiveCharacter(character);
+
+        const event = this.activeBattle.useOther(
+            character,
+            payload
+        );
+
+        this.saveBattle();
+
+        try {
+            const result = await this.actionRegistry.dispatch(
+                {
+                    mode: this,
+                    battle: this.activeBattle,
+                    character
+                },
+                payload
+            );
+
+            event.data.result = result === undefined
+                ? null
+                : JSON.parse(JSON.stringify(result));
+
+            this.saveBattle();
+            this.refreshUI();
+
+            return result;
+        } catch (error) {
+            event.data.handlerError = error.message;
+
+            this.saveBattle();
+            this.refreshUI();
+
+            throw error;
+        }
+    }
+
+    saveBattle() {
+        try {
+            this.saveCharacters();
+
+            const data = {
+                version: 2,
+                activeBattleId:
+                    this.activeBattle?.id ?? null,
+                battles: this.battles.map(serializeBattle)
+            };
+
+            localStorage.setItem(
+                "somnium-dnd-battles",
+                JSON.stringify(data)
+            );
+
+            return true;
+        } catch (error) {
+            console.error(
+                "[DnD] Battle save failed.",
+                error
+            );
+
+            this.showMessage("Unable to save battle.");
+
+            return false;
+        }
+    }
+
+    saveCharacters() {
+        try {
+            localStorage.setItem(
+                "somnium-dnd-characters",
+                JSON.stringify(
+                    [...this.characters.values()].map(serializeCharacter)
+                )
+            );
+
+            return true;
+        } catch (error) {
+            console.error(
+                "[DnD] Character save failed.",
+                error
+            );
+
+            return false;
+        }
+    }
+
+    restoreBattles() {
+        try {
+            this.restoreSavedCharacters();
+            const saved = this.loadSavedBattles();
+            this.restoreBattleRecords(saved);
+            this.selectRestoredCharacter();
+            this.centerCameraOnActiveCharacter();
+            this.refreshUI();
+        } catch (error) {
+            this.handleRestoreFailure(error);
+        }
+    }
+
+    restoreSavedCharacters() {
+        for (const data of this.readSavedCharacters()) {
+            const character = DnDCharacter.fromJSON(data);
+            this.characters.set(character.id, character);
+            this.createCharacterMesh(character);
+        }
+        this.syncAllCharacters();
+    }
+
+    readSavedCharacters() {
+        return JSON.parse(
+            localStorage.getItem("somnium-dnd-characters") || "[]"
+        );
+    }
+
+    loadSavedBattles() {
+        return JSON.parse(
+            localStorage.getItem("somnium-dnd-battles") || "null"
+        );
+    }
+
+    restoreBattleRecords(saved) {
+        if (!saved) {
+            this.battles = [];
+            this.activeBattle = null;
+            return;
+        }
+        const records = Array.isArray(saved) ? saved : saved.battles || [];
+        this.battles = records.map(restoreBattle);
+        const activeId = Array.isArray(saved) ? null : saved.activeBattleId;
+        this.activeBattle = this.findRestorableBattle(activeId);
+    }
+
+    selectRestoredCharacter() {
+        if (this.activeBattle) {
+            this.selectCharacter(this.activeBattle.activeCharacterId);
+            return;
+        }
+        const first = this.characters.values().next().value;
+        if (first) this.selectCharacter(first.id);
+    }
+
+    handleRestoreFailure(error) {
+        console.warn("[DnD] Unable to restore saved data.", error);
+        this.battles = [];
+        this.activeBattle = null;
+        this.refreshUI();
+    }
+
+    findRestorableBattle(activeBattleId) {
+        for (const battle of this.battles) {
+            if (
+                battle.id === activeBattleId &&
+                this.isRestorableBattle(battle)
+            ) return battle;
+        }
+        for (const battle of this.battles) {
+            if (this.isRestorableBattle(battle)) return battle;
+        }
+        return null;
+    }
+
+    isRestorableBattle(battle) {
+        if (!battle.active || !battle.turnOrder.length) return false;
+        for (const id of battle.turnOrder) {
+            if (!this.characters.has(id)) return false;
+        }
+        return true;
+    }
+
+    async replayBattle(battle) {
+        if (!battle || this.replaying) return;
+        this.replaying = true;
+        try {
+            await this.replayBattleMoves(battle);
+            if (!this.disposed) this.saveCharacters();
+        } catch (error) {
+            this.reportReplayFailure(error);
+        } finally {
+            this.replaying = false;
+        }
+    }
+
+    async replayBattleMoves(battle) {
+        const moves = battle.actions.filter(isMovementAction);
+        for (const action of moves) {
+            if (this.disposed) break;
+            await this.replayBattleMove(action);
+        }
+    }
+
+    async replayBattleMove(action) {
+        const data = action.data || action;
+        const character = this.characters.get(data.characterId);
+        if (!character || !data.from || !data.to) return;
+        await this.replayCharacterPosition(character, data.from);
+        if (!this.disposed) await this.replayCharacterPosition(character, data.to);
+    }
+
+    async replayCharacterPosition(character, position) {
+        character.position = { ...position };
+        this.syncCharacter(character);
+        this.centerCameraOnActiveCharacter();
+        await waitFor(REPLAY_STEP_DELAY);
+    }
+
+    reportReplayFailure(error) {
+        console.error("[DnD] Battle replay failed.", error);
+    }
+
+    createUI() {
+        this.ui = new DnDTacticalUI(this);
+        this.panel = this.ui.panel;
+    }
+
+    refreshUI() {
+        this.ui?.refresh();
+    }
+
+    showMessage(message) {
+        this.ui?.showMessage(message);
+    }
+
+    dispose() {
+        if (this.disposed) return;
+
+        this.disposed = true;
+
+        window.removeEventListener(
+            "keydown",
+            this.onKeyDown
+        );
+
+        this.scene.onPointerObservable.remove(
+            this.onPointerObservable
+        );
+
+        this.scene.onBeforeRenderObservable.remove(
+            this.gamepadObserver
+        );
+
+        this.clearMovementMeshes();
+        this.disposeGridMeshes();
+
+        for (const meshes of this.characterMeshes.values()) {
+            meshes.root.dispose(false, true);
+            meshes.material.dispose();
+            meshes.headMaterial.dispose();
+        }
+
+        this.characterMeshes.clear();
+        this.gamepadState.clear();
+
+        this.ui?.dispose();
+        this.ui = null;
+
+        for (const material of Object.values(
+            this.movementMaterials
+        )) {
+            material.dispose();
+        }
+
+        this.movementMaterials = {};
+
+        if (this.camera) {
+            this.camera.detachControl();
+
+            if (
+                this.previousCamera &&
+                !this.previousCamera.isDisposed()
+            ) {
+                this.scene.activeCamera = this.previousCamera;
+            } else {
+                this.scene.activeCamera = null;
+            }

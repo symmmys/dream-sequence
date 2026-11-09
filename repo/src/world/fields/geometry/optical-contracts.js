@@ -1,0 +1,200 @@
+import { smootherstep } from './anomaly-influence-field.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+
+/** Versioned, engine-independent optical configuration contracts. */
+
+const OPTICAL_MATERIAL_SCHEMA_VERSION = 1;
+const ANOMALY_OPTICS_SCHEMA_VERSION = 1;
+const EPSILON = 1e-12;
+
+/**
+ * Creates the initial optical material contract.
+ * Reflection/refraction behavior is consumed in a later optics phase; this
+ * phase only validates and preserves the coefficients for future consumers.
+ */
+function createOpticalMaterial(options = {}) {
+    const schemaVersion = options.schemaVersion ?? OPTICAL_MATERIAL_SCHEMA_VERSION;
+    if (schemaVersion !== OPTICAL_MATERIAL_SCHEMA_VERSION) {
+        throw new RangeError(`Unsupported optical material schema version: ${schemaVersion}`);
+    }
+
+    const material = {
+        schemaVersion,
+        id: requireId(options.id, 'Optical material id'),
+        enabled: options.enabled ?? true,
+        refractiveIndex: options.refractiveIndex ?? 1,
+        attenuationPerUnit: options.attenuationPerUnit ?? 0,
+        transmission: options.transmission ?? 1,
+        reflection: options.reflection ?? 0
+    };
+
+    if (typeof material.enabled !== 'boolean') {
+        throw new TypeError('Optical material enabled must be boolean.');
+    }
+    requirePositive(material.refractiveIndex, 'Optical material refractiveIndex');
+    requireNonNegative(material.attenuationPerUnit, 'Optical material attenuationPerUnit');
+    requireUnitInterval(material.transmission, 'Optical material transmission');
+    requireUnitInterval(material.reflection, 'Optical material reflection');
+    if (material.transmission + material.reflection > 1 + EPSILON) {
+        throw new RangeError('Optical material transmission and reflection cannot sum above one.');
+    }
+
+    return material;
+}
+
+/**
+ * Creates an optical permission/configuration independent of player traversal.
+ * Disabled by default so adding the contract cannot silently make old
+ * traversable anomalies transmit light.
+ */
+function createAnomalyOptics(options = {}) {
+    const schemaVersion = options.schemaVersion ?? ANOMALY_OPTICS_SCHEMA_VERSION;
+    if (schemaVersion !== ANOMALY_OPTICS_SCHEMA_VERSION) {
+        throw new RangeError(`Unsupported anomaly optics schema version: ${schemaVersion}`);
+    }
+
+    const optics = {
+        schemaVersion,
+        enabled: options.enabled ?? false,
+        bidirectional: options.bidirectional ?? true,
+        wCouplingScale: options.wCouplingScale ?? 1,
+        // Remaps the shared smootherstep envelope for optics without changing
+        // its centre, radii, endpoint values, or smooth zero-slope horizon.
+        // Values below one expose optical W freedom earlier in the shell.
+        wCouplingProfileBias: options.wCouplingProfileBias ?? 1,
+        maxWOpticalReach: options.maxWOpticalReach ?? null,
+        apertureRadius: options.apertureRadius ?? null,
+        interfaceRule: options.interfaceRule ?? 'aperture-normal-transfer',
+        // Endpoint sampling makes the bridge metric a stable interpolation of
+        // the two aperture tangent metrics. Pointwise sampling is available
+        // for future anomalies that explicitly want ambient chart gradients
+        // to continue through the full 4D interior.
+        metricSampling: options.metricSampling ?? 'endpoint',
+        // 'ambient' gives the anomaly interior its own isotropic Euclidean
+        // tangent metric, decoupled from endpoint chart scale.
+        // Controls the share of normal-plane launch momentum aimed radially
+        // into the anomaly versus along its fourth-dimensional normal.
+        entryRadialBias: options.entryRadialBias ?? 1,
+        refractiveIndex: options.refractiveIndex ?? 1,
+        attenuationPerUnit: options.attenuationPerUnit ?? 0,
+        transmission: options.transmission ?? 1
+    };
+
+    if (typeof optics.enabled !== 'boolean' || typeof optics.bidirectional !== 'boolean') {
+        throw new TypeError('Anomaly optics enabled and bidirectional flags must be boolean.');
+    }
+    requireUnitInterval(optics.wCouplingScale, 'Anomaly optics wCouplingScale');
+    requirePositive(optics.wCouplingProfileBias, 'Anomaly optics wCouplingProfileBias');
+    if (optics.wCouplingProfileBias < 0.001 || optics.wCouplingProfileBias > 100) {
+        throw new RangeError('Anomaly optics wCouplingProfileBias must be between 0.001 and 100.');
+    }
+    if (optics.maxWOpticalReach !== null) {
+        requirePositive(optics.maxWOpticalReach, 'Anomaly optics maxWOpticalReach');
+    }
+    if (optics.apertureRadius !== null) {
+        requirePositive(optics.apertureRadius, 'Anomaly optics apertureRadius');
+    }
+    if (optics.interfaceRule !== 'aperture-normal-transfer') {
+        throw new RangeError(`Unsupported anomaly optical interface rule: ${optics.interfaceRule}`);
+    }
+    if (!['endpoint', 'pointwise', 'ambient'].includes(optics.metricSampling)) {
+        throw new RangeError(`Unsupported anomaly optical metric sampling mode: ${optics.metricSampling}`);
+    }
+    requirePositive(optics.entryRadialBias, 'Anomaly optics entryRadialBias');
+    if (optics.entryRadialBias > 16) {
+        throw new RangeError('Anomaly optics entryRadialBias cannot exceed 16.');
+    }
+    if (optics.enabled && optics.maxWOpticalReach === null) {
+        throw new TypeError('Enabled anomaly optics requires an explicit maxWOpticalReach.');
+    }
+    requirePositive(optics.refractiveIndex, 'Anomaly optics refractiveIndex');
+    requireNonNegative(optics.attenuationPerUnit, 'Anomaly optics attenuationPerUnit');
+    requireUnitInterval(optics.transmission, 'Anomaly optics transmission');
+
+    return optics;
+}
+
+function evaluateOpticalAnomalyCoupling(anomaly, position4) {
+    const optics = createAnomalyOptics(anomaly?.optics ?? {});
+    if (!optics.enabled) {
+        return { enabled: false, coupling: 0, opticalWReach: 0, distance: Infinity };
+    }
+
+    const influence = anomaly.influence;
+    if (!influence?.center || !Number.isFinite(influence.horizonRadius) ||
+        !Number.isFinite(influence.innerRadius) || influence.horizonRadius <= influence.innerRadius) {
+        throw new TypeError('Enabled anomaly optics requires a resolved influence center and valid radii.');
+    }
+    validatePosition4(position4, 'Optical anomaly evaluation position');
+
+    const distance = Math.hypot(
+        position4.x - influence.center.x,
+        position4.y - influence.center.y,
+        position4.z - influence.center.z,
+        position4.w - influence.center.w
+    );
+    const t = clamp(
+        (influence.horizonRadius - distance) /
+            (influence.horizonRadius - influence.innerRadius),
+        0,
+        1
+    );
+    const envelope = smootherstep(t);
+    const biasDenominator = envelope + optics.wCouplingProfileBias * (1 - envelope);
+    const opticalEnvelope = envelope === 0 ? 0 :
+        envelope === 1 ? 1 : envelope / biasDenominator;
+    const coupling = clamp(opticalEnvelope * optics.wCouplingScale, 0, 1);
+
+    return {
+        enabled: true,
+        distance,
+        normalized: t,
+        envelope,
+        opticalEnvelope,
+        coupling,
+        opticalWReach: optics.maxWOpticalReach * coupling
+    };
+}
+
+function validatePosition4(value, label) {
+    if (!value || !['x', 'y', 'z', 'w'].every((axis) => Number.isFinite(value[axis]))) {
+        throw new TypeError(`${label} must contain finite x/y/z/w coordinates.`);
+    }
+}
+
+function requireId(value, label) {
+    if (typeof value !== 'string' || value.trim() === '') {
+        throw new TypeError(`${label} must be a non-empty string.`);
+    }
+    return value.trim();
+}
+
+function requirePositive(value, label) {
+    if (!Number.isFinite(value) || value <= 0) {
+        throw new RangeError(`${label} must be positive and finite.`);
+    }
+}
+
+function requireNonNegative(value, label) {
+    if (!Number.isFinite(value) || value < 0) {
+        throw new RangeError(`${label} must be non-negative and finite.`);
+    }
+}
+
+function requireUnitInterval(value, label) {
+    if (!Number.isFinite(value) || value < 0 || value > 1) {
+        throw new RangeError(`${label} must be between zero and one.`);
+    }
+}
+
+function clamp(value, minimum, maximum) {
+    return Math.min(maximum, Math.max(minimum, value));
+}
+
+export {
+    ANOMALY_OPTICS_SCHEMA_VERSION,
+    OPTICAL_MATERIAL_SCHEMA_VERSION,
+    createAnomalyOptics,
+    createOpticalMaterial,
+    evaluateOpticalAnomalyCoupling,
+    smootherstep as opticalSmootherstep
+};

@@ -1,0 +1,300 @@
+/** Owns the connected 4D demo chambers and their Babylon presentation. */
+
+import { SliceWorldRegistry } from '../world/slice-world-registry.js';
+import {
+    createGeometryDemoTopology, MAIN_WORLD_SLICE_ID
+} from './geometry-demo-topology.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { SpatialTransform } from '../world/fields/geometry/spatial-transform.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { ambientToSlice } from '../world/fields/geometry/spatial-4d.js';
+import { BabylonGeometryAdapter } from '../world/fields/geometry/babylon-geometry-adapter.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { CorridorRenderer } from '../world/fields/geometry/corridor-renderer.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { PortalPreviewRenderer } from '../world/fields/geometry/portal-preview-renderer.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { GeometryDebugGrid } from '../world/fields/geometry/geometry-debug-grid.js';
+import { PlayerCharacter } from '../game/player-character.js';
+import { PlayerController } from '../game/player-controller.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { GeometryDemoCameraController } from './geometry-demo-camera-controller.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { CorridorTraversalController } from '../world/fields/geometry/corridor-traversal-controller.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { SliceTransitionTraversalController } from '../world/fields/geometry/slice-transition-traversal-controller.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { SLICE_TRANSITION_ANOMALY } from '../world/fields/geometry/spatial-anomaly.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { CorridorTraversalNetwork } from './corridor-traversal-network.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { Hypercube4DRenderer } from './hypercube-4d-renderer.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+
+const SOURCE_LAYER = 0x10000000;
+const HYPERCUBE_LAYER = 0x20000000;
+const MAIN_WORLD_LAYER = 0x0FFFFFFF;
+const ROOM_MOVEMENT_PROFILE = Object.freeze({ walkSpeed: 4.5, runSpeed: 7.5, turnSpeed: 2.4 });
+const MAIN_WORLD_MOVEMENT_PROFILE = Object.freeze({ walkSpeed: 180, runSpeed: 360, turnSpeed: 2.2 });
+const GEOMETRY_DEMO_BUILD = '2026-11-08-phase16c-anomaly-optics-2';
+
+async function createGeometryDemoWorld(scene, canvas, mainWorld) {
+    console.info(`[GeometryDemo] Build: ${GEOMETRY_DEMO_BUILD}`);
+    const data = createGeometryDemoTopology(mainWorld);
+    const {
+        sourceSlice, hypercubeSlice, mainSlice, corridor, hypercubeCorridor, hypercubeMainCorridor,
+        topology, chunkGraph, corridorChunk, hypercubeCorridorChunk, hypercubeMainCorridorChunk, mainAnchor,
+        sourceChunkAddress, hypercubeChunkAddress, hypercubeDestinationChunkAddress,
+        destinationChunkAddress, hypercubeMainChunkAddress, hypercubeMainDestinationChunkAddress
+    } = data;
+
+    const sourceTransform = createSourceTransform();
+    const hypercubeTransform = createHypercubeTransform();
+    const registry = new SliceWorldRegistry();
+    registry.register(sourceSlice, { spatialTransform: sourceTransform });
+    registry.register(hypercubeSlice, { spatialTransform: hypercubeTransform });
+    registry.register(mainSlice, { spatialTransform: mainWorld.spatialTransform });
+
+    const adapter = new BabylonGeometryAdapter(scene, { opticalScene: mainWorld.opticalScene });
+    adapter.registerSlice(sourceSlice, sourceTransform);
+    adapter.registerSlice(hypercubeSlice, hypercubeTransform);
+    adapter.registerSlice(mainSlice, mainWorld.spatialTransform);
+
+    const sourceMeshes = createDemoRoom(scene, adapter, sourceTransform, sourceSlice.id);
+    const hypercubeRenderer = new Hypercube4DRenderer(scene, hypercubeTransform, {
+        center: { x: 0, y: 4, z: 0 }, halfExtent: 4.2,
+        initialAngles: { xw: 0.42, yw: 0.36, zw: 0.32 },
+        opticalScene: mainWorld.opticalScene,
+        sliceId: hypercubeSlice.id,
+        chunkAddress: hypercubeChunkAddress,
+        angularSpeeds: { xw: 0.68, yw: 0.49, zw: 0.33 },
+        viewerW: 0, layerMask: HYPERCUBE_LAYER,
+        edgeRadius: 0.095, vertexDiameter: 0.13
+    });
+    const hypercubeMeshes = [...hypercubeRenderer.meshes];
+    const hypercubeAuxiliaryMeshes = [];
+
+    const hypercubePortalCamera = {
+        x: -28, y: 9, z: 30, targetX: -2, targetY: 3, targetZ: -2, fov: 0.9
+    };
+    const sourceHypercubePortalCamera = {
+        x: 0, y: 10, z: -32, targetX: 0, targetY: 4, targetZ: 0, fov: 0.9
+    };
+    const mainPreviewCamera = createMainPreviewCamera(mainWorld.spatialTransform, mainAnchor);
+    const mainSourcePortal = createPortal(scene, sourceSlice.id, adapter, [], {
+        position: { x: 0, y: 2.5, z: 20.15 },
+        layerMask: SOURCE_LAYER, renderLayerMask: MAIN_WORLD_LAYER,
+        rimName: 'geometryMainWorldPortalRim', camera: mainPreviewCamera
+    });
+    const mainDestinationPortal = createDestinationPortal(
+        scene, mainSlice.id, adapter, [], mainAnchor
+    );
+    const hypercubeSourcePortal = createPortal(scene, hypercubeSlice.id, adapter, [], {
+        position: { x: -18, y: 2.5, z: 0.15 },
+        layerMask: HYPERCUBE_LAYER, renderLayerMask: SOURCE_LAYER,
+        rimName: 'geometryPoincareChamberPortalRim', camera: hypercubePortalCamera
+    });
+    const hypercubeDestinationPortal = createPortal(scene, sourceSlice.id, adapter, [], {
+        position: { x: -18, y: 2.5, z: 0.15 },
+        width: 7.4, height: 7.4, rimDiameter: 8.3,
+        layerMask: SOURCE_LAYER, renderLayerMask: HYPERCUBE_LAYER,
+        rimName: 'geometryHypercubePortalRim', camera: sourceHypercubePortalCamera
+    });
+    const hypercubeMainPortal = createPortal(scene, hypercubeSlice.id, adapter, [], {
+        position: { x: 18, y: 2.5, z: 0.15 },
+        width: 5.2, height: 5.6, rimDiameter: 6.1,
+        layerMask: HYPERCUBE_LAYER, renderLayerMask: MAIN_WORLD_LAYER,
+        rimName: 'geometryHypercubeMainWorldPortalRim', camera: mainPreviewCamera
+    });
+    const hypercubeMainDestinationPortal = createPortal(scene, mainSlice.id, adapter, [], {
+        position: { x: 18, y: mainAnchor.y + 35, z: -2 },
+        width: 76, height: 88, rimDiameter: 94, rimThickness: 4,
+        layerMask: MAIN_WORLD_LAYER, renderLayerMask: HYPERCUBE_LAYER,
+        rimName: 'geometryMainWorldHypercubePortalRim', camera: hypercubePortalCamera
+    });
+
+    const mainCorridorLabel = createWorldLabel(
+        scene, sourceSlice.id, 'geometryMainCorridorLabel',
+        'ANOMALY 02  |  SOMNIUM MAIN WORLD', 0, 8.5, 20.2, 12
+    );
+    const hypercubeCorridorLabel = createWorldLabel(
+        scene, sourceSlice.id, 'geometryHypercubeCorridorLabel',
+        'ANOMALY 01  |  4D HYPERCUBE CHAMBER', -18, 8.5, 0, 12
+    );
+    sourceMeshes.push(mainCorridorLabel, hypercubeCorridorLabel);
+    applySliceMeshes([mainCorridorLabel, hypercubeCorridorLabel], adapter, sourceTransform, sourceSlice.id);
+    for (const mesh of sourceMeshes) mesh.layerMask = SOURCE_LAYER;
+    const hypercubeMainCorridorLabel = createWorldLabel(
+        scene, hypercubeSlice.id, 'geometryHypercubeMainCorridorLabel',
+        'ANOMALY 03  |  SOMNIUM MAIN WORLD  ·  W +5', 18, 8.5, 0, 12
+    );
+    applySliceMeshes([hypercubeMainCorridorLabel], adapter, hypercubeTransform, hypercubeSlice.id);
+    hypercubeMainCorridorLabel.layerMask = HYPERCUBE_LAYER;
+    hypercubeMeshes.push(hypercubeMainCorridorLabel);
+    hypercubeAuxiliaryMeshes.push(hypercubeMainCorridorLabel);
+
+    const mainSourceRenderer = corridor.type === SLICE_TRANSITION_ANOMALY
+        ? null
+        : new CorridorRenderer(scene, corridor, sourceTransform);
+    const mainDestinationRenderer = corridor.type === SLICE_TRANSITION_ANOMALY
+        ? null
+        : new CorridorRenderer(scene, corridor, mainWorld.spatialTransform, { anchorT: 1 });
+    if (mainSourceRenderer) mainSourceRenderer.mesh.layerMask = SOURCE_LAYER;
+    if (mainDestinationRenderer) mainDestinationRenderer.mesh.layerMask = MAIN_WORLD_LAYER;
+
+    const hypercubeSourceRenderer = hypercubeCorridor.type === SLICE_TRANSITION_ANOMALY
+        ? null
+        : new CorridorRenderer(scene, hypercubeCorridor, hypercubeTransform);
+    const hypercubeDestinationRenderer = hypercubeCorridor.type === SLICE_TRANSITION_ANOMALY
+        ? null
+        : new CorridorRenderer(scene, hypercubeCorridor, sourceTransform, { anchorT: 1 });
+    if (hypercubeSourceRenderer) hypercubeSourceRenderer.mesh.layerMask = HYPERCUBE_LAYER;
+    if (hypercubeDestinationRenderer) hypercubeDestinationRenderer.mesh.layerMask = SOURCE_LAYER;
+
+    const sourceGrid = new GeometryDebugGrid(scene, adapter, {
+        sliceId: sourceSlice.id, size: 60, spacing: 2, visible: false
+    });
+    sourceGrid.mesh.layerMask = SOURCE_LAYER;
+    const hypercubeGrid = new GeometryDebugGrid(scene, adapter, {
+        sliceId: hypercubeSlice.id, size: 52, spacing: 2, visible: false
+    });
+    hypercubeGrid.mesh.layerMask = HYPERCUBE_LAYER;
+    const mainWorldGrid = new GeometryDebugGrid(scene, adapter, {
+        sliceId: mainSlice.id,
+        size: 120,
+        spacing: 4,
+        sampleStep: 2,
+        center: { x: mainAnchor.x, z: mainAnchor.z },
+        visible: false,
+        heightAt(x, z) {
+            const sample = mainWorld.terrain.sampleAt(x, z);
+            return Number.isFinite(sample?.y) ? sample.y + 0.35 : null;
+        }
+    });
+    mainWorldGrid.mesh.layerMask = MAIN_WORLD_LAYER;
+
+    const hypercubeTerrain = createHypercubeMovementSurface();
+    const player = new PlayerCharacter(scene, hypercubeTransform, {
+        x: 0, z: -18, terrain: hypercubeTerrain,
+        sliceId: hypercubeSlice.id, layerMask: HYPERCUBE_LAYER
+    });
+    const playerController = new PlayerController(player, hypercubeTerrain, canvas, {
+        ...ROOM_MOVEMENT_PROFILE
+    });
+    const getInfluenceModifiers = () =>
+        playerController.getAnomalyInfluenceModifiers?.() ?? playerController.anomalyInfluenceModifiers ?? {};
+    const camera = createDemoCamera(scene);
+    const cameraController = new GeometryDemoCameraController(
+        scene, camera, player, hypercubeTransform, playerController,
+        {
+            distance: 18, height: 8, minDistance: 2.5, maxDistance: 800, smoothing: 9,
+            orbitSensitivity: 0.005
+        }
+    );
+
+    const sourceWorld = createDemoWorldBinding(
+        sourceSlice, sourceTransform, createRoomMovementSurface(), SOURCE_LAYER, sourceChunkAddress,
+        { movementProfile: ROOM_MOVEMENT_PROFILE }
+    );
+    const hypercubeWorld = createDemoWorldBinding(
+        hypercubeSlice, hypercubeTransform, hypercubeTerrain, HYPERCUBE_LAYER, hypercubeChunkAddress,
+        { fourDimensionalRegion: false, wBounds: { min: 0, max: 0 }, movementProfile: ROOM_MOVEMENT_PROFILE }
+    );
+    const sourceExitWorld = createDemoWorldBinding(
+        sourceSlice, sourceTransform, sourceWorld.terrain, SOURCE_LAYER, hypercubeDestinationChunkAddress,
+        { movementProfile: ROOM_MOVEMENT_PROFILE }
+    );
+    const destinationWorld = createDemoWorldBinding(
+        mainSlice, mainWorld.spatialTransform, mainWorld.terrain, MAIN_WORLD_LAYER, destinationChunkAddress,
+        { movementProfile: mainWorld.movementProfile ?? MAIN_WORLD_MOVEMENT_PROFILE }
+    );
+    chunkGraph.registerChunk(sourceChunkAddress, sourceWorld);
+    chunkGraph.registerChunk(hypercubeDestinationChunkAddress, sourceExitWorld);
+    chunkGraph.registerChunk(hypercubeChunkAddress, hypercubeWorld);
+
+    const portalPairs = [
+        {
+            corridor, sourceSliceId: sourceSlice.id, destinationSliceId: mainSlice.id,
+            sourcePortal: mainSourcePortal, destinationPortal: mainDestinationPortal,
+            sourceRenderer: mainSourceRenderer, destinationRenderer: mainDestinationRenderer
+        },
+        {
+            corridor: hypercubeCorridor, sourceSliceId: hypercubeSlice.id, destinationSliceId: sourceSlice.id,
+            sourcePortal: hypercubeSourcePortal, destinationPortal: hypercubeDestinationPortal,
+            sourceRenderer: hypercubeSourceRenderer, destinationRenderer: hypercubeDestinationRenderer
+        },
+        {
+            corridor: hypercubeMainCorridor,
+            sourceSliceId: hypercubeSlice.id,
+            destinationSliceId: mainSlice.id,
+            sourcePortal: hypercubeMainPortal,
+            destinationPortal: hypercubeMainDestinationPortal,
+            sourceRenderer: null,
+            destinationRenderer: null
+        }
+    ];
+    const world = new GeometryDemoWorld({
+        scene, sourceSlice, hypercubeSlice,
+        destination: { slice: mainSlice, terrain: mainWorld.terrain, metadata: {
+            kind: 'existing-main-world', chunkSize: mainWorld.chunkSize ?? 2000,
+            exit: { ...mainAnchor }
+        } },
+        corridor, hypercubeCorridor, hypercubeMainCorridor, topology, registry, adapter,
+        sourceMeshes, hypercubeMeshes, hypercubeAuxiliaryMeshes, hypercubeRenderer,
+        sourceWorld, sourceExitWorld, hypercubeWorld, destinationWorld,
+        mainSourcePortal, mainDestinationPortal, hypercubeSourcePortal, hypercubeDestinationPortal,
+        hypercubeMainPortal, hypercubeMainDestinationPortal,
+        portalPairs,
+        mainSourceRenderer, mainDestinationRenderer,
+        hypercubeSourceRenderer, hypercubeDestinationRenderer,
+        sourceGrid, hypercubeGrid, mainWorldGrid,
+        chunkGraph, corridorChunk, hypercubeCorridorChunk, hypercubeMainCorridorChunk,
+        hypercubeMainChunkAddress, hypercubeMainDestinationChunkAddress,
+        destinationWorldManager: null, mainAnchor,
+        player, playerController, camera, cameraController
+    });
+
+    const controllers = [
+        createAnomalyTraversalController({
+            player, movementController: playerController, cameraController,
+            anomaly: hypercubeCorridor, topology, getInfluenceModifiers,
+            corridorRenderers: new Map([
+                [hypercubeSlice.id, hypercubeSourceRenderer],
+                [sourceSlice.id, hypercubeDestinationRenderer]
+            ]),
+            chunkGraph, corridorChunk: hypercubeCorridorChunk,
+            source: hypercubeWorld, destination: sourceExitWorld,
+            initialSliceId: hypercubeSlice.id,
+            traversal: { speed: 12, sprintSpeed: 18, entitySpeed: 10 }
+        }),
+        createAnomalyTraversalController({
+            player, movementController: playerController, cameraController,
+            anomaly: hypercubeMainCorridor, topology, getInfluenceModifiers,
+            corridorRenderers: new Map(),
+            chunkGraph, corridorChunk: hypercubeMainCorridorChunk,
+            source: hypercubeWorld, destination: destinationWorld,
+            initialSliceId: hypercubeSlice.id,
+            traversal: { speed: 12, sprintSpeed: 18, entitySpeed: 10 }
+        }),
+        createAnomalyTraversalController({
+            player, movementController: playerController, cameraController,
+            anomaly: corridor, topology, getInfluenceModifiers,
+            corridorRenderers: new Map([
+                [sourceSlice.id, mainSourceRenderer],
+                [mainSlice.id, mainDestinationRenderer]
+            ]),
+            chunkGraph, corridorChunk,
+            source: sourceWorld, destination: destinationWorld,
+            initialSliceId: hypercubeSlice.id,
+            traversal: { speed: 12, sprintSpeed: 18, entitySpeed: 10 }
+        })
+    ];
+    world.traversalController = new CorridorTraversalNetwork({
+        topology,
+        worlds: new Map([
+            [hypercubeSlice.id, hypercubeWorld],
+            [sourceSlice.id, sourceWorld],
+            [mainSlice.id, destinationWorld]
+        ]),
+        controllers,
+        initialSliceId: hypercubeSlice.id,
+        onSliceChanged: world.activateSlice.bind(world)
+    });
+    cameraController.setTraversalController(world.traversalController);
+    return world;
+}
+
+function createAnomalyTraversalController(options) {
+    const { anomaly, corridorRenderers, ...rest } = options;
+    if (anomaly.type === SLICE_TRANSITION_ANOMALY) {
+        return new SliceTransitionTraversalController({
+            ...rest,
+            anomaly,

@@ -1,0 +1,2637 @@
+SOMNIUM — DIRECTORY SOURCE DUMP
+========================================================================
+
+Directory: src/demo/
+Generated: 2026-11-09T03:15:29
+
+This file contains recursively collected UTF-8 text files.
+Binary files and excluded directories are omitted.
+File paths are relative to the project root.
+
+
+========================================================================
+FILE: src/demo/corridor-traversal-network.js
+========================================================================
+
+/** Coordinates several single-corridor controllers as one connected world graph. */
+
+class CorridorTraversalNetwork {
+    constructor(options = {}) {
+        this.topology = requireObject(options.topology, 'topology');
+        this.worlds = new Map(options.worlds ?? []);
+        this.controllers = [...(options.controllers ?? [])];
+        if (!this.controllers.length) throw new TypeError('Traversal network requires at least one controller.');
+        this.currentSliceId = options.initialSliceId ?? this.controllers[0].currentSliceId;
+        this.onSliceChanged = options.onSliceChanged ?? noop;
+        this.active = false;
+        this.disposed = false;
+        this.activeController = null;
+        this.bindControllers();
+    }
+
+    bindControllers() {
+        for (const controller of this.controllers) {
+            const notify = controller.onSliceChanged;
+            controller.currentSliceId = this.currentSliceId;
+            controller.onSliceChanged = this.handleSliceChanged.bind(this, controller, notify);
+        }
+    }
+
+    handleSliceChanged(controller, notify, sliceId, state) {
+        this.currentSliceId = sliceId;
+        this.syncSlice(sliceId);
+        if (typeof notify === 'function') notify(sliceId, state);
+        this.onSliceChanged(sliceId, state);
+    }
+
+    update(deltaSeconds) {
+        if (!this.active || this.disposed) return;
+        const delta = Math.max(0, Math.min(deltaSeconds, 0.1));
+        const transit = this.getActiveController();
+        if (transit) {
+            transit.update(delta);
+            for (const controller of this.controllers) {
+                if (controller !== transit) controller.advanceOtherEntities(delta);
+            }
+            if (transit.state !== 'transit') this.activeController = null;
+            this.currentSliceId = transit.currentSliceId;
+            this.syncSlice(this.currentSliceId);
+            return;
+        }
+
+        this.activeController = null;
+        this.syncSlice(this.currentSliceId);
+        for (const controller of this.controllers) {
+            if (controller.tryBeginTransit()) {
+                this.activeController = controller;
+                break;
+            }
+        }
+        if (!this.activeController) this.advanceAmbientInfluenceMovement(delta);
+        this.currentSliceId = this.controllers[0]?.currentSliceId ?? this.currentSliceId;
+        this.syncSlice(this.currentSliceId);
+        for (const controller of this.controllers) controller.advanceOtherEntities(delta);
+    }
+
+    advanceAmbientInfluenceMovement(deltaSeconds) {
+        const input = this.controllers[0]?.getMovementInput?.() ?? {};
+        const direction = Number(input.crossSectionW) || 0;
+        if (!direction) return false;
+
+        // Controllers are synchronized to the active slice, but not every
+        // controller owns a WorldSlice binding for that slice. Resolve one
+        // authoritative ambient position first, then evaluate only routes
+        // that actually connect from the current slice.
+        const position4D = this.getAmbientPlayerPosition();
+        if (!position4D) return false;
+        const candidates = this.controllers.filter((controller) =>
+            controller.ownsSlice?.(this.currentSliceId) ??
+                (controller.worlds instanceof Map
+                    ? controller.worlds.has(this.currentSliceId)
+                    : controller.currentSliceId === this.currentSliceId)
+        ).map((controller) => {
+            const influence = controller.getInfluenceMovementInfo?.(
+                position4D, direction, this.currentSliceId
+            );
+            return influence ? { controller, influence } : null;
+        }).filter(Boolean).sort((left, right) =>
+            right.influence.movementScale - left.influence.movementScale
+        );
+        if (!candidates.length) return false;
+        return candidates[0].controller.advanceAmbientInfluenceMovement(deltaSeconds);
+    }
+
+    getAmbientPlayerPosition() {
+        const active = this.getActiveController();
+        if (active?.spatialPosition4D) return { ...active.spatialPosition4D };
+
+        // A network may contain routes that do not touch the current slice.
+        // Do not stop at the first synchronized controller: find the first
+        // controller that owns a binding for this actual WorldSlice and can
+        // resolve a finite ambient position.
+        for (const controller of this.controllers) {
+            const ownsSlice = typeof controller.ownsSlice === 'function'
+                ? controller.ownsSlice(this.currentSliceId)
+                : controller.worlds instanceof Map
+                    ? controller.worlds.has(this.currentSliceId)
+                    : controller.currentSliceId === this.currentSliceId;
+            if (!ownsSlice || typeof controller.getAmbientPlayerPosition !== 'function') continue;
+            const position = controller.getAmbientPlayerPosition();
+            if (isFinitePosition4(position)) return { ...position };
+        }
+        return null;
+    }
+
+    getEntryDiagnostics() {
+        return this.controllers.map((controller) => ({
+            anomalyId: controller.corridor.id,
+            ...controller.getEntryDiagnostic?.()
+        }));
+    }
+
+    syncSlice(sliceId) {
+        for (const controller of this.controllers) controller.currentSliceId = sliceId;
+    }
+
+    setActive(active) {
+        this.active = Boolean(active) && !this.disposed;
+        for (const controller of this.controllers) controller.setActive(this.active);
+    }
+
+    getActiveController() {
+        return this.activeController?.state === 'transit'
+            ? this.activeController
+            : this.controllers.find(function inTransit(controller) {
+                return controller.state === 'transit';
+            }) ?? null;
+    }
+
+    get state() { return this.getActiveController()?.state ?? 'idle'; }
+    get corridor() { return this.getActiveController()?.corridor ?? null; }
+    get corridorLength() { return this.getActiveController()?.corridorLength ?? 0; }
+    get startWorld() { return this.getActiveController()?.startWorld ?? null; }
+    get target() { return this.getActiveController()?.target ?? null; }
+    get direction() { return this.getActiveController()?.direction ?? 0; }
+    get progress() { return this.getActiveController()?.progress ?? 0; }
+    get offsetU() { return this.getActiveController()?.offsetU ?? 0; }
+    get offsetV() { return this.getActiveController()?.offsetV ?? 0; }
+    get offsetW() { return this.getActiveController()?.offsetW ?? 0; }
+    get activeRenderer() { return this.getActiveController()?.activeRenderer ?? null; }
+
+    getRoutesForSlice(sliceId) {
+        return this.topology.getTraversableNeighbors(sliceId)
+            .map(this.resolveRoute.bind(this, sliceId))
+            .filter(Boolean);
+    }
+
+    resolveRoute(sliceId, link) {
+        const controller = this.controllers.find(function matchingController(entry) {
+            return entry.corridor.id === link.corridorId;
+        });
+        if (!controller) return null;
+        return {
+            ...link, controller, corridor: controller.corridor,
+            fromSource: controller.corridor.source.sliceId === sliceId,
+            renderer: controller.renderers.get(sliceId) ?? controller.renderer,
+            corridorLength: controller.corridorLength
+        };
+    }
+
+    getRouteForSlice(sliceId, corridorId) {
+        return this.getRoutesForSlice(sliceId).find(function matchRoute(route) {
+            return route.corridorId === corridorId;
+        }) ?? null;
+    }
+
+    beginEntityTransit(entity, fromSliceId = entity?.sliceId) {
+        const routes = this.getRoutesForSlice(fromSliceId);
+        const preferred = routes.find(function preferredRoute(route) {
+            return route.corridorId === entity?.corridorId;
+        });
+        for (const route of preferred ? [preferred] : routes) {
+            if (route.controller.beginEntityTransit(entity, fromSliceId)) return true;
+        }
+        return false;
+    }
+
+    tryBeginEntityTransit(entity, fromSliceId = entity?.sliceId) {
+        for (const route of this.getRoutesForSlice(fromSliceId)) {
+            if (route.controller.tryBeginEntityTransit(entity, fromSliceId)) return true;
+        }
+        return false;
+    }
+
+    getEntityTransitState(entity) {
+        for (const controller of this.controllers) {
+            const state = controller.getEntityTransitState(entity);
+            if (state) return state;
+        }
+        return null;
+    }
+
+    getState() {
+        return {
+            state: this.state,
+            currentSliceId: this.currentSliceId,
+            activeCorridorId: this.corridor?.id ?? null,
+            routes: this.controllers.map(function summarize(controller) {
+                return controller.getState();
+            })
+        };
+    }
+
+    dispose() {
+        if (this.disposed) return;
+        this.setActive(false);
+        this.disposed = true;
+        for (const controller of this.controllers) controller.dispose();
+        this.controllers.length = 0;
+        this.activeController = null;
+    }
+}
+
+
+function isFinitePosition4(position) {
+    return Boolean(position) &&
+        Number.isFinite(position.x) && Number.isFinite(position.y) &&
+        Number.isFinite(position.z) && Number.isFinite(position.w);
+}
+
+function requireObject(value, label) {
+    if (!value || typeof value !== 'object') throw new TypeError(`${label} is required.`);
+    return value;
+}
+
+function noop() {}
+
+export { CorridorTraversalNetwork };
+
+
+========================================================================
+FILE: src/demo/geometry-demo-camera-controller.js
+========================================================================
+
+/** Switches between player-following and independent 3D/4D inspection views. */
+
+import { CharacterCameraController } from '../game/camera-controller.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { add4, ambientToSlice, dot4, scale4, sliceToAmbient } from '../world/fields/geometry/spatial-4d.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { SLICE_TRANSITION_ANOMALY } from '../world/fields/geometry/spatial-anomaly.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { evaluateAnomalyInfluence, resolveAnomalyInfluence } from '../world/fields/geometry/anomaly-influence-field.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+
+const CAMERA_BUILD = '2026-11-08-phase15-main-world-reentry-metric-grid-1';
+const MOVEMENT_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyR', 'KeyF', 'KeyE', 'KeyQ', 'ShiftLeft'];
+
+class GeometryDemoCameraController extends CharacterCameraController {
+    constructor(scene, camera, character, transform, playerController, options = {}) {
+        super(scene, camera, character, transform, options);
+        this.playerController = playerController;
+        this.traversal = null;
+        this.mode = 'follow';
+        this.freeKeys = new Set();
+        this.freePosition = null;
+        this.freeSliceId = null;
+        this.freeW = 0;
+        this.freeEntryLock = null;
+        this.freeTransit = null;
+        this.freeYaw = 0;
+        this.freePitch = 0;
+        this.lookYawOffset = 0;
+        this.lookPitchOffset = 0;
+        this.freeSpeed = options.freeSpeed ?? 18;
+        this.freeEntryDistance = options.freeEntryDistance ?? 14;
+        this.freeTransverseSpeed = options.freeTransverseSpeed ?? 7;
+        this.freeMouseSensitivity = options.freeMouseSensitivity ?? 0.0035;
+        this.freeDragging = false;
+        this.previousMouse = { x: 0, y: 0 };
+        this.onFreeKeyDown = this.handleFreeKeyDown.bind(this);
+        this.onFreeKeyUp = this.handleFreeKeyUp.bind(this);
+        this.onFreeBlur = this.handleFreeBlur.bind(this);
+        this.onFreePointerDown = this.handleFreePointerDown.bind(this);
+        this.onFreePointerMove = this.handleFreePointerMove.bind(this);
+        this.onFreePointerUp = this.handleFreePointerUp.bind(this);
+        window.addEventListener('keydown', this.onFreeKeyDown);
+        window.addEventListener('keyup', this.onFreeKeyUp);
+        window.addEventListener('blur', this.onFreeBlur);
+        this.canvas?.addEventListener('pointerdown', this.onFreePointerDown);
+        window.addEventListener('pointermove', this.onFreePointerMove);
+        window.addEventListener('pointerup', this.onFreePointerUp);
+        this.onModeChanged = options.onModeChanged ?? function ignoreModeChange() {};
+        console.info(`[GeometryDemoCamera] Build: ${CAMERA_BUILD}`);
+    }
+
+
+    setTraversalController(controller) {
+        this.traversal = controller;
+    }
+
+    setEnabled(enabled) {
+        if (!enabled && this.mode === 'free') this.setMode('follow');
+        super.setEnabled(enabled);
+        this.playerController?.setInputEnabled(this.mode !== 'free');
+        if (!enabled) this.freeKeys.clear();
+    }
+
+    toggleMode() {
+        return this.setMode(this.mode === 'follow' ? 'free' : 'follow');
+    }
+
+    setMode(mode) {
+        if (!['follow', 'free'].includes(mode)) throw new RangeError(`Unknown geometry camera mode: ${mode}`);
+        if (mode === this.mode) return this.mode;
+        if (mode === 'free' && (!this.enabled || this.disposed)) return this.mode;
+        if (mode === 'free') this.enterFreeMode();
+        else this.enterFollowMode();
+        this.mode = mode;
+        this.playerController?.setInputEnabled(mode !== 'free');
+        this.character.root?.setEnabled(mode !== 'free');
+        this.freeKeys.clear();
+        this.freeDragging = false;
+        this.onModeChanged(mode);
+        if (mode === 'follow' && this.enabled) super.setEnabled(true);
+        return this.mode;
+    }
+
+    enterFreeMode() {
+        this.lookYawOffset = 0;
+        this.lookPitchOffset = 0;
+        this.freePosition = copyVector(this.camera.position);
+        const forward = this.camera.getForwardRay().direction;
+        this.freeYaw = Math.atan2(forward.x, forward.z);
+        this.freePitch = Math.asin(clamp(forward.y, -1, 1));
+        const traversal = this.traversal;
+        this.freeSliceId = traversal?.state === 'transit'
+            ? traversal.startWorld.slice.id
+            : traversal?.currentSliceId ?? this.character.sliceId;
+        this.constrainFreePosition(traversal?.worlds.get(this.freeSliceId));
+        this.freeW = this.freeW || 0;
+        const world = traversal?.worlds.get(this.freeSliceId);
+        if (world) this.setSpatialContext(world.transform, world.layerMask);
+        this.freeTransit = traversal?.state === 'transit'
+            ? this.createTransitFromPlayer(traversal)
+            : null;
+        if (this.freeTransit) this.updateFreeTransitCamera();
+    }
+
+    enterFollowMode() {
+        const worldId = this.character.sliceId ?? this.traversal?.currentSliceId;
+        const world = this.traversal?.worlds.get(worldId);
+        if (world) this.setSpatialContext(world.transform, world.layerMask);
+        this.freeTransit = null;
+        this.freePosition = null;
+        this.freeSliceId = null;
+        this.freeW = 0;
+    }
+
+    setFreeView(position, target, sliceId, w = 0) {
+        this.freeSliceId = sliceId;
+        this.freeW = Number.isFinite(w) ? w : 0;
+        this.freePosition = copyVector(position);
+        const direction = normalize3(subtract3(target, position));
+        this.freeYaw = Math.atan2(direction.x, direction.z);
+        this.freePitch = Math.asin(clamp(direction.y, -1, 1));
+        const world = this.traversal?.worlds.get(sliceId);
+        if (world) {
+            this.setSpatialContext(world.transform, world.layerMask);
+            this.constrainFreePosition(world);
+        }
+        this.applyFreePose();
+    }
+
+    createTransitFromPlayer(traversal) {
+        const active = traversal.getActiveController?.() ?? traversal;
+        if (active.corridor?.type === SLICE_TRANSITION_ANOMALY) {
+            return {
+                type: SLICE_TRANSITION_ANOMALY,
+                controller: active,
+                anomaly: active.corridor,
+                corridor: active.corridor,
+                startWorld: active.startWorld,
+                targetWorld: active.target,
+                direction: active.direction,
+                progress: active.progress,
+                position4D: active.spatialPosition4D ? { ...active.spatialPosition4D } : null,
+                bounds: active.corridor.region
+            };
+        }
+        const length = active.corridorLength || traversal.corridorLength;
+        const lag = Math.min(0.18, (this.distance || 0) / length);
+        return {
+            type: 'bezier',
+            controller: active,
+            startWorld: active.startWorld,
+            targetWorld: active.target,
+            direction: active.direction,
+            progress: clamp(active.progress - lag, 0, 1),
+            offsetU: active.offsetU,
+            offsetV: active.offsetV,
+            offsetW: active.offsetW,
+            renderer: active.activeRenderer,
+            corridorLength: length
+        };
+    }
+
+    handleWheel(event) {
+        if (this.mode !== 'free') return super.handleWheel(event);
+        if (!this.enabled || this.disposed) return;
+        event.preventDefault();
+        this.freeSpeed = clamp(this.freeSpeed * Math.exp(-event.deltaY * 0.001), 2, 120);
+    }
+
+    handleFreeKeyDown(event) {
+        if (!this.enabled || this.disposed) return;
+        // Do not intercept browser shortcuts (notably Ctrl+R / Cmd+R).
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
+        if (event.code === 'KeyC' && !event.repeat) {
+            event.preventDefault();
+            this.toggleMode();
+            return;
+        }
+        if (this.mode !== 'free' || !MOVEMENT_KEYS.includes(event.code)) return;
+        this.freeKeys.add(event.code);
+        event.preventDefault();
+    }
+
+    handleFreeKeyUp(event) {
+        this.freeKeys.delete(event.code);
+    }
+
+    handleFreeBlur() {
+        this.freeKeys.clear();
+        this.freeDragging = false;
+    }
+
+    handleFreePointerDown(event) {
+        if (!this.enabled || this.mode !== 'free' || event.button !== 0) return;
+        this.freeDragging = true;
+        this.previousMouse = { x: event.clientX, y: event.clientY };
+        event.preventDefault();
+    }
+
+    handleFreePointerMove(event) {
+        if (!this.freeDragging || !this.enabled || this.mode !== 'free' || this.disposed) return;
+        const yawDelta = (event.clientX - this.previousMouse.x) * this.freeMouseSensitivity;
+        const pitchDelta = -(event.clientY - this.previousMouse.y) * this.freeMouseSensitivity;
+        if (this.freeTransit) {
+            this.lookYawOffset += yawDelta;
+            this.lookPitchOffset = clamp(this.lookPitchOffset + pitchDelta, -1.2, 1.2);
+        } else {
+            this.freeYaw += yawDelta;
+            this.freePitch = clamp(this.freePitch + pitchDelta, -1.48, 1.48);
+        }
+        this.previousMouse = { x: event.clientX, y: event.clientY };
+    }
+
+    handleFreePointerUp() {
+        this.freeDragging = false;
+    }
+
+    update(deltaSeconds) {
+        if (this.mode === 'follow') {
+            super.update(deltaSeconds);
+            return;
+        }
+        if (!this.enabled || this.disposed) return;
+        const delta = clamp(deltaSeconds, 0, 0.1);
+        const input = this.getFreeInput();
+        if (this.freeTransit?.type === SLICE_TRANSITION_ANOMALY) this.updateFreeAnomaly(delta, input);
+        else if (this.freeTransit) this.updateFreeTransit(delta, input);
+        else if (!this.tryEnterCorridor(input.forward)) this.updateFreeWorld(delta, input);
+    }
+
+    getFreeInput() {
+        return {
+            forward: keyAxis(this.freeKeys, 'KeyW', 'KeyS'),
+            strafe: keyAxis(this.freeKeys, 'KeyD', 'KeyA'),
+            vertical: keyAxis(this.freeKeys, 'KeyR', 'KeyF'),
+            crossSectionW: keyAxis(this.freeKeys, 'KeyE', 'KeyQ'),
+            sprint: this.freeKeys.has('ShiftLeft')
+        };
+    }
+
+    updateFreeWorld(delta, input) {
+        const speed = this.freeSpeed * (input.sprint ? 2 : 1);
+        const forward = this.getForwardVector();
+        const right = { x: Math.cos(this.freeYaw), y: 0, z: -Math.sin(this.freeYaw) };
+        const movement = add3(
+            add3(scale3(forward, input.forward), scale3(right, input.strafe)),
+            { x: 0, y: input.vertical, z: 0 }
+        );
+        const length = length3(movement);
+        if (length > 1e-9) {
+            const candidate = add3(
+                this.freePosition,
+                scale3(movement, speed * delta / Math.max(1, length))
+            );
+            this.freePosition = this.constrainFreePosition(
+                this.traversal?.worlds.get(this.freeSliceId), candidate
+            );
+        }
+        this.advanceFreeInfluenceMovement(delta, input, speed);
+        this.applyFreePose();
+    }
+
+    advanceFreeInfluenceMovement(delta, input, speed) {
+        if (!input.crossSectionW || !this.traversal || !this.freeSliceId) return false;
+        const world = this.traversal.worlds.get(this.freeSliceId);
+        const worldPosition = this.renderFreePositionToWorld(world);
+        if (!world || !worldPosition) return false;
+        const base = sliceToAmbient(world.slice.frame, worldPosition);
+        const current = add4(base, scale4(world.slice.frame.normal, this.freeW));
+        const routes = this.traversal.getRoutesForSlice?.(this.freeSliceId) ?? this.getLegacyRoute();
+        const candidates = routes.map((route) => {
+            const info = route.controller?.getInfluenceMovementInfo?.(current, input.crossSectionW, this.freeSliceId);
+            return info ? { route, info } : null;
+        }).filter(Boolean).sort((left, right) =>
+            right.info.movementScale - left.info.movementScale
+        );
+        if (!candidates.length) return false;
+
+        const { route, info } = candidates[0];
+        const amount = Math.sign(input.crossSectionW) * speed * delta * info.movementScale;
+        if (Math.abs(amount) <= 1e-10) return false;
+        const normal = world.slice.frame.normal;
+        let candidate = add4(current, scale4(normal, amount));
+        const nextPlane = dot4(candidate, normal);
+        const targetPlane = dot4(info.targetWorld.slice.frame.origin, normal);
+        const crossed = info.direction > 0
+            ? nextPlane >= targetPlane - 1e-8
+            : nextPlane <= targetPlane + 1e-8;
+
+        if (crossed) {
+            candidate = add4(candidate, scale4(normal, targetPlane - nextPlane));
+            const sourceLocal = ambientToSlice(world.slice.frame, candidate).position;
+            const targetLocal = ambientToSlice(info.targetWorld.slice.frame, candidate).position;
+            const graph = route.controller?.chunkGraph;
+            const sourceAddress = graph?.getAddress(this.freeSliceId, sourceLocal);
+            const targetAddress = graph?.getAddress(info.targetSliceId, targetLocal);
+            const reachability = sourceAddress && targetAddress
+                ? graph.getReachability(sourceAddress, targetAddress, {
+                    position4D: candidate, corridorId: info.anomalyId
+                }) : { reachable: true };
+            if (reachability.reachable) {
+                this.completeFreeInfluenceHandoff(info.targetWorld, candidate);
+                return true;
+            }
+            candidate = add4(candidate, scale4(normal, -info.direction * 1e-7));
+        }
+
+        this.freeW = ambientToSlice(world.slice.frame, candidate).normalOffset;
+        return true;
+    }
+
+    completeFreeInfluenceHandoff(world, position4D) {
+        const local = ambientToSlice(world.slice.frame, position4D).position;
+        const arrival = world.transform?.constrainWorldPosition?.(local) ?? local;
+        this.freeSliceId = world.slice.id;
+        this.freeW = 0;
+        this.freeTransit = null;
+        this.freeEntryLock = { sliceId: world.slice.id, position: { ...arrival } };
+        this.setSpatialContext(world.transform, world.layerMask);
+        this.freePosition = world.transform.worldToRender(arrival);
+        this.applyFreePose();
+    }
+
+    getFreeAmbientPosition() {
+        if (this.mode !== 'free' || !this.freePosition || !this.freeSliceId) return null;
+        if (this.freeTransit?.position4D) return { ...this.freeTransit.position4D };
+        const world = this.traversal?.worlds.get(this.freeSliceId);
+        const position = this.renderFreePositionToWorld(world);
+        if (!world || !position) return null;
+        return add4(
+            sliceToAmbient(world.slice.frame, position),
+            scale4(world.slice.frame.normal, this.freeW)
+        );
+    }
+
+    tryEnterCorridor(forwardInput) {
+        if (forwardInput <= 0 || !this.traversal || !this.freeSliceId) return false;
+        if (this.freeEntryLock?.sliceId === this.freeSliceId) {
+            const world = this.traversal.worlds.get(this.freeSliceId);
+            const position = this.renderFreePositionToWorld(world);
+            if (position && Math.hypot(
+                position.x - this.freeEntryLock.position.x,
+                position.z - this.freeEntryLock.position.z
+            ) < 1.25) return false;
+            this.freeEntryLock = null;
+        }
+        const routes = this.traversal.getRoutesForSlice?.(this.freeSliceId) ?? this.getLegacyRoute();
+        for (const route of routes) {
+            const corridor = route.corridor;
+            const fromSource = route.fromSource ?? (corridor.source.sliceId === this.freeSliceId);
+            const endpoint = fromSource ? corridor.source : corridor.destination;
+            const world = this.traversal.worlds.get(this.freeSliceId);
+            const renderer = route.renderer ?? route.controller?.renderers?.get(this.freeSliceId);
+            const mouth = renderer?.getDisplaySample(fromSource ? 0 : 1).position ??
+                world?.transform?.worldToRender(endpoint.position);
+            if (!mouth) continue;
+            const delta = subtract3(mouth, this.freePosition);
+            const distance = length3(delta);
+            const entryDistance = corridor.type === SLICE_TRANSITION_ANOMALY
+                ? (corridor.entryRadius ?? this.freeEntryDistance)
+                : this.freeEntryDistance;
+            if (distance > entryDistance) continue;
+            const facing = distance < 1e-6 ? 1 :
+                dot3(this.getForwardVector(), scale3(delta, 1 / distance));
+            if (facing < 0.25) continue;
+            const startWorld = world;
+            const targetWorld = this.traversal.worlds.get(route.sliceId);
+            if (!startWorld || !targetWorld) continue;
+            this.lookYawOffset = 0;
+            this.lookPitchOffset = 0;
+            if (corridor.type === SLICE_TRANSITION_ANOMALY) {
+                const position3 = this.renderFreePositionToWorld(startWorld);
+                if (!position3) continue;
+                const basePosition4D = sliceToAmbient(startWorld.slice.frame, position3);
+                const position4D = add4(basePosition4D, scale4(startWorld.slice.frame.normal, this.freeW));
+                const resolvedAnomaly = corridor.influence?.center ? corridor : resolveAnomalyInfluence(
+                    corridor,
+                    sliceToAmbient(startWorld.slice.frame, fromSource ? corridor.source.position : corridor.destination.position),
+                    sliceToAmbient(targetWorld.slice.frame, fromSource ? corridor.destination.position : corridor.source.position),
+                    startWorld.slice.frame.normal
+                );
+                if (!isInsideBounds(position4D, resolvedAnomaly.region)) continue;
+                this.freeTransit = {
+                    type: SLICE_TRANSITION_ANOMALY,
+                    controller: route.controller ?? this.traversal,
+                    anomaly: resolvedAnomaly,
+                    corridor: resolvedAnomaly,
+                    startWorld,
+                    targetWorld,
+                    direction: fromSource ? 1 : -1,
+                    position4D,
+                    bounds: corridor.region,
+                    progress: 0
+                };
+                this.freeW = ambientToSlice(startWorld.slice.frame, position4D).normalOffset;
+                this.updateFreeAnomalyCamera();
+            } else {
+                if (!renderer) continue;
+                this.freeTransit = {
+                    type: 'bezier',
+                    controller: route.controller ?? this.traversal,
+                    corridor,
+                    corridorId: corridor.id,
+                    corridorLength: route.corridorLength ?? route.controller?.corridorLength ?? this.traversal.corridorLength,
+                    startWorld, targetWorld,
+                    direction: fromSource ? 1 : -1,
+                    progress: 0, offsetU: 0, offsetV: 0, offsetW: 0, renderer
+                };
+                this.updateFreeTransitCamera();
+            }
+            return true;
+        }
+        return false;
+    }
+
+    getLegacyRoute() {
+        const corridor = this.traversal?.corridor;
+        if (!corridor) return [];
+        const link = this.traversal.topology?.getTraversableNeighbors(this.freeSliceId)
+            .find(function findLink(neighbor) { return neighbor.corridorId === corridor.id; });
+        return link ? [{
+            ...link, corridor,
+            fromSource: corridor.source.sliceId === this.freeSliceId,
+            renderer: this.traversal.renderers?.get(this.freeSliceId) ?? this.traversal.renderer,
+            controller: this.traversal,
+            corridorLength: this.traversal.corridorLength
+        }] : [];
+    }
+
+    updateFreeAnomaly(delta, input) {
+        const transit = this.freeTransit;
+        const frame = transit.startWorld.slice.frame;
+        const speed = this.freeSpeed * (input.sprint ? 2 : 1);
+        const forward = this.getForwardVector();
+        const right = { x: Math.cos(this.freeYaw), y: 0, z: -Math.sin(this.freeYaw) };
+        const movement = add3(
+            add3(scale3(forward, input.forward), scale3(right, input.strafe)),
+            { x: 0, y: input.vertical, z: 0 }
+        );
+        const length = length3(movement);
+        const distance = length > 1e-9 ? speed * delta / Math.max(1, length) : 0;
+        const raw = { ...transit.position4D };
+        for (const [index, key] of ['x', 'y', 'z'].entries()) {
+            const component = key === 'x' ? movement.x : key === 'y' ? movement.y : movement.z;
+            const axis = frame.axes[index];
+            raw.x += axis.x * component * distance;
+            raw.y += axis.y * component * distance;
+            raw.z += axis.z * component * distance;
+            raw.w += axis.w * component * distance;
+        }
+        const influence = evaluateAnomalyInfluence(transit.anomaly ?? transit.corridor, transit.position4D);
+        const wStep = input.crossSectionW * speed * delta * influence.wMovementScale;
+        raw.x += frame.normal.x * wStep;
+        raw.y += frame.normal.y * wStep;
+        raw.z += frame.normal.z * wStep;
+        raw.w += frame.normal.w * wStep;
+
+        const startPlane = dot4(frame.origin, frame.normal);
+        const targetPlane = dot4(transit.targetWorld.slice.frame.origin, frame.normal);
+        const currentPlane = dot4(transit.position4D, frame.normal);
+        const nextPlane = dot4(raw, frame.normal);
+        const targetDirection = Math.sign(targetPlane - startPlane);
+        const reachedTarget = targetDirection > 0
+            ? nextPlane >= targetPlane - 1e-8
+            : nextPlane <= targetPlane + 1e-8;
+        const hasEnteredSliceInterval = (currentPlane - startPlane) * targetDirection > 1e-8;
+        const returnedToSource = hasEnteredSliceInterval &&
+            (nextPlane - currentPlane) * targetDirection < -1e-8 &&
+            (nextPlane - startPlane) * targetDirection <= 1e-8;
+
+        transit.position4D = clampAmbient(raw, transit.bounds);
+        transit.position4D = constrainAmbientPositionToWorldChart(transit.startWorld, transit.position4D);
+        transit.progress = clamp((dot4(transit.position4D, frame.normal) - startPlane) /
+            (targetPlane - startPlane), 0, 1);
+        if (reachedTarget) {
+            transit.position4D = clampAmbient(raw, transit.bounds);
+            this.completeFreeAnomaly(transit.targetWorld, transit);
+        } else if (returnedToSource) {
+            this.completeFreeAnomaly(transit.startWorld, transit);
+        } else {
+            this.updateFreeAnomalyCamera();
+        }
+    }
+
+    updateFreeAnomalyCamera() {
+        const transit = this.freeTransit;
+        if (!transit) return;
+        transit.position4D = constrainAmbientPositionToWorldChart(transit.startWorld, transit.position4D);
+        const local = ambientToSlice(transit.startWorld.slice.frame, transit.position4D).position;
+        this.freePosition = transit.startWorld.transform.worldToRender(local);
+        this.freeW = ambientToSlice(transit.startWorld.slice.frame, transit.position4D).normalOffset;
+        this.applyFreePose();
+    }
+
+    completeFreeAnomaly(world, transit) {
+        const ambient = transit.position4D;
+        const local = ambientToSlice(world.slice.frame, ambient).position;
+        const terrain = world.terrain;
+        const x = clamp(local.x, terrain.min.x, terrain.max.x);
+        const z = clamp(local.z, terrain.min.z, terrain.max.z);
+        const sample = terrain.sampleAt(x, z);
+        const fallback = world.slice.id === transit.corridor.destination.sliceId
+            ? transit.corridor.destination.position : transit.corridor.source.position;
+        const arrival = sample && Number.isFinite(sample.y)
+            ? { x, y: sample.y + 4, z }
+            : { x: fallback.x, y: fallback.y + 4, z: fallback.z };
+        this.freeSliceId = world.slice.id;
+        this.freeEntryLock = { sliceId: world.slice.id, position: { x: arrival.x, y: arrival.y, z: arrival.z } };
+        const chartSafeArrival = world.transform.constrainWorldPosition?.(arrival) ?? arrival;
+        this.freeW = 0;
+        this.setSpatialContext(world.transform, world.layerMask);
+        this.freePosition = world.transform.worldToRender(chartSafeArrival);
+        this.freeTransit = null;
+        this.applyFreePose();
+    }
+
+    updateFreeTransit(delta, input) {
+        const transit = this.freeTransit;
+        const speed = this.freeSpeed * (input.sprint ? 2 : 1);
+        transit.progress = clamp(
+            transit.progress + input.forward * speed * delta / (transit.corridorLength ?? this.traversal.corridorLength),
+            0,
+            1
+        );
+        transit.offsetU += input.strafe * this.freeTransverseSpeed * delta;
+        transit.offsetV += input.vertical * this.freeTransverseSpeed * delta;
+        transit.offsetW += input.crossSectionW * this.freeTransverseSpeed * delta;
+        this.constrainFreeOffset(transit);
+        if (transit.progress >= 1 || (transit.progress <= 0 && input.forward < 0)) {
+            this.updateFreeTransitCamera();
+            const destination = transit.progress >= 1 ? transit.targetWorld : transit.startWorld;
+            this.completeFreeTransit(destination, transit);
+            return;
+        }
+        this.updateFreeTransitCamera();
+    }
+
+    constrainFreeOffset(transit) {
+        const sample = this.getFreeCorridorSample(transit);
+        const scale = transit.renderer.options?.displayScale ?? 1;
+        const limit = sample.radius / Math.max(scale, 1e-9) * 0.62;
+        const length = Math.hypot(transit.offsetU, transit.offsetV, transit.offsetW);
+        if (length <= limit || length <= 1e-9) return;
+        const factor = limit / length;
+        transit.offsetU *= factor;
+        transit.offsetV *= factor;
+        transit.offsetW *= factor;
+    }
+
+    getFreeCorridorSample(transit) {
+        const t = transit.direction > 0 ? transit.progress : 1 - transit.progress;
+        return transit.renderer.getDisplaySample(t);
+    }
+
+    updateFreeTransitCamera() {
+        const transit = this.freeTransit;
+        const sample = this.getFreeCorridorSample(transit);
+        const scale = transit.renderer.options?.displayScale ?? 1;
+        const axes = getDisplayAxes(sample);
+        const position = add3(
+            add3(
+                add3(sample.position, scale3(axes[0], transit.offsetU * scale)),
+                scale3(axes[1], transit.offsetV * scale)
+            ),
+            scale3(axes[2], transit.offsetW * scale)
+        );
+        this.freePosition = position;
+        const tangent = normalize3(sample.tangent);
+        const tangentYaw = Math.atan2(tangent.x * transit.direction, tangent.z * transit.direction);
+        const tangentPitch = Math.asin(clamp(tangent.y * transit.direction, -1, 1));
+        this.freeYaw = tangentYaw + this.lookYawOffset;
+        this.freePitch = clamp(tangentPitch + this.lookPitchOffset, -1.48, 1.48);
+        this.applyFreePose();
+        transit.spatialPosition4D = applyAmbientOffsets(sample, transit);
+    }
+
+    completeFreeTransit(world, transit) {
+        const ambientPosition = transit.spatialPosition4D ?? this.getAmbientPosition(transit);
+        const arrival = (transit.controller ?? this.traversal).createArrivalPosition(world, ambientPosition);
+        const rawCameraWorld = { ...arrival, y: arrival.y + 4 };
+        const cameraWorld = world.transform?.constrainWorldPosition?.(rawCameraWorld) ?? rawCameraWorld;
+        this.freeSliceId = world.slice.id;
+        this.freeW = world.fourDimensionalRegion ? ambientPosition.w - world.slice.frame.origin.w : 0;
+        this.freeW = clamp(this.freeW, world.wBounds?.min ?? -12, world.wBounds?.max ?? 12);
+        this.setSpatialContext(world.transform, world.layerMask);
+        this.freePosition = world.transform.worldToRender(cameraWorld);
+        const sample = transit.renderer.getDisplaySample(transit.direction > 0 ? 1 : 0);
+        const tangent = normalize3(sample.tangent);
+        const tangentYaw = Math.atan2(tangent.x * transit.direction, tangent.z * transit.direction);
+        const tangentPitch = Math.asin(clamp(tangent.y * transit.direction, -1, 1));
+        this.freeYaw = tangentYaw + this.lookYawOffset;
+        this.freePitch = clamp(tangentPitch + this.lookPitchOffset, -1.48, 1.48);
+        this.freeTransit = null;
+        this.applyFreePose();
+    }
+
+    getAmbientPosition(transit) {
+        return applyAmbientOffsets(this.getFreeCorridorSample(transit), transit);
+    }
+
+    getForwardVector() {
+        const horizontal = Math.cos(this.freePitch);
+        return {
+            x: Math.sin(this.freeYaw) * horizontal,
+            y: Math.sin(this.freePitch),
+            z: Math.cos(this.freeYaw) * horizontal
+        };
+    }
+
+    applyFreePose() {
+        if (!this.freePosition) return;
+        const forward = this.getForwardVector();
+        this.camera.position.set(this.freePosition.x, this.freePosition.y, this.freePosition.z);
+        this.camera.setTarget(new BABYLON.Vector3(
+            this.freePosition.x + forward.x,
+            this.freePosition.y + forward.y,
+            this.freePosition.z + forward.z
+        ));
+    }
+
+    getModeInfo() {
+        return {
+            mode: this.mode,
+            freeSliceId: this.freeSliceId,
+            inCorridor: Boolean(this.freeTransit),
+            anomalyType: this.freeTransit?.type ?? null,
+            corridorProgress: this.freeTransit?.progress ?? null,
+            corridorPosition4D: this.freeTransit?.position4D ?? this.freeTransit?.spatialPosition4D ?? null,
+            fourthCoordinate: this.freeW,
+            speed: this.freeSpeed
+        };
+    }
+
+    getFreeTransitState() {
+        return this.freeTransit;
+    }
+
+    getViewSliceId() {
+        if (this.mode === 'free') {
+            return this.freeTransit?.startWorld.slice.id ??
+                this.freeSliceId ?? this.traversal?.currentSliceId ?? this.character.sliceId;
+        }
+        if (this.traversal?.state === 'transit') return this.traversal.startWorld.slice.id;
+        return this.traversal?.currentSliceId ?? this.character.sliceId;
+    }
+
+    getFreeW() { return this.mode === 'free' ? this.freeW : 0; }
+
+    getFreeWorldPosition() {
+        if (this.mode !== 'free' || this.freeTransit || !this.freePosition) return null;
+        const world = this.traversal?.worlds.get(this.freeSliceId);
+        if (typeof world?.transform?.renderToWorld !== 'function') return null;
+        const position = this.renderFreePositionToWorld(world);
+        return isFinitePosition(position) ? position : null;
+    }
+
+    constrainFreePosition(world, position = this.freePosition) {
+        if (!position) return position;
+        const constrained = world?.transform?.constrainRenderPosition?.(position) ?? position;
+        this.freePosition = copyVector(constrained);
+        return this.freePosition;
+    }
+
+    renderFreePositionToWorld(world) {
+        if (typeof world?.transform?.renderToWorld !== 'function' || !this.freePosition) return null;
+        this.constrainFreePosition(world);
+        try {
+            return world.transform.renderToWorld(this.freePosition);
+        } catch (error) {
+            // A chart-boundary miss should prevent corridor entry for this
+            // frame, not terminate the entire render/update loop.
+            if (error instanceof RangeError) return null;
+            throw error;
+        }
+    }
+
+    dispose() {
+        if (this.disposed) return;
+        window.removeEventListener('keydown', this.onFreeKeyDown);
+        window.removeEventListener('keyup', this.onFreeKeyUp);
+        window.removeEventListener('blur', this.onFreeBlur);
+        this.canvas?.removeEventListener('pointerdown', this.onFreePointerDown);
+        window.removeEventListener('pointermove', this.onFreePointerMove);
+        window.removeEventListener('pointerup', this.onFreePointerUp);
+        this.playerController?.setInputEnabled(true);
+        this.freeKeys.clear();
+        this.freeTransit = null;
+        super.dispose();
+    }
+}
+
+function constrainAmbientPositionToWorldChart(world, position4D) {
+    if (typeof world?.transform?.constrainWorldPosition !== 'function') return position4D;
+    const frame = world.slice.frame;
+    const local = ambientToSlice(frame, position4D);
+    const constrained = world.transform.constrainWorldPosition(local.position);
+    if (['x', 'y', 'z'].every((axis) => Math.abs(constrained[axis] - local.position[axis]) <= 1e-10)) {
+        return position4D;
+    }
+    return add4(
+        sliceToAmbient(frame, constrained),
+        scale4(frame.normal, local.normalOffset)
+    );
+}
+
+function applyAmbientOffsets(sample, transit) {
+    const position = { ...sample.spatialPosition4D };
+    for (const [index, key] of ['offsetU', 'offsetV', 'offsetW'].entries()) {
+        const axis = sample.axes4D[index];
+        const amount = transit[key];
+        position.x += axis.x * amount;
+        position.y += axis.y * amount;
+        position.z += axis.z * amount;
+        position.w += axis.w * amount;
+    }
+    return position;
+}
+
+function getDisplayAxes(sample) {
+    const first = normalize3(sample.axes?.[0] ?? sample.crossSectionAxes?.[0]);
+    const secondRaw = normalize3(sample.axes?.[1] ?? sample.crossSectionAxes?.[1]);
+    const second = normalize3(subtract3(secondRaw, scale3(first, dot3(secondRaw, first))));
+    const third = normalize3(sample.crossSectionAxes?.[2] ?? cross3(sample.tangent, first));
+    return [first, second, length3(third) > 1e-9 ? third : normalize3(cross3(first, second))];
+}
+
+function isInsideBounds(position, bounds) {
+    return ['x', 'y', 'z', 'w'].every((axis) =>
+        position[axis] >= bounds.min[axis] - 1e-7 && position[axis] <= bounds.max[axis] + 1e-7
+    );
+}
+
+function clampAmbient(position, bounds) {
+    return {
+        x: clamp(position.x, bounds.min.x, bounds.max.x),
+        y: clamp(position.y, bounds.min.y, bounds.max.y),
+        z: clamp(position.z, bounds.min.z, bounds.max.z),
+        w: clamp(position.w, bounds.min.w, bounds.max.w)
+    };
+}
+
+function keyAxis(keys, positive, negative) {
+    return Number(keys.has(positive)) - Number(keys.has(negative));
+}
+
+function copyVector(value) { return { x: value.x, y: value.y, z: value.z }; }
+function add3(left, right) { return { x: left.x + right.x, y: left.y + right.y, z: left.z + right.z }; }
+function subtract3(left, right) { return { x: left.x - right.x, y: left.y - right.y, z: left.z - right.z }; }
+function scale3(value, amount) { return { x: value.x * amount, y: value.y * amount, z: value.z * amount }; }
+function dot3(left, right) { return left.x * right.x + left.y * right.y + left.z * right.z; }
+function cross3(left, right) {
+    return {
+        x: left.y * right.z - left.z * right.y,
+        y: left.z * right.x - left.x * right.z,
+        z: left.x * right.y - left.y * right.x
+    };
+}
+function length3(value) { return Math.hypot(value.x, value.y, value.z); }
+function normalize3(value) {
+    const length = length3(value);
+    return length > 1e-9 ? scale3(value, 1 / length) : { x: 0, y: 0, z: 1 };
+}
+function clamp(value, minimum, maximum) { return Math.min(maximum, Math.max(minimum, value)); }
+
+function isFinitePosition(position) {
+    return Boolean(position && ['x', 'y', 'z'].every(function finiteAxis(axis) {
+        return Number.isFinite(position[axis]);
+    }));
+}
+
+export { GeometryDemoCameraController };
+
+
+========================================================================
+FILE: src/demo/geometry-demo-topology.js
+========================================================================
+
+/** Builds the demo world graph: 4D chamber, Poincare chamber, and main world. */
+
+import { createWorldSlice } from '../world/fields/geometry/world-slice.js';
+import { createSliceTransitionAnomaly } from '../world/fields/geometry/spatial-anomaly.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { sliceToAmbient } from '../world/fields/geometry/spatial-4d.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { WorldTopology } from '../world/fields/geometry/world-topology.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { SpatialChunkGraph } from '../world/spatial-chunk-graph.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+
+const SOURCE_SLICE_ID = 'geometry-demo-room';
+const HYPERCUBE_SLICE_ID = 'geometry-demo-4d-chamber';
+const MAIN_WORLD_SLICE_ID = 'somnium-main';
+const CORRIDOR_ID = 'geometry-demo-corridor';
+const HYPERCUBE_CORRIDOR_ID = 'geometry-demo-4d-corridor';
+const HYPERCUBE_MAIN_CORRIDOR_ID = 'geometry-demo-4d-main-world-corridor';
+const MAIN_WORLD_EXIT = Object.freeze({ x: 0, z: 0 });
+const MAIN_WORLD_MOUTH_Y = 2.5;
+const MAIN_WORLD_W = 80;
+// Position the 4D chamber five ambient W units before the live main-world
+// slice so its dedicated exit is a short, direct +W transition.
+const HYPERCUBE_WORLD_W = 75;
+const SOURCE_CHUNK_SIZE = 32;
+const DEFAULT_MAIN_CHUNK_SIZE = 2000;
+const HYPERCUBE_EXIT = Object.freeze({ x: -18, y: MAIN_WORLD_MOUTH_Y, z: 0 });
+const HYPERCUBE_MOUTH = Object.freeze({ x: -18, y: MAIN_WORLD_MOUTH_Y, z: 0 });
+const HYPERCUBE_MAIN_EXIT = Object.freeze({ x: 18, y: MAIN_WORLD_MOUTH_Y, z: 0 });
+
+function createGeometryDemoTopology(mainWorld) {
+    validateMainWorld(mainWorld);
+    const mainAnchor = sampleMainWorldAnchor(mainWorld.terrain);
+    const sourceSlice = createSourceSlice();
+    const hypercubeSlice = createHypercubeSlice();
+    const mainSlice = createMainWorldSlice(mainWorld, mainAnchor);
+    const corridor = createMainWorldCorridor(sourceSlice, mainSlice, mainAnchor);
+    const hypercubeCorridor = createHypercubeCorridor(hypercubeSlice, sourceSlice);
+    const hypercubeMainCorridor = createHypercubeMainWorldCorridor(
+        hypercubeSlice, mainSlice, mainAnchor
+    );
+    const topology = createTopology(
+        sourceSlice, hypercubeSlice, mainSlice, corridor, hypercubeCorridor, hypercubeMainCorridor
+    );
+    // Use the topology-resolved records so every subsystem shares one exact
+    // ambient 4D influence center and one validated field configuration.
+    const resolvedCorridor = topology.getCorridor(corridor.id);
+    const resolvedHypercubeCorridor = topology.getCorridor(hypercubeCorridor.id);
+    const resolvedHypercubeMainCorridor = topology.getCorridor(hypercubeMainCorridor.id);
+    const mainChunkSize = mainWorld.chunkSize ?? DEFAULT_MAIN_CHUNK_SIZE;
+    const chunkGraph = createChunkGraph(
+        topology, sourceSlice, hypercubeSlice, mainSlice, resolvedCorridor, resolvedHypercubeCorridor,
+        resolvedHypercubeMainCorridor, mainChunkSize
+    );
+    return createTopologyResult(
+        sourceSlice, hypercubeSlice, mainSlice, resolvedCorridor, resolvedHypercubeCorridor, resolvedHypercubeMainCorridor,
+        topology, chunkGraph, mainAnchor, mainChunkSize
+    );
+}
+
+function createSourceSlice() {
+    return createWorldSlice({ id: SOURCE_SLICE_ID, w: 0, geometry: 'poincare', seed: 41026 });
+}
+
+function createHypercubeSlice() {
+    return createWorldSlice({
+        id: HYPERCUBE_SLICE_ID, w: HYPERCUBE_WORLD_W,
+        geometry: 'euclidean', seed: 41027
+    });
+}
+
+function createMainWorldSlice(mainWorld, mainAnchor) {
+    // Embed the destination terrain surface at the same ambient XYZ height as
+    // the chamber mouth. Local terrain elevation remains unchanged; the slice
+    // frame carries the vertical origin offset so the R4 anomaly stays compact.
+    return createWorldSlice({
+        id: MAIN_WORLD_SLICE_ID,
+        w: MAIN_WORLD_W,
+        frame: {
+            origin: { x: 0, y: MAIN_WORLD_MOUTH_Y - mainAnchor.y, z: 0, w: MAIN_WORLD_W },
+            axes: [
+                { x: 1, y: 0, z: 0, w: 0 },
+                { x: 0, y: 1, z: 0, w: 0 },
+                { x: 0, y: 0, z: 1, w: 0 }
+            ],
+            normal: { x: 0, y: 0, z: 0, w: 1 }
+        },
+        geometry: mainWorld.spatialTransform.geometryName ?? 'poincare',
+        seed: 91827
+    });
+}
+
+function createMainWorldCorridor(sourceSlice, mainSlice, mainAnchor) {
+    const source = { sliceId: sourceSlice.id, position: { x: 0, y: MAIN_WORLD_MOUTH_Y, z: 0 } };
+    const destination = { sliceId: mainSlice.id, position: mainAnchor };
+    return createSliceTransitionAnomaly({
+        id: CORRIDOR_ID,
+        source,
+        destination,
+        region: createTransitionRegion(
+            sliceToAmbient(sourceSlice.frame, source.position),
+            sliceToAmbient(mainSlice.frame, destination.position),
+            { horizontalPadding: 7, verticalPadding: 8 }
+        ),
+        entryRadius: 3.8,
+        optics: {
+            enabled: true, bidirectional: true, maxWOpticalReach: 80,
+            apertureRadius: 3.5, entryRadialBias: 0.5, wCouplingScale: 1,
+            wCouplingProfileBias: 0.006, refractiveIndex: 1,
+            attenuationPerUnit: 0, transmission: 1
+        },
+        visible: true,
+        traversable: true,
+        bidirectional: true
+    });
+}
+
+function createHypercubeCorridor(hypercubeSlice, sourceSlice) {
+    const source = { sliceId: hypercubeSlice.id, position: { ...HYPERCUBE_MOUTH } };
+    const destination = { sliceId: sourceSlice.id, position: { ...HYPERCUBE_EXIT } };
+    return createSliceTransitionAnomaly({
+        id: HYPERCUBE_CORRIDOR_ID,
+        source,
+        destination,
+        region: createTransitionRegion(
+            sliceToAmbient(hypercubeSlice.frame, source.position),
+            sliceToAmbient(sourceSlice.frame, destination.position),
+            { horizontalPadding: 7, verticalPadding: 8 }
+        ),
+        entryRadius: 7.5,
+        optics: {
+            enabled: true, bidirectional: true, maxWOpticalReach: 75,
+            apertureRadius: 3.5, entryRadialBias: 4, wCouplingScale: 1, refractiveIndex: 1,
+            metricSampling: 'ambient',
+            attenuationPerUnit: 0, transmission: 1
+        },
+        visible: true,
+        traversable: true,
+        bidirectional: true
+    });
+}
+
+function createHypercubeMainWorldCorridor(hypercubeSlice, mainSlice, mainAnchor) {
+    const source = {
+        sliceId: hypercubeSlice.id,
+        position: { ...HYPERCUBE_MAIN_EXIT }
+    };
+    // Align this endpoint with the source mouth in ambient XYZ. The destination
+    // handoff samples the live terrain, so its local Y is only the slice-frame
+    // coordinate used to define the 4D plane crossing.
+    const destination = {
+        sliceId: mainSlice.id,
+        position: {
+            x: HYPERCUBE_MAIN_EXIT.x,
+            y: mainAnchor.y,
+            z: HYPERCUBE_MAIN_EXIT.z
+        }
+    };
+    return createSliceTransitionAnomaly({
+        id: HYPERCUBE_MAIN_CORRIDOR_ID,
+        source,
+        destination,
+        region: createTransitionRegion(
+            sliceToAmbient(hypercubeSlice.frame, source.position),
+            sliceToAmbient(mainSlice.frame, destination.position),
+            { horizontalPadding: 7, verticalPadding: 8 }
+        ),
+        entryRadius: 3.8,
+        optics: {
+            enabled: true, bidirectional: true, maxWOpticalReach: 5,
+            apertureRadius: 2.8, entryRadialBias: 1, wCouplingScale: 1, refractiveIndex: 1,
+            metricSampling: 'ambient',
+            attenuationPerUnit: 0, transmission: 1
+        },
+        visible: true,
+        traversable: true,
+        bidirectional: true
+    });
+}
+
+function createTransitionRegion(sourcePoint, destinationPoint, padding = {}) {
+    const horizontalPadding = padding.horizontalPadding ?? 6;
+    const verticalPadding = padding.verticalPadding ?? 6;
+    const wPadding = padding.wPadding ?? 6;
+    const min = {
+        x: Math.min(sourcePoint.x, destinationPoint.x) - horizontalPadding,
+        y: Math.min(sourcePoint.y, destinationPoint.y) - verticalPadding,
+        z: Math.min(sourcePoint.z, destinationPoint.z) - horizontalPadding,
+        w: Math.min(sourcePoint.w, destinationPoint.w) - wPadding
+    };
+    const max = {
+        x: Math.max(sourcePoint.x, destinationPoint.x) + horizontalPadding,
+        y: Math.max(sourcePoint.y, destinationPoint.y) + verticalPadding,
+        z: Math.max(sourcePoint.z, destinationPoint.z) + horizontalPadding,
+        w: Math.max(sourcePoint.w, destinationPoint.w) + wPadding
+    };
+    return { min, max };
+}
+
+function createTopology(
+    sourceSlice, hypercubeSlice, mainSlice, corridor, hypercubeCorridor, hypercubeMainCorridor
+) {
+    const topology = new WorldTopology();
+    for (const slice of [sourceSlice, hypercubeSlice, mainSlice]) topology.registerSlice(slice);
+    topology.registerCorridor(corridor);
+    topology.registerCorridor(hypercubeCorridor);
+    topology.registerCorridor(hypercubeMainCorridor);
+    return topology;
+}
+
+function createChunkGraph(
+    topology, sourceSlice, hypercubeSlice, mainSlice, corridor, hypercubeCorridor,
+    hypercubeMainCorridor, mainChunkSize
+) {
+    const graph = new SpatialChunkGraph(topology);
+    graph.registerSlice(sourceSlice, { chunkSize: SOURCE_CHUNK_SIZE });
+    graph.registerSlice(hypercubeSlice, { chunkSize: SOURCE_CHUNK_SIZE });
+    graph.registerSlice(mainSlice, { chunkSize: mainChunkSize ?? DEFAULT_MAIN_CHUNK_SIZE });
+    graph.registerCorridor(corridor.id);
+    graph.registerCorridor(hypercubeCorridor.id);
+    graph.registerCorridor(hypercubeMainCorridor.id);
+    return graph;
+}
+
+function createTopologyResult(
+    sourceSlice, hypercubeSlice, mainSlice, corridor, hypercubeCorridor, hypercubeMainCorridor,
+    topology, chunkGraph, mainAnchor, mainChunkSize
+) {
+    return {
+        sourceSlice, hypercubeSlice, mainSlice, corridor, hypercubeCorridor, hypercubeMainCorridor,
+        topology, chunkGraph,
+        corridorChunk: chunkGraph.getCorridorChunk(corridor.id),
+        hypercubeCorridorChunk: chunkGraph.getCorridorChunk(hypercubeCorridor.id),
+        hypercubeMainCorridorChunk: chunkGraph.getCorridorChunk(hypercubeMainCorridor.id),
+        mainAnchor,
+        sourceChunkAddress: chunkGraph.getAddress(sourceSlice.id, corridor.source.position),
+        hypercubeChunkAddress: chunkGraph.getAddress(hypercubeSlice.id, hypercubeCorridor.source.position),
+        hypercubeDestinationChunkAddress: chunkGraph.getAddress(sourceSlice.id, hypercubeCorridor.destination.position),
+        destinationChunkAddress: chunkGraph.getAddress(mainSlice.id, corridor.destination.position),
+        hypercubeMainChunkAddress: chunkGraph.getAddress(
+            hypercubeSlice.id, hypercubeMainCorridor.source.position
+        ),
+        hypercubeMainDestinationChunkAddress: chunkGraph.getAddress(
+            mainSlice.id, hypercubeMainCorridor.destination.position
+        ),
+        mainChunkSize
+    };
+}
+
+function validateMainWorld(mainWorld) {
+    if (!mainWorld?.terrain || !mainWorld?.spatialTransform) {
+        throw new TypeError('Geometry demo requires the live main-world terrain and spatial transform.');
+    }
+    if (typeof mainWorld.terrain.sampleAt !== 'function') {
+        throw new TypeError('Main-world terrain must provide sampleAt(x, z).');
+    }
+    const size = mainWorld.chunkSize;
+    if (size !== undefined && (!Number.isFinite(size) || size <= 0)) {
+        throw new RangeError('Main-world chunk size must be positive.');
+    }
+}
+
+function sampleMainWorldAnchor(terrain) {
+    const sample = terrain.sampleAt(MAIN_WORLD_EXIT.x, MAIN_WORLD_EXIT.z);
+    if (!sample || !Number.isFinite(sample.y)) {
+        throw new RangeError('The main-world anomaly exit must lie on valid terrain.');
+    }
+    return { x: MAIN_WORLD_EXIT.x, y: sample.y, z: MAIN_WORLD_EXIT.z };
+}
+
+export {
+    createGeometryDemoTopology,
+    MAIN_WORLD_SLICE_ID,
+    SOURCE_SLICE_ID,
+    HYPERCUBE_SLICE_ID,
+    CORRIDOR_ID,
+    HYPERCUBE_CORRIDOR_ID,
+    HYPERCUBE_MAIN_CORRIDOR_ID
+};
+
+
+========================================================================
+FILE: src/demo/geometry-demo-world.js
+========================================================================
+
+/** Owns the connected 4D demo chambers and their Babylon presentation. */
+
+import { SliceWorldRegistry } from '../world/slice-world-registry.js';
+import {
+    createGeometryDemoTopology, MAIN_WORLD_SLICE_ID
+} from './geometry-demo-topology.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { SpatialTransform } from '../world/fields/geometry/spatial-transform.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { ambientToSlice } from '../world/fields/geometry/spatial-4d.js';
+import { BabylonGeometryAdapter } from '../world/fields/geometry/babylon-geometry-adapter.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { CorridorRenderer } from '../world/fields/geometry/corridor-renderer.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { PortalPreviewRenderer } from '../world/fields/geometry/portal-preview-renderer.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { GeometryDebugGrid } from '../world/fields/geometry/geometry-debug-grid.js';
+import { PlayerCharacter } from '../game/player-character.js';
+import { PlayerController } from '../game/player-controller.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { GeometryDemoCameraController } from './geometry-demo-camera-controller.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { CorridorTraversalController } from '../world/fields/geometry/corridor-traversal-controller.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { SliceTransitionTraversalController } from '../world/fields/geometry/slice-transition-traversal-controller.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { SLICE_TRANSITION_ANOMALY } from '../world/fields/geometry/spatial-anomaly.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { CorridorTraversalNetwork } from './corridor-traversal-network.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { Hypercube4DRenderer } from './hypercube-4d-renderer.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+
+const SOURCE_LAYER = 0x10000000;
+const HYPERCUBE_LAYER = 0x20000000;
+const MAIN_WORLD_LAYER = 0x0FFFFFFF;
+const ROOM_MOVEMENT_PROFILE = Object.freeze({ walkSpeed: 4.5, runSpeed: 7.5, turnSpeed: 2.4 });
+const MAIN_WORLD_MOVEMENT_PROFILE = Object.freeze({ walkSpeed: 180, runSpeed: 360, turnSpeed: 2.2 });
+const GEOMETRY_DEMO_BUILD = '2026-11-08-phase16c-anomaly-optics-2';
+
+async function createGeometryDemoWorld(scene, canvas, mainWorld) {
+    console.info(`[GeometryDemo] Build: ${GEOMETRY_DEMO_BUILD}`);
+    const data = createGeometryDemoTopology(mainWorld);
+    const {
+        sourceSlice, hypercubeSlice, mainSlice, corridor, hypercubeCorridor, hypercubeMainCorridor,
+        topology, chunkGraph, corridorChunk, hypercubeCorridorChunk, hypercubeMainCorridorChunk, mainAnchor,
+        sourceChunkAddress, hypercubeChunkAddress, hypercubeDestinationChunkAddress,
+        destinationChunkAddress, hypercubeMainChunkAddress, hypercubeMainDestinationChunkAddress
+    } = data;
+
+    const sourceTransform = createSourceTransform();
+    const hypercubeTransform = createHypercubeTransform();
+    const registry = new SliceWorldRegistry();
+    registry.register(sourceSlice, { spatialTransform: sourceTransform });
+    registry.register(hypercubeSlice, { spatialTransform: hypercubeTransform });
+    registry.register(mainSlice, { spatialTransform: mainWorld.spatialTransform });
+
+    const adapter = new BabylonGeometryAdapter(scene, { opticalScene: mainWorld.opticalScene });
+    adapter.registerSlice(sourceSlice, sourceTransform);
+    adapter.registerSlice(hypercubeSlice, hypercubeTransform);
+    adapter.registerSlice(mainSlice, mainWorld.spatialTransform);
+
+    const sourceMeshes = createDemoRoom(scene, adapter, sourceTransform, sourceSlice.id);
+    const hypercubeRenderer = new Hypercube4DRenderer(scene, hypercubeTransform, {
+        center: { x: 0, y: 4, z: 0 }, halfExtent: 4.2,
+        initialAngles: { xw: 0.42, yw: 0.36, zw: 0.32 },
+        opticalScene: mainWorld.opticalScene,
+        sliceId: hypercubeSlice.id,
+        chunkAddress: hypercubeChunkAddress,
+        angularSpeeds: { xw: 0.68, yw: 0.49, zw: 0.33 },
+        viewerW: 0, layerMask: HYPERCUBE_LAYER,
+        edgeRadius: 0.095, vertexDiameter: 0.13
+    });
+    const hypercubeMeshes = [...hypercubeRenderer.meshes];
+    const hypercubeAuxiliaryMeshes = [];
+
+    const hypercubePortalCamera = {
+        x: -28, y: 9, z: 30, targetX: -2, targetY: 3, targetZ: -2, fov: 0.9
+    };
+    const sourceHypercubePortalCamera = {
+        x: 0, y: 10, z: -32, targetX: 0, targetY: 4, targetZ: 0, fov: 0.9
+    };
+    const mainPreviewCamera = createMainPreviewCamera(mainWorld.spatialTransform, mainAnchor);
+    const mainSourcePortal = createPortal(scene, sourceSlice.id, adapter, [], {
+        position: { x: 0, y: 2.5, z: 20.15 },
+        layerMask: SOURCE_LAYER, renderLayerMask: MAIN_WORLD_LAYER,
+        rimName: 'geometryMainWorldPortalRim', camera: mainPreviewCamera
+    });
+    const mainDestinationPortal = createDestinationPortal(
+        scene, mainSlice.id, adapter, [], mainAnchor
+    );
+    const hypercubeSourcePortal = createPortal(scene, hypercubeSlice.id, adapter, [], {
+        position: { x: -18, y: 2.5, z: 0.15 },
+        layerMask: HYPERCUBE_LAYER, renderLayerMask: SOURCE_LAYER,
+        rimName: 'geometryPoincareChamberPortalRim', camera: hypercubePortalCamera
+    });
+    const hypercubeDestinationPortal = createPortal(scene, sourceSlice.id, adapter, [], {
+        position: { x: -18, y: 2.5, z: 0.15 },
+        width: 7.4, height: 7.4, rimDiameter: 8.3,
+        layerMask: SOURCE_LAYER, renderLayerMask: HYPERCUBE_LAYER,
+        rimName: 'geometryHypercubePortalRim', camera: sourceHypercubePortalCamera
+    });
+    const hypercubeMainPortal = createPortal(scene, hypercubeSlice.id, adapter, [], {
+        position: { x: 18, y: 2.5, z: 0.15 },
+        width: 5.2, height: 5.6, rimDiameter: 6.1,
+        layerMask: HYPERCUBE_LAYER, renderLayerMask: MAIN_WORLD_LAYER,
+        rimName: 'geometryHypercubeMainWorldPortalRim', camera: mainPreviewCamera
+    });
+    const hypercubeMainDestinationPortal = createPortal(scene, mainSlice.id, adapter, [], {
+        position: { x: 18, y: mainAnchor.y + 35, z: -2 },
+        width: 76, height: 88, rimDiameter: 94, rimThickness: 4,
+        layerMask: MAIN_WORLD_LAYER, renderLayerMask: HYPERCUBE_LAYER,
+        rimName: 'geometryMainWorldHypercubePortalRim', camera: hypercubePortalCamera
+    });
+
+    const mainCorridorLabel = createWorldLabel(
+        scene, sourceSlice.id, 'geometryMainCorridorLabel',
+        'ANOMALY 02  |  SOMNIUM MAIN WORLD', 0, 8.5, 20.2, 12
+    );
+    const hypercubeCorridorLabel = createWorldLabel(
+        scene, sourceSlice.id, 'geometryHypercubeCorridorLabel',
+        'ANOMALY 01  |  4D HYPERCUBE CHAMBER', -18, 8.5, 0, 12
+    );
+    sourceMeshes.push(mainCorridorLabel, hypercubeCorridorLabel);
+    applySliceMeshes([mainCorridorLabel, hypercubeCorridorLabel], adapter, sourceTransform, sourceSlice.id);
+    for (const mesh of sourceMeshes) mesh.layerMask = SOURCE_LAYER;
+    const hypercubeMainCorridorLabel = createWorldLabel(
+        scene, hypercubeSlice.id, 'geometryHypercubeMainCorridorLabel',
+        'ANOMALY 03  |  SOMNIUM MAIN WORLD  ·  W +5', 18, 8.5, 0, 12
+    );
+    applySliceMeshes([hypercubeMainCorridorLabel], adapter, hypercubeTransform, hypercubeSlice.id);
+    hypercubeMainCorridorLabel.layerMask = HYPERCUBE_LAYER;
+    hypercubeMeshes.push(hypercubeMainCorridorLabel);
+    hypercubeAuxiliaryMeshes.push(hypercubeMainCorridorLabel);
+
+    const mainSourceRenderer = corridor.type === SLICE_TRANSITION_ANOMALY
+        ? null
+        : new CorridorRenderer(scene, corridor, sourceTransform);
+    const mainDestinationRenderer = corridor.type === SLICE_TRANSITION_ANOMALY
+        ? null
+        : new CorridorRenderer(scene, corridor, mainWorld.spatialTransform, { anchorT: 1 });
+    if (mainSourceRenderer) mainSourceRenderer.mesh.layerMask = SOURCE_LAYER;
+    if (mainDestinationRenderer) mainDestinationRenderer.mesh.layerMask = MAIN_WORLD_LAYER;
+
+    const hypercubeSourceRenderer = hypercubeCorridor.type === SLICE_TRANSITION_ANOMALY
+        ? null
+        : new CorridorRenderer(scene, hypercubeCorridor, hypercubeTransform);
+    const hypercubeDestinationRenderer = hypercubeCorridor.type === SLICE_TRANSITION_ANOMALY
+        ? null
+        : new CorridorRenderer(scene, hypercubeCorridor, sourceTransform, { anchorT: 1 });
+    if (hypercubeSourceRenderer) hypercubeSourceRenderer.mesh.layerMask = HYPERCUBE_LAYER;
+    if (hypercubeDestinationRenderer) hypercubeDestinationRenderer.mesh.layerMask = SOURCE_LAYER;
+
+    const sourceGrid = new GeometryDebugGrid(scene, adapter, {
+        sliceId: sourceSlice.id, size: 60, spacing: 2, visible: false
+    });
+    sourceGrid.mesh.layerMask = SOURCE_LAYER;
+    const hypercubeGrid = new GeometryDebugGrid(scene, adapter, {
+        sliceId: hypercubeSlice.id, size: 52, spacing: 2, visible: false
+    });
+    hypercubeGrid.mesh.layerMask = HYPERCUBE_LAYER;
+    const mainWorldGrid = new GeometryDebugGrid(scene, adapter, {
+        sliceId: mainSlice.id,
+        size: 120,
+        spacing: 4,
+        sampleStep: 2,
+        center: { x: mainAnchor.x, z: mainAnchor.z },
+        visible: false,
+        heightAt(x, z) {
+            const sample = mainWorld.terrain.sampleAt(x, z);
+            return Number.isFinite(sample?.y) ? sample.y + 0.35 : null;
+        }
+    });
+    mainWorldGrid.mesh.layerMask = MAIN_WORLD_LAYER;
+
+    const hypercubeTerrain = createHypercubeMovementSurface();
+    const player = new PlayerCharacter(scene, hypercubeTransform, {
+        x: 0, z: -18, terrain: hypercubeTerrain,
+        sliceId: hypercubeSlice.id, layerMask: HYPERCUBE_LAYER
+    });
+    const playerController = new PlayerController(player, hypercubeTerrain, canvas, {
+        ...ROOM_MOVEMENT_PROFILE
+    });
+    const getInfluenceModifiers = () =>
+        playerController.getAnomalyInfluenceModifiers?.() ?? playerController.anomalyInfluenceModifiers ?? {};
+    const camera = createDemoCamera(scene);
+    const cameraController = new GeometryDemoCameraController(
+        scene, camera, player, hypercubeTransform, playerController,
+        {
+            distance: 18, height: 8, minDistance: 2.5, maxDistance: 800, smoothing: 9,
+            orbitSensitivity: 0.005
+        }
+    );
+
+    const sourceWorld = createDemoWorldBinding(
+        sourceSlice, sourceTransform, createRoomMovementSurface(), SOURCE_LAYER, sourceChunkAddress,
+        { movementProfile: ROOM_MOVEMENT_PROFILE }
+    );
+    const hypercubeWorld = createDemoWorldBinding(
+        hypercubeSlice, hypercubeTransform, hypercubeTerrain, HYPERCUBE_LAYER, hypercubeChunkAddress,
+        { fourDimensionalRegion: false, wBounds: { min: 0, max: 0 }, movementProfile: ROOM_MOVEMENT_PROFILE }
+    );
+    const sourceExitWorld = createDemoWorldBinding(
+        sourceSlice, sourceTransform, sourceWorld.terrain, SOURCE_LAYER, hypercubeDestinationChunkAddress,
+        { movementProfile: ROOM_MOVEMENT_PROFILE }
+    );
+    const destinationWorld = createDemoWorldBinding(
+        mainSlice, mainWorld.spatialTransform, mainWorld.terrain, MAIN_WORLD_LAYER, destinationChunkAddress,
+        { movementProfile: mainWorld.movementProfile ?? MAIN_WORLD_MOVEMENT_PROFILE }
+    );
+    chunkGraph.registerChunk(sourceChunkAddress, sourceWorld);
+    chunkGraph.registerChunk(hypercubeDestinationChunkAddress, sourceExitWorld);
+    chunkGraph.registerChunk(hypercubeChunkAddress, hypercubeWorld);
+
+    const portalPairs = [
+        {
+            corridor, sourceSliceId: sourceSlice.id, destinationSliceId: mainSlice.id,
+            sourcePortal: mainSourcePortal, destinationPortal: mainDestinationPortal,
+            sourceRenderer: mainSourceRenderer, destinationRenderer: mainDestinationRenderer
+        },
+        {
+            corridor: hypercubeCorridor, sourceSliceId: hypercubeSlice.id, destinationSliceId: sourceSlice.id,
+            sourcePortal: hypercubeSourcePortal, destinationPortal: hypercubeDestinationPortal,
+            sourceRenderer: hypercubeSourceRenderer, destinationRenderer: hypercubeDestinationRenderer
+        },
+        {
+            corridor: hypercubeMainCorridor,
+            sourceSliceId: hypercubeSlice.id,
+            destinationSliceId: mainSlice.id,
+            sourcePortal: hypercubeMainPortal,
+            destinationPortal: hypercubeMainDestinationPortal,
+            sourceRenderer: null,
+            destinationRenderer: null
+        }
+    ];
+    const world = new GeometryDemoWorld({
+        scene, sourceSlice, hypercubeSlice,
+        destination: { slice: mainSlice, terrain: mainWorld.terrain, metadata: {
+            kind: 'existing-main-world', chunkSize: mainWorld.chunkSize ?? 2000,
+            exit: { ...mainAnchor }
+        } },
+        corridor, hypercubeCorridor, hypercubeMainCorridor, topology, registry, adapter,
+        sourceMeshes, hypercubeMeshes, hypercubeAuxiliaryMeshes, hypercubeRenderer,
+        sourceWorld, sourceExitWorld, hypercubeWorld, destinationWorld,
+        mainSourcePortal, mainDestinationPortal, hypercubeSourcePortal, hypercubeDestinationPortal,
+        hypercubeMainPortal, hypercubeMainDestinationPortal,
+        portalPairs,
+        mainSourceRenderer, mainDestinationRenderer,
+        hypercubeSourceRenderer, hypercubeDestinationRenderer,
+        sourceGrid, hypercubeGrid, mainWorldGrid,
+        chunkGraph, corridorChunk, hypercubeCorridorChunk, hypercubeMainCorridorChunk,
+        hypercubeMainChunkAddress, hypercubeMainDestinationChunkAddress,
+        destinationWorldManager: null, mainAnchor,
+        player, playerController, camera, cameraController
+    });
+
+    const controllers = [
+        createAnomalyTraversalController({
+            player, movementController: playerController, cameraController,
+            anomaly: hypercubeCorridor, topology, getInfluenceModifiers,
+            corridorRenderers: new Map([
+                [hypercubeSlice.id, hypercubeSourceRenderer],
+                [sourceSlice.id, hypercubeDestinationRenderer]
+            ]),
+            chunkGraph, corridorChunk: hypercubeCorridorChunk,
+            source: hypercubeWorld, destination: sourceExitWorld,
+            initialSliceId: hypercubeSlice.id,
+            traversal: { speed: 12, sprintSpeed: 18, entitySpeed: 10 }
+        }),
+        createAnomalyTraversalController({
+            player, movementController: playerController, cameraController,
+            anomaly: hypercubeMainCorridor, topology, getInfluenceModifiers,
+            corridorRenderers: new Map(),
+            chunkGraph, corridorChunk: hypercubeMainCorridorChunk,
+            source: hypercubeWorld, destination: destinationWorld,
+            initialSliceId: hypercubeSlice.id,
+            traversal: { speed: 12, sprintSpeed: 18, entitySpeed: 10 }
+        }),
+        createAnomalyTraversalController({
+            player, movementController: playerController, cameraController,
+            anomaly: corridor, topology, getInfluenceModifiers,
+            corridorRenderers: new Map([
+                [sourceSlice.id, mainSourceRenderer],
+                [mainSlice.id, mainDestinationRenderer]
+            ]),
+            chunkGraph, corridorChunk,
+            source: sourceWorld, destination: destinationWorld,
+            initialSliceId: hypercubeSlice.id,
+            traversal: { speed: 12, sprintSpeed: 18, entitySpeed: 10 }
+        })
+    ];
+    world.traversalController = new CorridorTraversalNetwork({
+        topology,
+        worlds: new Map([
+            [hypercubeSlice.id, hypercubeWorld],
+            [sourceSlice.id, sourceWorld],
+            [mainSlice.id, destinationWorld]
+        ]),
+        controllers,
+        initialSliceId: hypercubeSlice.id,
+        onSliceChanged: world.activateSlice.bind(world)
+    });
+    cameraController.setTraversalController(world.traversalController);
+    return world;
+}
+
+function createAnomalyTraversalController(options) {
+    const { anomaly, corridorRenderers, ...rest } = options;
+    if (anomaly.type === SLICE_TRANSITION_ANOMALY) {
+        return new SliceTransitionTraversalController({
+            ...rest,
+            anomaly,
+            corridor: anomaly,
+            corridorRenderers
+        });
+    }
+    return new CorridorTraversalController({
+        ...rest,
+        corridor: anomaly,
+        corridorRenderer: corridorRenderers?.get(options.source.slice.id),
+        corridorRenderers
+    });
+}
+
+function createDemoWorldBinding(slice, transform, terrain, layerMask, address, options = {}) {
+    return {
+        slice, transform, terrain, layerMask, address,
+        fourDimensionalRegion: Boolean(options.fourDimensionalRegion),
+        wBounds: options.wBounds ?? null,
+        movementProfile: options.movementProfile ? { ...options.movementProfile } : null,
+        spatialNeighbors: [], adjacentWorldChunks: [],
+        setSpatialNeighbors: function setSpatialNeighbors(neighbors, worldChunks) {
+            this.spatialNeighbors = neighbors;
+            this.adjacentWorldChunks = worldChunks;
+        }
+    };
+}
+
+function createMainPreviewCamera(transform, anchor) {
+    const bounds = transform.projection?.bounds;
+    const cameraWorld = {
+        x: anchor.x,
+        y: Math.min(anchor.y + 90, (bounds?.maxY ?? anchor.y + 90) - 1),
+        z: Math.max(anchor.z - 260, (bounds?.minZ ?? anchor.z - 260) + 1)
+    };
+    const targetWorld = {
+        x: anchor.x,
+        y: clamp(anchor.y + 18, (bounds?.minY ?? anchor.y - 18) + 1, (bounds?.maxY ?? anchor.y + 18) - 1),
+        z: clamp(anchor.z + 520, (bounds?.minZ ?? anchor.z + 520) + 1, (bounds?.maxZ ?? anchor.z + 520) - 1)
+    };
+    const position = transform.worldToRender(cameraWorld);
+    const target = transform.worldToRender(targetWorld);
+    return {
+        x: position.x, y: position.y, z: position.z,
+        targetX: target.x, targetY: target.y, targetZ: target.z,
+        fov: 0.88, maxZ: 100000
+    };
+}
+
+class GeometryDemoWorld {
+    constructor(resources) {
+        Object.assign(this, resources);
+        this.active = false;
+        this.disposed = false;
+        this.corridorRenderer = this.mainSourceRenderer;
+        this.destinationCorridorRenderer = this.mainDestinationRenderer;
+        this.didStart = false;
+        this.gridEnabled = false;
+        this.currentSliceId = this.hypercubeSlice.id;
+        this.grids = new Map([
+            [this.sourceSlice.id, this.sourceGrid],
+            [this.hypercubeSlice.id, this.hypercubeGrid],
+            [this.destination.slice.id, this.mainWorldGrid]
+        ]);
+        this.onGridKeyDown = this.handleGridKeyDown.bind(this);
+        if (typeof window !== 'undefined') window.addEventListener('keydown', this.onGridKeyDown);
+        this.corridorRenderers = [
+            [this.sourceSlice.id, this.mainSourceRenderer],
+            [this.destination.slice.id, this.mainDestinationRenderer],
+            [this.hypercubeSlice.id, this.hypercubeSourceRenderer],
+            [this.sourceSlice.id, this.hypercubeDestinationRenderer]
+        ].filter(([, renderer]) => Boolean(renderer))
+            .map(([sliceId, renderer]) => ({ sliceId, renderer }));
+        this.setActive(false);
+    }
+
+    setActive(active) {
+        if (this.disposed) return;
+        this.active = Boolean(active);
+        for (const mesh of [...this.sourceMeshes, ...this.hypercubeMeshes]) mesh.isVisible = this.active;
+        this.player.root.setEnabled(this.active && this.cameraController.mode !== 'free');
+        this.traversalController?.setActive(this.active);
+        for (const entry of this.corridorRenderers) entry.renderer.mesh.isVisible = this.active;
+        for (const pair of this.portalPairs) {
+            pair.sourcePortal.setVisible(false);
+            pair.destinationPortal.setVisible(false);
+            pair.sourcePortal.rim.isVisible = false;
+            pair.destinationPortal.rim.isVisible = false;
+        }
+        if (!this.active) {
+            for (const grid of this.grids.values()) grid.setActive(false);
+            return;
+        }
+        if (this.cameraController.mode !== 'follow') this.cameraController.setMode('follow');
+        this.didStart = true;
+        const transitioning = this.traversalController?.state === 'transit';
+        this.activateSlice(this.currentSliceId, {
+            transitioning,
+            renderSliceId: this.traversalController?.startWorld?.slice.id ?? this.currentSliceId
+        });
+        this.updateCameraPresentation();
+        this.updatePortalLists();
+    }
+
+    activateSlice(sliceId, state = {}) {
+        this.currentSliceId = sliceId;
+        const transitioning = Boolean(state.transitioning);
+        const renderWorld = this.getWorld(transitioning ? (state.renderSliceId ?? sliceId) : sliceId);
+        this.camera.layerMask = renderWorld.layerMask;
+        this.cameraController.setSpatialContext(renderWorld.transform, renderWorld.layerMask);
+        this.player.setLayerMask(renderWorld.layerMask);
+        this.updateCameraPresentation();
+    }
+
+    getWorld(sliceId) {
+        const world = [this.hypercubeWorld, this.sourceWorld, this.destinationWorld]
+            .find(function matchWorld(entry) { return entry.slice.id === sliceId; });
+        if (!world) throw new Error(`Unknown geometry demo slice: ${sliceId}`);
+        return world;
+    }
+
+    update(deltaSeconds) {
+        if (!this.active || this.disposed) return;
+        this.playerController.update(deltaSeconds);
+        this.traversalController.update(deltaSeconds);
+        this.cameraController.update(deltaSeconds);
+        const viewSliceId = this.cameraController.getViewSliceId();
+        const ambientPosition4D = this.cameraController.mode === 'free'
+            ? this.cameraController.getFreeAmbientPosition()
+            : this.traversalController.getAmbientPlayerPosition?.();
+        let viewerW = 0;
+        if (viewSliceId === this.hypercubeSlice.id) {
+            if (this.cameraController.mode === 'free') {
+                viewerW = this.cameraController.getFreeW();
+            } else if (ambientPosition4D) {
+                viewerW = ambientToSlice(this.hypercubeSlice.frame, ambientPosition4D).normalOffset;
+            }
+        }
+        this.hypercubeRenderer.update(deltaSeconds, viewerW);
+        this.updateHypercubeSliceHud();
+        this.updateCameraPresentation();
+        this.updatePortalPreview();
+        this.updatePortalLists();
+        const focus = this.getDestinationFocus();
+        const reachabilityContext = ambientPosition4D ? {
+            sourceSliceId: this.cameraController.mode === 'free'
+                ? this.cameraController.freeSliceId : this.traversalController.currentSliceId,
+            position4D: ambientPosition4D,
+            influenceOptions: this.playerController.getAnomalyInfluenceModifiers?.() ??
+                this.playerController.anomalyInfluenceModifiers ?? {}
+        } : null;
+        this.destinationWorldManager?.update(focus, { x: 0, z: 1 }, reachabilityContext);
+        const destinationMeshes = this.destinationWorldManager?.getMeshes() ?? [];
+        this.mainSourcePortal.setRenderList(destinationMeshes);
+        this.hypercubeMainPortal.setRenderList(destinationMeshes);
+    }
+
+    updateHypercubeSliceHud() {
+        const viewSliceId = this.cameraController.getViewSliceId();
+        if (viewSliceId !== this.hypercubeSlice.id) {
+            const position4D = this.cameraController.mode === 'free'
+                ? this.cameraController.getFreeAmbientPosition?.()
+                : this.traversalController.getAmbientPlayerPosition?.();
+            const routes = this.traversalController.getRoutesForSlice?.(viewSliceId) ?? [];
+            const availableFields = position4D ? routes.map((route) => ({
+                route,
+                influence: route.controller?.getAnomalyInfluence?.(position4D)
+            })).filter((entry) => Number(entry.influence?.wMovementScale) > 0) : [];
+            availableFields.sort((left, right) =>
+                right.influence.wMovementScale - left.influence.wMovementScale
+            );
+            const best = availableFields[0] ?? null;
+            const freedomPercent = best
+                ? Math.round(best.influence.wMovementScale * 100) : 0;
+            const label = best
+                ? `W FREEDOM ACTIVE · ${freedomPercent}%`
+                : 'W SLICE INACTIVE';
+            if (label !== this.lastHypercubeSliceLabel) {
+                this.lastHypercubeSliceLabel = label;
+                this.onSliceInfoChanged?.(label, best ? {
+                    anomalyId: best.route.corridorId,
+                    freedom: best.influence.freedom,
+                    wMovementScale: best.influence.wMovementScale,
+                    wReach: best.influence.wReach,
+                    position4D: { ...position4D }
+                } : null);
+            }
+            return;
+        }
+        const info = this.hypercubeRenderer.getInfo();
+        const active = this.cameraController.mode === 'free'
+            ? this.cameraController.getFreeTransitState()
+            : this.traversalController.getActiveController?.();
+        const inAnomaly = (active?.state === 'transit' || active?.type === SLICE_TRANSITION_ANOMALY) &&
+            active.startWorld?.slice.id === this.hypercubeSlice.id &&
+            (active.spatialPosition4D || active.position4D);
+        const label = inAnomaly
+            ? `ANOMALY W ${info.viewerW.toFixed(2)} · ${info.sliceVertexCount} VERTICES · ${info.sliceFaceCount} FACES`
+            : `W ${info.viewerW.toFixed(2)} · ${info.sliceVertexCount} VERTICES · ${info.sliceFaceCount} FACES`;
+        if (label === this.lastHypercubeSliceLabel) return;
+        this.lastHypercubeSliceLabel = label;
+        this.onSliceInfoChanged?.(label, info);
+    }
+
+    updateCameraPresentation() {
+        if (!this.corridorRenderers) return updateLegacyCameraPresentation(this);
+        const viewSliceId = this.cameraController.getViewSliceId();
+        const world = this.getWorld(viewSliceId);
+        this.camera.layerMask = world.layerMask;
+        for (const entry of this.corridorRenderers) {
+            entry.renderer.mesh.isVisible = this.active && entry.sliceId === viewSliceId;
+        }
+        for (const [sliceId, grid] of this.grids) {
+            grid.setActive(this.active && sliceId === viewSliceId);
+        }
+        for (const pair of this.portalPairs) {
+            const sourceActive = pair.sourceSliceId === viewSliceId;
+            const destinationActive = pair.destinationSliceId === viewSliceId;
+            pair.sourcePortal.setVisible(this.active && sourceActive);
+            pair.destinationPortal.setVisible(this.active && destinationActive);
+            pair.sourcePortal.rim.isVisible = this.active && sourceActive;
+            pair.destinationPortal.rim.isVisible = this.active && destinationActive;
+        }
+        this.onViewChanged?.(viewSliceId);
+    }
+
+    updatePortalLists() {
+        const poincareMeshes = [
+            ...this.sourceMeshes,
+            this.mainSourceRenderer?.mesh,
+            this.hypercubeDestinationRenderer?.mesh
+        ].filter(Boolean);
+        const hypercubeMeshes = [
+            ...this.hypercubeMeshes,
+            this.hypercubeSourceRenderer?.mesh
+        ].filter(Boolean);
+        this.mainDestinationPortal.setRenderList(poincareMeshes);
+        this.hypercubeSourcePortal.setRenderList(poincareMeshes);
+        this.hypercubeDestinationPortal.setRenderList(hypercubeMeshes);
+        this.hypercubeMainDestinationPortal.setRenderList(hypercubeMeshes);
+    }
+
+    getDestinationFocus() {
+        if (this.cameraController.mode === 'free' &&
+            this.cameraController.freeSliceId === this.destination.slice.id) {
+            return this.cameraController.getFreeWorldPosition() ?? this.mainAnchor;
+        }
+        return this.currentSliceId === this.destination.slice.id
+            ? this.player.worldPosition : this.mainAnchor;
+    }
+
+    beginEntityTransit(entity, fromSliceId = entity?.sliceId) {
+        return this.traversalController.beginEntityTransit(entity, fromSliceId);
+    }
+
+    tryBeginEntityTransit(entity, fromSliceId = entity?.sliceId) {
+        return this.traversalController.tryBeginEntityTransit(entity, fromSliceId);
+    }
+
+    toggleGrid() {
+        const sliceId = this.cameraController.getViewSliceId();
+        if (!this.grids.has(sliceId)) return false;
+        this.gridEnabled = !this.gridEnabled;
+        for (const grid of this.grids.values()) grid.setVisible(this.gridEnabled);
+        this.updateCameraPresentation();
+        return this.gridEnabled;
+    }
+
+    handleGridKeyDown(event) {
+        if (!this.active || this.disposed || event.code !== 'KeyG' || event.repeat ||
+            event.ctrlKey || event.metaKey || event.altKey) return;
+        const tagName = String(event.target?.tagName ?? '').toUpperCase();
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tagName) || event.target?.isContentEditable) return;
+        event.preventDefault?.();
+        this.toggleGrid();
+    }
+
+    toggleCameraMode() { return this.cameraController.toggleMode(); }
+
+    updatePortalPreview() {
+        if (!this.active) return;
+        if (!Array.isArray(this.portalPairs)) return updateLegacyPortalPreview(this);
+        const playerController = this.traversalController.getActiveController?.();
+        const playerTransit = playerController?.state === 'transit' ? playerController : null;
+        const cameraTransit = this.cameraController.getFreeTransitState();
+        const transit = this.cameraController.mode === 'free' ? cameraTransit : playerTransit;
+        if (transit?.type === SLICE_TRANSITION_ANOMALY || transit?.corridor?.type === SLICE_TRANSITION_ANOMALY) {
+            for (const pair of this.portalPairs) {
+                pair.sourcePortal.resetPose();
+                pair.destinationPortal.resetPose();
+            }
+            return;
+        }
+        if (!transit) {
+            for (const pair of this.portalPairs) {
+                pair.sourcePortal.resetPose();
+                pair.destinationPortal.resetPose();
+            }
+            return;
+        }
+        const corridorId = transit.corridorId ?? transit.corridor?.id ?? playerController?.corridor.id;
+        const pair = this.portalPairs.find(function findPair(entry) { return entry.corridor.id === corridorId; });
+        if (!pair) return;
+        const length = transit.corridorLength ?? playerController?.corridorLength ?? 1;
+        const lead = clamp(14 / Math.max(1, length), 0.08, 0.22);
+        const progress = clamp(transit.progress ?? 0, 0, 1);
+        const previewProgress = Math.min(0.995, progress + lead);
+        const t = transit.direction > 0 ? previewProgress : 1 - previewProgress;
+        const renderer = transit.activeRenderer ?? transit.renderer;
+        const sample = renderer.getDisplaySample(t);
+        const portal = transit.direction > 0 ? pair.sourcePortal : pair.destinationPortal;
+        portal.setPose(sample.position, scaleVector(sample.tangent, transit.direction));
+        portal.setVisible(true);
+        portal.rim.isVisible = true;
+        for (const other of this.portalPairs) {
+            if (other === pair) continue;
+            other.sourcePortal.setVisible(false);
+            other.destinationPortal.setVisible(false);
+            other.sourcePortal.rim.isVisible = false;
+            other.destinationPortal.rim.isVisible = false;
+        }
+    }
+
+    getDiagnostics() {
+        return {
+            defaultSlice: this.hypercubeSlice.id,
+            sourceSlice: this.sourceSlice.id,
+            destinationSlice: this.destination.slice.id,
+            corridors: this.portalPairs.map(function describePair(pair) {
+                return { id: pair.corridor.id, type: pair.corridor.type, source: pair.sourceSliceId, destination: pair.destinationSliceId };
+            }),
+            hypercube: this.hypercubeRenderer.getInfo(),
+            chunkGraph: this.chunkGraph.getStats(),
+            destinationChunking: this.destinationWorldManager?.getStats() ?? null,
+            traversal: this.traversalController.getState(),
+            camera: this.cameraController.getModeInfo(),
+            viewSliceId: this.cameraController.getViewSliceId(),
+            visibleDestinations: this.topology.getVisibleDestinations(this.cameraController.getViewSliceId()),
+            traversableNeighbors: this.topology.getTraversableNeighbors(this.cameraController.getViewSliceId()),
+            anomalyEntryDiagnostics: this.traversalController.getEntryDiagnostics?.() ?? [],
+            ambientPlayerPosition4D: this.cameraController.mode === 'free'
+                ? this.cameraController.getFreeAmbientPosition()
+                : this.traversalController.getAmbientPlayerPosition?.() ?? null,
+            sourceGrid: this.sourceGrid.getInfo(),
+            hypercubeGrid: this.hypercubeGrid.getInfo(),
+            mainWorldGrid: this.mainWorldGrid.getInfo(),
+            metricGridEnabled: this.gridEnabled,
+            geometry: this.adapter.getStats()
+        };
+    }
+
+    setDestinationWorldManager(manager) {
+        if (!manager || manager.sliceId !== this.destination.slice.id) {
+            throw new TypeError('Geometry demo requires the main WorldManager for its destination slice.');
+        }
+        if (manager.chunkGraph !== this.chunkGraph || manager.spatialAdapter !== this.adapter ||
+            manager.terrain !== this.destination.terrain) {
+            throw new Error('Main WorldManager must share the main terrain, geometry adapter, and chunk graph.');
+        }
+        this.destinationWorldManager = manager;
+        return manager;
+    }
+
+    dispose() {
+        if (this.disposed) return;
+        this.setActive(false);
+        this.disposed = true;
+        if (typeof window !== 'undefined') window.removeEventListener('keydown', this.onGridKeyDown);
+        this.traversalController?.dispose();
+        this.chunkGraph.dispose();
+        this.cameraController.dispose();
+        this.camera.dispose();
+        this.playerController.dispose();
+        this.player.dispose();
+        for (const grid of this.grids.values()) grid.dispose();
+        for (const pair of this.portalPairs) {
+            pair.sourcePortal.dispose();
+            pair.destinationPortal.dispose();
+        }
+        for (const entry of this.corridorRenderers) entry.renderer.dispose();
+        this.hypercubeRenderer.dispose();
+        disposeMeshes(this.sourceMeshes);
+        disposeMeshes(this.hypercubeAuxiliaryMeshes ?? []);
+        this.adapter.dispose();
+        this.registry.dispose();
+    }
+}
+
+function updateLegacyCameraPresentation(world) {
+    const viewSliceId = world.cameraController.getViewSliceId();
+    const isSource = viewSliceId === world.sourceSlice.id;
+    const renderWorld = isSource ? world.sourceWorld : world.destinationWorld;
+    world.camera.layerMask = renderWorld.layerMask;
+    world.corridorRenderer.mesh.isVisible = world.active && isSource;
+    world.destinationCorridorRenderer.mesh.isVisible = world.active && !isSource;
+    world.debugGrid?.setActive(world.active && isSource && !world.cameraController.getFreeTransitState?.());
+}
+
+function updateLegacyPortalPreview(world) {
+    const controller = world.traversalController;
+    const playerTransit = controller.state === 'transit' ? controller : null;
+    const cameraTransit = world.cameraController.getFreeTransitState?.();
+    const transit = world.cameraController.mode === 'free' ? cameraTransit : playerTransit;
+    const sourceActive = world.cameraController.getViewSliceId?.() === world.sourceSlice.id;
+    if (!transit) {
+        world.portal.resetPose();
+        world.destinationPortal.resetPose();
+        world.portal.setVisible(sourceActive);
+        world.destinationPortal.setVisible(!sourceActive);
+        world.portal.rim.isVisible = sourceActive;
+        world.destinationPortal.rim.isVisible = !sourceActive;
+        return;
+    }
+    const length = controller.corridorLength || 1;
+    const lead = clamp(14 / Math.max(1, length), 0.08, 0.22);
+    const progress = clamp(transit.progress ?? 0, 0, 1);
+    const t = transit.direction > 0 ? Math.min(0.995, progress + lead) : 1 - Math.min(0.995, progress + lead);
+    const sample = (transit.activeRenderer ?? transit.renderer ?? controller.renderer).getDisplaySample(t);
+    const target = transit.direction > 0 ? world.portal : world.destinationPortal;
+    const other = transit.direction > 0 ? world.destinationPortal : world.portal;
+    target.setPose(sample.position, scaleVector(sample.tangent, transit.direction));
+    target.setVisible(true);
+    target.rim.isVisible = true;
+    other.resetPose();
+    other.setVisible(false);
+    other.rim.isVisible = false;
+}
+
+function createHypercubeTransform() {
+    return new SpatialTransform({ geometry: 'euclidean', renderScale: 1, enabled: true });
+}
+
+function createHypercubeMovementSurface() {
+    return {
+        min: { x: -34, y: -10, z: -30 },
+        max: { x: 34, y: 20, z: 34 },
+        sampleAt: function sampleHypercubeGround(x, z) {
+            if (x < -34 || x > 34 || z < -30 || z > 34) return null;
+            return { x, y: 0, z };
+        }
+    };
+}
+
+function createSourceTransform() {
+    return new SpatialTransform({
+        geometry: 'poincare',
+        renderScale: 24,
+        visualScaleGamma: 0.72,
+        maxVisualScale: 3.5,
+        bounds: {
+            minX: -46, maxX: 46,
+            minY: -5, maxY: 18,
+            minZ: -48, maxZ: 46,
+            characteristicLength: 0.7,
+            boundaryEpsilon: 1e-5
+        }
+    });
+}
+
+function createDemoRoom(scene, adapter, transform, sliceId) {
+    const palette = createRoomPalette(scene);
+    const meshes = [
+        ...createRoomObjects(scene, palette),
+        ...createRoomLabels(scene, sliceId)
+    ];
+    applySliceMeshes(meshes, adapter, transform, sliceId);
+    for (const mesh of meshes) mesh.layerMask = SOURCE_LAYER;
+    return meshes;
+}
+
+function createRoomPalette(scene) {
+    return {
+        amber: makeMaterial(scene, 'demoAmber', '#e59c42', '#3b210d'),
+        violet: makeMaterial(scene, 'demoViolet', '#9e78e8', '#25143f'),
+        green: makeMaterial(scene, 'demoGreen', '#6ec58d', '#142b20'),
+        blue: makeMaterial(scene, 'demoBlue', '#55a7dc', '#102b40')
+    };
+}
+
+function createRoomObjects(scene, palette) {
+    return [
+        createPrimitive(scene, 'demoSphere', 'sphere', -15, 1.25, -9, palette.amber),
+        createPrimitive(scene, 'demoCube', 'box', -5, 1.1, 2, palette.violet),
+        createPrimitive(scene, 'demoCylinder', 'cylinder', 6, 1.1, -9, palette.green),
+        createPrimitive(scene, 'demoTorus', 'torus', 15, 2.1, 7, palette.blue)
+    ];
+}
+
+function createRoomLabels(scene, sliceId) {
+    return [
+        createWorldLabel(scene, sliceId, 'demoTitleLabel', 'SOMNIUM  |  POINCARE TEST CHAMBER', 0, 10.5, -1, 14),
+        createWorldLabel(scene, sliceId, 'demoSphereLabel', '01  SPHERE  |  AMBER', -15, 4.1, -9, 7),
+        createWorldLabel(scene, sliceId, 'demoCubeLabel', '02  CUBE  |  VIOLET', -5, 3.9, 2, 7),
+        createWorldLabel(scene, sliceId, 'demoCylinderLabel', '03  CYLINDER  |  GREEN', 6, 4.0, -9, 8),
+        createWorldLabel(scene, sliceId, 'demoTorusLabel', '04  TORUS  |  BLUE', 15, 5.0, 7, 7)
+    ];
+}
+
+function createWorldLabel(scene, sliceId, name, text, x, y, z, width = 8) {
+    const texture = createLabelTexture(scene, name, text);
+    const material = createLabelMaterial(scene, name, texture);
+    const label = createLabelPlane(scene, name, material, width);
+    label.position.set(x, y, z);
+    label.metadata = {
+        sliceId, demoLabel: true, labelText: text,
+        worldPosition: { x, y, z }
+    };
+    return label;
+}
+
+function createLabelTexture(scene, name, text) {
+    const texture = new BABYLON.DynamicTexture(
+        `${name}Texture`, { width: 1024, height: 160 }, scene, false
+    );
+    texture.hasAlpha = true;
+    texture.drawText(
+        text, null, null, 'bold 46px Arial',
+        '#ffffff', 'rgba(7, 15, 28, 0.88)', true
+    );
+    return texture;
+}
+
+function createLabelMaterial(scene, name, texture) {
+    const material = new BABYLON.StandardMaterial(`${name}Material`, scene);
+    material.diffuseTexture = texture;
+    material.opacityTexture = texture;
+    material.useAlphaFromDiffuseTexture = true;
+    material.disableLighting = true;
+    material.emissiveColor = BABYLON.Color3.White();
+    material.specularColor = BABYLON.Color3.Black();
+    material.backFaceCulling = false;
+    material.zOffset = -2;
+    return material;
+}
+
+function createLabelPlane(scene, name, material, width) {
+    const label = BABYLON.MeshBuilder.CreatePlane(name, {
+        width,
+        height: width * 0.16,
+        sideOrientation: BABYLON.Mesh.DOUBLESIDE
+    }, scene);
+    label.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+    label.material = material;
+    label.isPickable = false;
+    return label;
+}
+
+function applySliceMeshes(meshes, adapter, transform, sliceId) {
+    for (const mesh of meshes) {
+        mesh.metadata = { ...(mesh.metadata || {}), sliceId, demoRoom: true };
+        if (mesh.metadata.demoLabel) {
+            positionWorldLabel(mesh, transform);
+        } else if (!mesh.metadata.spatiallyTransformed) {
+            adapter.applyMesh(mesh, sliceId);
+        }
+    }
+}
+
+function positionWorldLabel(mesh, transform) {
+    const world = mesh.metadata.worldPosition;
+    const render = transform.worldToRender(world);
+    mesh.position.set(render.x, render.y, render.z);
+    mesh.scaling.setAll(transform.getVisualScale(world));
+}
+
+
+function createPrimitive(scene, name, type, x, y, z, material) {
+    const mesh = type === 'sphere'
+        ? BABYLON.MeshBuilder.CreateSphere(name, { diameter: 2.4, segments: 20 }, scene)
+        : type === 'box'
+            ? BABYLON.MeshBuilder.CreateBox(name, { size: 2.1 }, scene)
+            : type === 'cylinder'
+                ? BABYLON.MeshBuilder.CreateCylinder(name, { height: 2.2, diameter: 1.8, tessellation: 24 }, scene)
+                : BABYLON.MeshBuilder.CreateTorus(name, { diameter: 2.7, thickness: 0.45, tessellation: 32 }, scene);
+    mesh.position.set(x, y, z);
+    mesh.material = material;
+    return mesh;
+}
+
+function makeMaterial(scene, name, color, emissive) {
+    const material = new BABYLON.StandardMaterial(name, scene);
+    material.diffuseColor = BABYLON.Color3.FromHexString(color);
+    material.emissiveColor = BABYLON.Color3.FromHexString(emissive);
+    material.specularColor = new BABYLON.Color3(0.12, 0.14, 0.18);
+    material.roughness = 0.86;
+    return material;
+}
+
+function createPortal(scene, sliceId, adapter, renderMeshes, options = {}) {
+    const position = options.position ?? { x: 0, y: 2.5, z: 20.15 };
+    const width = options.width ?? 5.4;
+    const height = options.height ?? 5.6;
+    const rimDiameter = options.rimDiameter ?? 6.3;
+    const rimThickness = options.rimThickness ?? 0.28;
+    const portal = new PortalPreviewRenderer(scene, {
+        position, width, height, resolution: options.resolution ?? 512,
+        camera: { ...options.camera, layerMask: options.renderLayerMask }
+    });
+    portal.surface.layerMask = options.layerMask;
+    portal.surface.metadata = { ...(portal.surface.metadata || {}), sliceId };
+    adapter.applyMesh(portal.surface, sliceId);
+    portal.surface.layerMask = options.layerMask;
+    portal.setRenderList(renderMeshes);
+
+    const rim = BABYLON.MeshBuilder.CreateTorus(options.rimName ?? `geometryPortalRim_${sliceId}`, {
+        diameter: rimDiameter, thickness: rimThickness, tessellation: 64
+    }, scene);
+    rim.position.set(position.x, position.y, position.z - 0.03);
+    rim.material = makeMaterial(scene, `${options.rimName ?? 'geometryPortal'}Material`, '#69d8f0', '#286d8b');
+    rim.metadata = { sliceId, geometryPortalRim: true };
+    rim.layerMask = options.layerMask;
+    adapter.applyMesh(rim, sliceId);
+    rim.layerMask = options.layerMask;
+    portal.rim = rim;
+    portal.setHomePose();
+    return portal;
+}
+
+function createDestinationPortal(scene, sliceId, adapter, sourceMeshes, anchor) {
+    const position = { x: anchor.x, y: anchor.y + 35, z: anchor.z - 2 };
+    return createPortal(scene, sliceId, adapter, sourceMeshes, {
+        position,
+        width: 76,
+        height: 88,
+        rimDiameter: 94,
+        rimThickness: 4,
+        layerMask: MAIN_WORLD_LAYER,
+        renderLayerMask: SOURCE_LAYER,
+        rimName: 'geometryDestinationPortalRim',
+        camera: { x: 0, y: 28, z: 48, targetY: 2, targetZ: 0, fov: 0.95 }
+    });
+}
+
+function createRoomMovementSurface() {
+    return {
+        min: { x: -21.5, y: 0, z: -27.5 },
+        max: { x: 21.5, y: 0, z: 28 },
+        sampleAt: sampleRoomElevation
+    };
+}
+
+function sampleRoomElevation(x, z) {
+    if (x < -21.5 || x > 21.5 || z < -27.5 || z > 28) return null;
+    return { x, y: 0, z };
+}
+
+function createDemoCamera(scene) {
+    const camera = new BABYLON.FreeCamera('geometryDemoThirdPersonCamera', BABYLON.Vector3.Zero(), scene);
+    camera.minZ = 0.08;
+    camera.maxZ = 1000;
+    camera.fov = 0.82;
+    return camera;
+}
+
+function scaleVector(vector, amount) {
+    return { x: vector.x * amount, y: vector.y * amount, z: vector.z * amount };
+}
+
+function clamp(value, minimum, maximum) {
+    return Math.min(maximum, Math.max(minimum, value));
+}
+
+function disposeMeshes(meshes) {
+    for (const mesh of meshes) {
+        const material = mesh.material;
+        if (mesh.metadata?.demoLabel) material?.diffuseTexture?.dispose();
+        mesh.dispose(false, false);
+        if (material && !material.isDisposed()) material.dispose();
+    }
+}
+
+export { GeometryDemoWorld, createGeometryDemoWorld, MAIN_WORLD_SLICE_ID };
+
+
+========================================================================
+FILE: src/demo/hypercube-4d-renderer.js
+========================================================================
+
+/** Renders the actual 3D cross-section of a rotating 4D tesseract. */
+
+import {
+    createHypercubeEdges, createHypercubeSlice, createHypercubeVertices
+} from '../world/fields/geometry/hypercube-4d.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+
+const MAX_SECTION_VERTICES = 32;
+const MAX_SECTION_EDGES = 64;
+
+class Hypercube4DRenderer {
+    constructor(scene, transform, options = {}) {
+        if (!scene || !transform?.worldToRender) {
+            throw new TypeError('Hypercube renderer requires a scene and spatial transform.');
+        }
+        this.scene = scene;
+        this.transform = transform;
+        this.center = { ...(options.center ?? { x: 0, y: 4, z: 0 }) };
+        this.angularSpeeds = { xw: 0.68, yw: 0.49, zw: 0.33, ...options.angularSpeeds };
+        this.angles = { xw: 0.42, yw: 0.36, zw: 0.32, ...options.initialAngles };
+        this.angularSpeed = this.angularSpeeds.xw;
+        this.edgeRadius = options.edgeRadius ?? 0.095;
+        this.radialSegments = options.radialSegments ?? 7;
+        this.vertexDiameter = options.vertexDiameter ?? 0.13;
+        this.layerMask = options.layerMask ?? 0x0FFFFFFF;
+        this.opticalScene = options.opticalScene ?? null;
+        this.opticalSliceId = options.sliceId ?? null;
+        this.opticalChunkAddress = options.chunkAddress ?? null;
+        this.opticalRevision = 0;
+        this.opticalRegistrationId = this.opticalSliceId ? `hypercube-surface:${this.opticalSliceId}` : null;
+        this.viewerW = options.viewerW ?? 0;
+        this.disposed = false;
+        this.vertices = createHypercubeVertices(options.halfExtent ?? 4.2);
+        this.edges = createHypercubeEdges(this.vertices);
+        this.surfaceMaterial = this.createMaterial('geometryDemoTesseractSliceSurface', 0.2, 0.16);
+        this.edgeMaterial = this.createMaterial('geometryDemoTesseractSliceEdges', 1, 1);
+        this.surfaceMesh = this.createSurfaceMesh();
+        this.edgeMesh = this.createEdgeMesh();
+        this.mesh = this.edgeMesh;
+        this.vertexMeshes = this.createVertexMeshes();
+        this.meshes = [this.surfaceMesh, this.edgeMesh, ...this.vertexMeshes];
+        this.slice = createHypercubeSlice(this.vertices, this.angles, this.viewerW);
+        this.update(0, this.viewerW);
+    }
+
+    createMaterial(name, alpha, emissive) {
+        const material = new BABYLON.StandardMaterial(name, this.scene);
+        material.emissiveColor = new BABYLON.Color3(0.28 * emissive, 0.88 * emissive, emissive);
+        material.diffuseColor = new BABYLON.Color3(0.12, 0.56, 0.82);
+        material.specularColor = BABYLON.Color3.White();
+        material.disableLighting = true;
+        material.backFaceCulling = false;
+        material.alpha = alpha;
+        return material;
+    }
+
+    createSurfaceMesh() {
+        const mesh = new BABYLON.Mesh('geometryDemoTesseractSliceSurface', this.scene);
+        mesh.setVerticesData(BABYLON.VertexBuffer.PositionKind, new Float32Array(MAX_SECTION_VERTICES * 3), true, 3);
+        mesh.setVerticesData(BABYLON.VertexBuffer.NormalKind, new Float32Array(MAX_SECTION_VERTICES * 3), true, 3);
+        mesh.material = this.surfaceMaterial;
+        this.configureMesh(mesh, { section: 'surface' });
+        return mesh;
+    }
+
+    createEdgeMesh() {
+        const mesh = new BABYLON.Mesh('geometryDemoTesseractSliceEdges', this.scene);
+        mesh.setVerticesData(BABYLON.VertexBuffer.PositionKind,
+            new Float32Array(MAX_SECTION_EDGES * this.radialSegments * 6), true, 3);
+        mesh.setVerticesData(BABYLON.VertexBuffer.NormalKind,
+            new Float32Array(MAX_SECTION_EDGES * this.radialSegments * 6), true, 3);
+        mesh.material = this.edgeMaterial;
+        this.configureMesh(mesh, { section: 'edges' });
+        return mesh;
+    }
+
+    configureMesh(mesh, metadata) {
+        mesh.layerMask = this.layerMask;
+        mesh.isVisible = true;
+        mesh.isPickable = false;
+        mesh.alwaysSelectAsActiveMesh = true;
+        mesh.metadata = { geometryDemo: true, hypercube4D: true, ...metadata };
+    }
+
+    createVertexMeshes() {
+        return Array.from({ length: MAX_SECTION_VERTICES }, function createMarker(unused, index) {
+            const mesh = BABYLON.MeshBuilder.CreateSphere(
+                `geometryDemoTesseractSliceVertex${index}`,
+                { diameter: this.vertexDiameter, segments: 8 },
+                this.scene
+            );
+            mesh.material = this.edgeMaterial;
+            mesh.layerMask = this.layerMask;
+            mesh.isPickable = false;
+            mesh.isVisible = false;
+            mesh.alwaysSelectAsActiveMesh = true;
+            mesh.metadata = { geometryDemo: true, hypercube4DSectionVertex: index };
+            return mesh;
+        }, this);
+    }
+
+    toRenderPoint(point) {
+        return this.transform.worldToRender({
+            x: this.center.x + point.x,
+            y: this.center.y + point.y,
+            z: this.center.z + point.z
+        });
+    }
+
+    createSurfaceBuffers(section) {
+        if (section.vertices.length > MAX_SECTION_VERTICES) {
+            throw new RangeError('Tesseract section exceeds the renderer vertex capacity.');
+        }
+        const positions = new Float32Array(MAX_SECTION_VERTICES * 3);
+        const normals = new Float32Array(MAX_SECTION_VERTICES * 3);
+        const points = section.vertices.map(this.toRenderPoint.bind(this));
+        for (let index = 0; index < points.length; index++) writeVector3(positions, index * 3, points[index]);
+        const indices = [];
+        for (const face of section.faces) {
+            for (let index = 1; index < face.length - 1; index++) {
+                const a = face[0];
+                const b = face[index];
+                const c = face[index + 1];
+                indices.push(a, b, c);
+                const normal = normalize3(cross3(subtract3(points[b], points[a]), subtract3(points[c], points[a])));
+                for (const vertex of [a, b, c]) {
+                    normals[vertex * 3] += normal.x;
+                    normals[vertex * 3 + 1] += normal.y;
+                    normals[vertex * 3 + 2] += normal.z;
+                }
+            }
+        }
+        for (let index = 0; index < section.vertices.length; index++) {
+            const offset = index * 3;
+            const normal = normalize3({ x: normals[offset], y: normals[offset + 1], z: normals[offset + 2] });
+            writeVector3(normals, offset, normal);
+        }
+        return { positions, normals, indices, points };
+    }
+
+    createEdgeBuffers(section, points) {
+        if (section.edges.length > MAX_SECTION_EDGES) {
+            throw new RangeError('Tesseract section exceeds the renderer edge capacity.');
+        }
+        const vertexCount = MAX_SECTION_EDGES * this.radialSegments * 2;
+        const positions = new Float32Array(vertexCount * 3);
+        const normals = new Float32Array(vertexCount * 3);
+        const indices = [];
+        let offset = 0;
+        for (const edge of section.edges) {
+            const start = points[edge[0]];
+            const end = points[edge[1]];
+            offset = appendTube(start, end, this.edgeRadius, this.radialSegments, offset, positions, normals, indices);
+        }
+        return { positions, normals, indices };
+    }
+
+    update(deltaSeconds, viewerW = 0) {
+        if (this.disposed) return;
+        const delta = Math.max(0, Math.min(Number(deltaSeconds) || 0, 0.1));
+        for (const plane of ['xw', 'yw', 'zw']) {
+            this.angles[plane] = (this.angles[plane] + delta * this.angularSpeeds[plane]) % (Math.PI * 2);
+        }
+        this.angle = this.angles.xw;
+        this.viewerW = Number.isFinite(viewerW) ? viewerW : 0;
+        this.slice = createHypercubeSlice(this.vertices, this.angles, this.viewerW);
+        const surface = this.createSurfaceBuffers(this.slice);
+        const edges = this.createEdgeBuffers(this.slice, surface.points);
+        this.updateMesh(this.surfaceMesh, surface);
+        this.updateMesh(this.edgeMesh, edges);
+        this.updateOpticalSurface(this.slice);
+        const visible = this.slice.vertices.length > 0;
+        this.surfaceMesh.isVisible = visible && this.slice.faces.length > 0;
+        this.edgeMesh.isVisible = visible && this.slice.edges.length > 0;
+        for (let index = 0; index < this.vertexMeshes.length; index++) {
+            const marker = this.vertexMeshes[index];
+            const point = surface.points[index];
+            marker.isVisible = Boolean(point);
+            if (point) marker.position.set(point.x, point.y, point.z);
+        }
+    }
+
+    updateOpticalSurface(section) {
+        if (!this.opticalScene || !this.opticalSliceId || !this.opticalRegistrationId) return;
+        const positions = new Float64Array(section.vertices.length * 3);
+        section.vertices.forEach((point, index) => {
+            const offset = index * 3;
+            positions[offset] = this.center.x + point.x;
+            positions[offset + 1] = this.center.y + point.y;
+            positions[offset + 2] = this.center.z + point.z;
+        });
+        const indices = [];
+        for (const face of section.faces) {
+            for (let index = 1; index < face.length - 1; index++) {
+                indices.push(face[0], face[index], face[index + 1]);
+            }
+        }
+        if (indices.length === 0) {
+            this.opticalScene.unregister(this.opticalRegistrationId);
+            return;
+        }
+        this.opticalRevision++;
+        this.opticalScene.registerTriangleMesh({
+            id: this.opticalRegistrationId,
+            sliceId: this.opticalSliceId,
+            chunkAddress: this.opticalChunkAddress,
+            positions,
+            indices,
+            material: { id: 'material:hypercube-cross-section', refractiveIndex: 1, transmission: 1 },
+            revision: this.opticalRevision
+        });
+    }
+
+    updateMesh(mesh, buffers) {
+        mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, buffers.positions, false, false);
+        mesh.updateVerticesData(BABYLON.VertexBuffer.NormalKind, buffers.normals, false, false);
+        mesh.setIndices(buffers.indices);
+        mesh.refreshBoundingInfo();
+    }
+
+    getInfo() {
+        return {
+            vertices: this.vertices.length,
+            edges: this.edges.length,
+            rotationPlane: 'xw+yw+zw',
+            rotationAngles: { ...this.angles },
+            angle: this.angle,
+            viewerW: this.viewerW,
+            sliceVertexCount: this.slice.vertices.length,
+            sliceFaceCount: this.slice.faces.length,
+            sliceEdgeCount: this.slice.edges.length,
+            visibleMeshCount: Number(this.surfaceMesh.isVisible) + Number(this.edgeMesh.isVisible) +
+                this.vertexMeshes.filter(function visibleMarker(marker) { return marker.isVisible; }).length,
+            mesh: this.edgeMesh
+        };
+    }
+
+    dispose() {
+        if (this.disposed) return;
+        this.disposed = true;
+        if (this.opticalRegistrationId) this.opticalScene?.unregister(this.opticalRegistrationId);
+        for (const mesh of this.meshes) mesh.dispose(false, false);
+        this.surfaceMaterial.dispose(false, true);
+        this.edgeMaterial.dispose(false, true);
+    }
+}
+
+function appendTube(start, end, radius, radialSegments, offset, positions, normals, indices) {
+    const direction = normalize3(subtract3(end, start));
+    const reference = Math.abs(direction.x) < 0.8 ? { x: 1, y: 0, z: 0 } : { x: 0, y: 1, z: 0 };
+    const first = normalize3(cross3(direction, reference));
+    const second = cross3(direction, first);
+    const base = offset / 3;
+    for (const point of [start, end]) {
+        for (let index = 0; index < radialSegments; index++) {
+            const angle = index / radialSegments * Math.PI * 2;
+            const normal = add3(scale3(first, Math.cos(angle)), scale3(second, Math.sin(angle)));
+            const target = offset;
+            positions[target] = point.x + normal.x * radius;
+            positions[target + 1] = point.y + normal.y * radius;
+            positions[target + 2] = point.z + normal.z * radius;
+            normals[target] = normal.x;
+            normals[target + 1] = normal.y;
+            normals[target + 2] = normal.z;
+            offset += 3;
+        }
+    }
+    for (let index = 0; index < radialSegments; index++) {
+        const next = (index + 1) % radialSegments;
+        const a = base + index;
+        const b = base + radialSegments + index;
+        const c = base + next;
+        const d = base + radialSegments + next;
+        indices.push(a, c, b, c, d, b);
+    }
+    return offset;
+}
+
+function writeVector3(target, offset, value) {
+    target[offset] = value.x;
+    target[offset + 1] = value.y;
+    target[offset + 2] = value.z;
+}
+function subtract3(a, b) { return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }; }
+function add3(a, b) { return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }; }
+function scale3(value, amount) { return { x: value.x * amount, y: value.y * amount, z: value.z * amount }; }
+function cross3(a, b) {
+    return { x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x };
+}
+function length3(value) { return Math.hypot(value.x, value.y, value.z); }
+function normalize3(value) {
+    const length = length3(value);
+    return length > 1e-9 ? scale3(value, 1 / length) : { x: 0, y: 1, z: 0 };
+}
+
+export { Hypercube4DRenderer };
+
+
+========================================================================
+FILE: src/demo/world-manager-visibility.js
+========================================================================
+
+/** Applies visibility across current and legacy world-manager contracts. */
+
+export function setWorldManagerVisibility(manager, visible) {
+    if (!manager) return;
+
+    const nextVisible = Boolean(visible);
+    manager.visible = nextVisible;
+
+    if (applyManagerVisibility(manager, nextVisible)) return;
+    applyResidentVisibility(manager, nextVisible);
+}
+
+function applyManagerVisibility(manager, visible) {
+    if (typeof manager.setVisible !== 'function') return false;
+
+    try {
+        manager.setVisible(visible);
+        return true;
+    } catch (error) {
+        console.warn('[GeometryDemo] WorldManager.setVisible failed; using compatibility fallback.', error);
+        return false;
+    }
+}
+
+function applyResidentVisibility(manager, visible) {
+    const chunks = manager.chunks;
+    if (chunks && typeof chunks.values === 'function') {
+        for (const chunk of chunks.values()) setChunkVisibility(chunk, visible);
+        return;
+    }
+    applyMeshVisibility(manager, visible);
+}
+
+function setChunkVisibility(chunk, visible) {
+    if (!chunk) return;
+    chunk.visible = visible;
+    if (chunk.mesh) chunk.mesh.isVisible = visible;
+}
+
+function applyMeshVisibility(manager, visible) {
+    if (typeof manager.getMeshes !== 'function') return;
+    for (const mesh of manager.getMeshes() || []) {
+        if (mesh) mesh.isVisible = visible;
+    }
+}
+
+
+========================================================================
+END OF DIRECTORY SOURCE DUMP
+Files included: 6
+Binary/unreadable files skipped: 0
+========================================================================

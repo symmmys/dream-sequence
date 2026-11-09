@@ -1,0 +1,79 @@
+            y:
+                weightA * A.y +
+                weightB * B.y,
+
+            z:
+                weightA * A.z +
+                weightB * B.z
+        };
+
+        return this.fromHyperboloid(point);
+    }
+
+    // -----------------------------------------
+    // GEODESIC PATH
+    // -----------------------------------------
+
+    geodesic(a, b, segments = 32) {
+
+        this.validatePosition(a);
+        this.validatePosition(b);
+
+        if (
+            !Number.isInteger(segments) ||
+            segments < 1 ||
+            segments > 10000
+        ) {
+            throw new RangeError(
+                "Invalid geodesic segment count."
+            );
+        }
+
+        const points = [];
+
+        for (let i = 0; i <= segments; i++) {
+
+            const t = i / segments;
+
+            points.push(
+                this.interpolateGeodesic(
+                    a,
+                    b,
+                    t
+                )
+            );
+        }
+
+        return {
+            points,
+
+            length: this.distance(a, b),
+
+            segments,
+
+            geometry: "poincare-3d"
+        };
+    }
+
+    // -----------------------------------------
+    // INFORMATION
+    // -----------------------------------------
+
+    getInfo() {
+
+        return {
+            geometry: "poincare-3d",
+
+            curvature: this.curvature,
+
+            radius: this.radius,
+
+            dimensions: 3,
+
+            boundaryReachable: false
+        };
+    }
+}
+
+export { PoincareMetric };
+

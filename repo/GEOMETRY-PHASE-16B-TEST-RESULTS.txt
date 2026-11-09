@@ -1,0 +1,40 @@
+SOMNIUM — GEOMETRY PHASE 16B TEST RESULTS
+
+Full regression command:
+  node --test tests/*.test.mjs
+
+Result:
+  Tests: 228
+  Passed: 228
+  Failed: 0
+  Cancelled: 0
+  Skipped: 0
+
+Focused optics tests:
+  optical-foundation.test.mjs: 15 passed
+  optical-intersections.test.mjs: 25 passed
+  optical-debug-renderer.test.mjs: 2 passed
+  Focused total: 42 passed
+
+Static verification:
+  JavaScript syntax checks: 147 files passed
+  Relative module references checked: 278
+  Missing relative module references: 0
+
+Coverage highlights:
+  - Euclidean and Poincare slice-native ray paths.
+  - Triangle BVH nearest-hit and deterministic tie resolution.
+  - Mesh revision replacement and authoritative pre-projection geometry.
+  - Analytic terrain intersections, chunk bounds, normals, and raster sampling density.
+  - Independent X/Z raster spacing for non-square terrain dimensions.
+  - Slice isolation, chunk filtering, and slice-global static geometry.
+  - Ambient R4 to slice-local intersection and render-space-only debug projection.
+  - Debug mesh visibility, splitting at off-slice samples, and disposal.
+
+Packaging verification:
+  - ZIP archive integrity tested with unzip -t.
+  - Archive extracted into a clean directory.
+  - Full 228-test suite rerun from extracted directory.
+
+Runtime qualification:
+  A live desktop browser/WebGL session was not run in this environment. Browser visualization of the diagnostic line meshes remains a local manual verification step.

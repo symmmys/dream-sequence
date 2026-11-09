@@ -1,0 +1,279 @@
+/** Builds the demo world graph: 4D chamber, Poincare chamber, and main world. */
+
+import { createWorldSlice } from '../world/fields/geometry/world-slice.js';
+import { createSliceTransitionAnomaly } from '../world/fields/geometry/spatial-anomaly.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+import { sliceToAmbient } from '../world/fields/geometry/spatial-4d.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+import { WorldTopology } from '../world/fields/geometry/world-topology.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+import { SpatialChunkGraph } from '../world/spatial-chunk-graph.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+
+const SOURCE_SLICE_ID = 'geometry-demo-room';
+const HYPERCUBE_SLICE_ID = 'geometry-demo-4d-chamber';
+const MAIN_WORLD_SLICE_ID = 'somnium-main';
+const CORRIDOR_ID = 'geometry-demo-corridor';
+const HYPERCUBE_CORRIDOR_ID = 'geometry-demo-4d-corridor';
+const HYPERCUBE_MAIN_CORRIDOR_ID = 'geometry-demo-4d-main-world-corridor';
+const MAIN_WORLD_EXIT = Object.freeze({ x: 0, z: 0 });
+const MAIN_WORLD_MOUTH_Y = 2.5;
+const MAIN_WORLD_W = 80;
+// Position the 4D chamber five ambient W units before the live main-world
+// slice so its dedicated exit is a short, direct +W transition.
+const HYPERCUBE_WORLD_W = 75;
+const SOURCE_CHUNK_SIZE = 32;
+const DEFAULT_MAIN_CHUNK_SIZE = 2000;
+const HYPERCUBE_EXIT = Object.freeze({ x: -18, y: MAIN_WORLD_MOUTH_Y, z: 0 });
+const HYPERCUBE_MOUTH = Object.freeze({ x: -18, y: MAIN_WORLD_MOUTH_Y, z: 0 });
+const HYPERCUBE_MAIN_EXIT = Object.freeze({ x: 18, y: MAIN_WORLD_MOUTH_Y, z: 0 });
+
+function createGeometryDemoTopology(mainWorld) {
+    validateMainWorld(mainWorld);
+    const mainAnchor = sampleMainWorldAnchor(mainWorld.terrain);
+    const sourceSlice = createSourceSlice();
+    const hypercubeSlice = createHypercubeSlice();
+    const mainSlice = createMainWorldSlice(mainWorld, mainAnchor);
+    const corridor = createMainWorldCorridor(sourceSlice, mainSlice, mainAnchor);
+    const hypercubeCorridor = createHypercubeCorridor(hypercubeSlice, sourceSlice);
+    const hypercubeMainCorridor = createHypercubeMainWorldCorridor(
+        hypercubeSlice, mainSlice, mainAnchor
+    );
+    const topology = createTopology(
+        sourceSlice, hypercubeSlice, mainSlice, corridor, hypercubeCorridor, hypercubeMainCorridor
+    );
+    // Use the topology-resolved records so every subsystem shares one exact
+    // ambient 4D influence center and one validated field configuration.
+    const resolvedCorridor = topology.getCorridor(corridor.id);
+    const resolvedHypercubeCorridor = topology.getCorridor(hypercubeCorridor.id);
+    const resolvedHypercubeMainCorridor = topology.getCorridor(hypercubeMainCorridor.id);
+    const mainChunkSize = mainWorld.chunkSize ?? DEFAULT_MAIN_CHUNK_SIZE;
+    const chunkGraph = createChunkGraph(
+        topology, sourceSlice, hypercubeSlice, mainSlice, resolvedCorridor, resolvedHypercubeCorridor,
+        resolvedHypercubeMainCorridor, mainChunkSize
+    );
+    return createTopologyResult(
+        sourceSlice, hypercubeSlice, mainSlice, resolvedCorridor, resolvedHypercubeCorridor, resolvedHypercubeMainCorridor,
+        topology, chunkGraph, mainAnchor, mainChunkSize
+    );
+}
+
+function createSourceSlice() {
+    return createWorldSlice({ id: SOURCE_SLICE_ID, w: 0, geometry: 'poincare', seed: 41026 });
+}
+
+function createHypercubeSlice() {
+    return createWorldSlice({
+        id: HYPERCUBE_SLICE_ID, w: HYPERCUBE_WORLD_W,
+        geometry: 'euclidean', seed: 41027
+    });
+}
+
+function createMainWorldSlice(mainWorld, mainAnchor) {
+    // Embed the destination terrain surface at the same ambient XYZ height as
+    // the chamber mouth. Local terrain elevation remains unchanged; the slice
+    // frame carries the vertical origin offset so the R4 anomaly stays compact.
+    return createWorldSlice({
+        id: MAIN_WORLD_SLICE_ID,
+        w: MAIN_WORLD_W,
+        frame: {
+            origin: { x: 0, y: MAIN_WORLD_MOUTH_Y - mainAnchor.y, z: 0, w: MAIN_WORLD_W },
+            axes: [
+                { x: 1, y: 0, z: 0, w: 0 },
+                { x: 0, y: 1, z: 0, w: 0 },
+                { x: 0, y: 0, z: 1, w: 0 }
+            ],
+            normal: { x: 0, y: 0, z: 0, w: 1 }
+        },
+        geometry: mainWorld.spatialTransform.geometryName ?? 'poincare',
+        seed: 91827
+    });
+}
+
+function createMainWorldCorridor(sourceSlice, mainSlice, mainAnchor) {
+    const source = { sliceId: sourceSlice.id, position: { x: 0, y: MAIN_WORLD_MOUTH_Y, z: 0 } };
+    const destination = { sliceId: mainSlice.id, position: mainAnchor };
+    return createSliceTransitionAnomaly({
+        id: CORRIDOR_ID,
+        source,
+        destination,
+        region: createTransitionRegion(
+            sliceToAmbient(sourceSlice.frame, source.position),
+            sliceToAmbient(mainSlice.frame, destination.position),
+            { horizontalPadding: 7, verticalPadding: 8 }
+        ),
+        entryRadius: 3.8,
+        optics: {
+            enabled: true, bidirectional: true, maxWOpticalReach: 80,
+            apertureRadius: 3.5, entryRadialBias: 0.5, wCouplingScale: 1,
+            wCouplingProfileBias: 0.006, refractiveIndex: 1,
+            attenuationPerUnit: 0, transmission: 1
+        },
+        visible: true,
+        traversable: true,
+        bidirectional: true
+    });
+}
+
+function createHypercubeCorridor(hypercubeSlice, sourceSlice) {
+    const source = { sliceId: hypercubeSlice.id, position: { ...HYPERCUBE_MOUTH } };
+    const destination = { sliceId: sourceSlice.id, position: { ...HYPERCUBE_EXIT } };
+    return createSliceTransitionAnomaly({
+        id: HYPERCUBE_CORRIDOR_ID,
+        source,
+        destination,
+        region: createTransitionRegion(
+            sliceToAmbient(hypercubeSlice.frame, source.position),
+            sliceToAmbient(sourceSlice.frame, destination.position),
+            { horizontalPadding: 7, verticalPadding: 8 }
+        ),
+        entryRadius: 7.5,
+        optics: {
+            enabled: true, bidirectional: true, maxWOpticalReach: 75,
+            apertureRadius: 3.5, entryRadialBias: 4, wCouplingScale: 1, refractiveIndex: 1,
+            metricSampling: 'ambient',
+            attenuationPerUnit: 0, transmission: 1
+        },
+        visible: true,
+        traversable: true,
+        bidirectional: true
+    });
+}
+
+function createHypercubeMainWorldCorridor(hypercubeSlice, mainSlice, mainAnchor) {
+    const source = {
+        sliceId: hypercubeSlice.id,
+        position: { ...HYPERCUBE_MAIN_EXIT }
+    };
+    // Align this endpoint with the source mouth in ambient XYZ. The destination
+    // handoff samples the live terrain, so its local Y is only the slice-frame
+    // coordinate used to define the 4D plane crossing.
+    const destination = {
+        sliceId: mainSlice.id,
+        position: {
+            x: HYPERCUBE_MAIN_EXIT.x,
+            y: mainAnchor.y,
+            z: HYPERCUBE_MAIN_EXIT.z
+        }
+    };
+    return createSliceTransitionAnomaly({
+        id: HYPERCUBE_MAIN_CORRIDOR_ID,
+        source,
+        destination,
+        region: createTransitionRegion(
+            sliceToAmbient(hypercubeSlice.frame, source.position),
+            sliceToAmbient(mainSlice.frame, destination.position),
+            { horizontalPadding: 7, verticalPadding: 8 }
+        ),
+        entryRadius: 3.8,
+        optics: {
+            enabled: true, bidirectional: true, maxWOpticalReach: 5,
+            apertureRadius: 2.8, entryRadialBias: 1, wCouplingScale: 1, refractiveIndex: 1,
+            metricSampling: 'ambient',
+            attenuationPerUnit: 0, transmission: 1
+        },
+        view: {
+            enabled: true, mapping: 'endpoint-frame', apertureShape: 'circle',
+            crossSection: 'euclidean-4d-ball'
+        },
+        visible: true,
+        traversable: true,
+        bidirectional: true
+    });
+}
+
+function createTransitionRegion(sourcePoint, destinationPoint, padding = {}) {
+    const horizontalPadding = padding.horizontalPadding ?? 6;
+    const verticalPadding = padding.verticalPadding ?? 6;
+    const wPadding = padding.wPadding ?? 6;
+    const min = {
+        x: Math.min(sourcePoint.x, destinationPoint.x) - horizontalPadding,
+        y: Math.min(sourcePoint.y, destinationPoint.y) - verticalPadding,
+        z: Math.min(sourcePoint.z, destinationPoint.z) - horizontalPadding,
+        w: Math.min(sourcePoint.w, destinationPoint.w) - wPadding
+    };
+    const max = {
+        x: Math.max(sourcePoint.x, destinationPoint.x) + horizontalPadding,
+        y: Math.max(sourcePoint.y, destinationPoint.y) + verticalPadding,
+        z: Math.max(sourcePoint.z, destinationPoint.z) + horizontalPadding,
+        w: Math.max(sourcePoint.w, destinationPoint.w) + wPadding
+    };
+    return { min, max };
+}
+
+function createTopology(
+    sourceSlice, hypercubeSlice, mainSlice, corridor, hypercubeCorridor, hypercubeMainCorridor
+) {
+    const topology = new WorldTopology();
+    for (const slice of [sourceSlice, hypercubeSlice, mainSlice]) topology.registerSlice(slice);
+    topology.registerCorridor(corridor);
+    topology.registerCorridor(hypercubeCorridor);
+    topology.registerCorridor(hypercubeMainCorridor);
+    return topology;
+}
+
+function createChunkGraph(
+    topology, sourceSlice, hypercubeSlice, mainSlice, corridor, hypercubeCorridor,
+    hypercubeMainCorridor, mainChunkSize
+) {
+    const graph = new SpatialChunkGraph(topology);
+    graph.registerSlice(sourceSlice, { chunkSize: SOURCE_CHUNK_SIZE });
+    graph.registerSlice(hypercubeSlice, { chunkSize: SOURCE_CHUNK_SIZE });
+    graph.registerSlice(mainSlice, { chunkSize: mainChunkSize ?? DEFAULT_MAIN_CHUNK_SIZE });
+    graph.registerCorridor(corridor.id);
+    graph.registerCorridor(hypercubeCorridor.id);
+    graph.registerCorridor(hypercubeMainCorridor.id);
+    return graph;
+}
+
+function createTopologyResult(
+    sourceSlice, hypercubeSlice, mainSlice, corridor, hypercubeCorridor, hypercubeMainCorridor,
+    topology, chunkGraph, mainAnchor, mainChunkSize
+) {
+    return {
+        sourceSlice, hypercubeSlice, mainSlice, corridor, hypercubeCorridor, hypercubeMainCorridor,
+        topology, chunkGraph,
+        corridorChunk: chunkGraph.getCorridorChunk(corridor.id),
+        hypercubeCorridorChunk: chunkGraph.getCorridorChunk(hypercubeCorridor.id),
+        hypercubeMainCorridorChunk: chunkGraph.getCorridorChunk(hypercubeMainCorridor.id),
+        mainAnchor,
+        sourceChunkAddress: chunkGraph.getAddress(sourceSlice.id, corridor.source.position),
+        hypercubeChunkAddress: chunkGraph.getAddress(hypercubeSlice.id, hypercubeCorridor.source.position),
+        hypercubeDestinationChunkAddress: chunkGraph.getAddress(sourceSlice.id, hypercubeCorridor.destination.position),
+        destinationChunkAddress: chunkGraph.getAddress(mainSlice.id, corridor.destination.position),
+        hypercubeMainChunkAddress: chunkGraph.getAddress(
+            hypercubeSlice.id, hypercubeMainCorridor.source.position
+        ),
+        hypercubeMainDestinationChunkAddress: chunkGraph.getAddress(
+            mainSlice.id, hypercubeMainCorridor.destination.position
+        ),
+        mainChunkSize
+    };
+}
+
+function validateMainWorld(mainWorld) {
+    if (!mainWorld?.terrain || !mainWorld?.spatialTransform) {
+        throw new TypeError('Geometry demo requires the live main-world terrain and spatial transform.');
+    }
+    if (typeof mainWorld.terrain.sampleAt !== 'function') {
+        throw new TypeError('Main-world terrain must provide sampleAt(x, z).');
+    }
+    const size = mainWorld.chunkSize;
+    if (size !== undefined && (!Number.isFinite(size) || size <= 0)) {
+        throw new RangeError('Main-world chunk size must be positive.');
+    }
+}
+
+function sampleMainWorldAnchor(terrain) {
+    const sample = terrain.sampleAt(MAIN_WORLD_EXIT.x, MAIN_WORLD_EXIT.z);
+    if (!sample || !Number.isFinite(sample.y)) {
+        throw new RangeError('The main-world anomaly exit must lie on valid terrain.');
+    }
+    return { x: MAIN_WORLD_EXIT.x, y: sample.y, z: MAIN_WORLD_EXIT.z };
+}
+
+export {
+    createGeometryDemoTopology,
+    MAIN_WORLD_SLICE_ID,
+    SOURCE_SLICE_ID,
+    HYPERCUBE_SLICE_ID,
+    CORRIDOR_ID,
+    HYPERCUBE_CORRIDOR_ID,
+    HYPERCUBE_MAIN_CORRIDOR_ID
+};

@@ -1,0 +1,50 @@
+SOMNIUM — GEOMETRY PHASE 14
+Main-world W traversal and Poincare camera safety
+
+INSTALLATION
+
+1. Extract this complete ZIP into a clean project directory.
+2. Serve the directory containing index.html:
+
+   cd /path/to/somnium-project-root
+   python3 -m http.server 8081
+
+3. Open http://127.0.0.1:8081/.
+4. Phase 14 uses the cache-busting identifier:
+   somnium-20261108-phase14-w-traversal-chart-boundary-1
+   Hard-refresh after replacing an existing project directory.
+
+EXPECTED BEHAVIOR
+
+- On the Main World side of an anomaly, the character uses the faster Main
+  World movement profile (180 walk / 360 run). Entering a chamber restores
+  chamber-scale movement (4.5 walk / 7.5 run).
+- E and Q both move along W while the player is within an anomaly's influence
+  field. In the transition interior, the bounded region extends six ambient
+  W units beyond each endpoint by default.
+- The Poincare free camera remains inside the finite world chart while moving
+  through an anomaly. Third-person-to-free-camera switching also constrains
+  the inherited camera pose.
+- Arrival into a Poincare chart constrains the final player/camera position
+  before projection. Projection validation itself remains strict.
+
+TESTS
+
+Run from the project root:
+
+   node --test tests/*.test.mjs
+
+Phase 14 automated test results are included in
+GEOMETRY-PHASE-14-TEST-RESULTS.txt.
+
+VISUAL VERIFICATION
+
+The automated suite and syntax/module checks pass. A live browser/WebGL session
+was not available in this build environment, so locally verify:
+
+- Move away from and back toward the W direction after arriving in Main World.
+- Confirm Main World walking/running speed is responsive and chamber speeds
+  return after entering a chamber.
+- Enter the Hypercube-to-Poincare anomaly and test both E and Q repeatedly.
+- In the Poincare room, switch from third-person to free camera and explore
+  near the anomaly influence horizon without console RangeErrors.

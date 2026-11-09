@@ -1,0 +1,300 @@
+            width: "100%",
+            boxSizing: "border-box",
+            padding: "8px",
+            color: "white",
+            background: "#193b55",
+            border: "1px solid #54758d",
+            borderRadius: "4px"
+        });
+
+        wrapper.appendChild(caption);
+        wrapper.appendChild(input);
+        parent.appendChild(wrapper);
+
+        return input;
+    }
+
+    createSelect(parent, label, options) {
+        const wrapper = document.createElement("div");
+
+        wrapper.style.margin = "8px 0";
+
+        const caption = this.element("label", label);
+        caption.style.display = "block";
+        caption.style.marginBottom = "4px";
+
+        const select = document.createElement("select");
+
+        Object.assign(select.style, {
+            width: "100%",
+            padding: "9px",
+            color: "white",
+            background: "#193b55",
+            border: "1px solid #54758d",
+            borderRadius: "4px"
+        });
+
+        for (const [value, labelText] of options) {
+            const option = this.element("option", labelText);
+            option.value = value;
+            select.appendChild(option);
+        }
+
+        wrapper.appendChild(caption);
+        wrapper.appendChild(select);
+        parent.appendChild(wrapper);
+
+        return select;
+    }
+
+    createTextarea(parent, placeholder, rows = 3) {
+        const textarea = document.createElement("textarea");
+
+        textarea.placeholder = placeholder;
+        textarea.rows = rows;
+
+        Object.assign(textarea.style, {
+            width: "100%",
+            boxSizing: "border-box",
+            padding: "9px",
+            margin: "7px 0",
+            color: "white",
+            background: "#193b55",
+            border: "1px solid #54758d",
+            borderRadius: "4px",
+            fontFamily: "monospace",
+            resize: "vertical"
+        });
+
+        parent.appendChild(textarea);
+
+        return textarea;
+    }
+
+    buildBattlefieldTab() {
+        const parent = this.tabContents.battlefield;
+        this.buildGridOriginControls(parent);
+        this.buildGridDimensionControls(parent);
+        this.buildCameraControls(parent);
+    }
+
+    buildGridOriginControls(parent) {
+        this.addSection(parent, "BATTLEFIELD GRID");
+        this.gridX = this.createInput(parent, "World X origin", "number");
+        this.gridZ = this.createInput(parent, "World Z origin", "number");
+        this.gridX.value = String(this.mode.gridOrigin.x);
+        this.gridZ.value = String(this.mode.gridOrigin.z);
+        parent.appendChild(this.createButton(
+            "APPLY GRID ORIGIN",
+            this.handleApplyGridOrigin.bind(this)
+        ));
+    }
+
+    buildGridDimensionControls(parent) {
+        this.addSection(parent, "GRID DIMENSIONS");
+        this.gridRowsInput = this.createGridDimensionInput(parent, "Rows (2–300)", this.mode.gridRows);
+        this.gridColumnsInput = this.createGridDimensionInput(parent, "Columns (2–300)", this.mode.gridColumns);
+        this.cellSizeInput = this.createInput(parent, "Cell size (world units; square cells)", "number");
+        this.configureNumericInput(this.cellSizeInput, 0.5, 1000, 0.5, this.mode.cellSize);
+        parent.appendChild(this.createButton(
+            "APPLY GRID SETTINGS",
+            this.handleApplyGridConfiguration.bind(this)
+        ));
+        this.gridInfo = this.element("div");
+        Object.assign(this.gridInfo.style, {
+            marginTop: "10px",
+            padding: "9px",
+            background: "rgba(40,80,110,0.3)",
+            borderRadius: "5px",
+            lineHeight: "1.7",
+            whiteSpace: "pre-line"
+        });
+        parent.appendChild(this.gridInfo);
+    }
+
+    createGridDimensionInput(parent, label, value) {
+        const input = this.createInput(parent, label, "number");
+        this.configureNumericInput(input, 2, 300, 1, value);
+        return input;
+    }
+
+    configureNumericInput(input, min, max, step, value) {
+        input.min = String(min);
+        input.max = String(max);
+        input.step = String(step);
+        input.value = String(value);
+    }
+
+    buildCameraControls(parent) {
+        this.addSection(parent, "CAMERA");
+        parent.appendChild(this.createButton(
+            "ZOOM TO ACTIVE CHARACTER",
+            this.handleFocusActiveCharacter.bind(this)
+        ));
+        parent.appendChild(this.createButton(
+            "CENTER ON SELECTED CHARACTER",
+            this.handleCenterSelectedCharacter.bind(this)
+        ));
+    }
+
+    handleApplyGridOrigin() {
+        this.run(this.applyGridOrigin.bind(this));
+    }
+
+    applyGridOrigin() {
+        const x = Number(this.gridX.value);
+        const z = Number(this.gridZ.value);
+        if (!Number.isSafeInteger(x) || !Number.isSafeInteger(z)) {
+            throw new Error("World coordinates must be safe integers.");
+        }
+        if (!this.mode.setGridOrigin(x, z)) {
+            throw new Error("Unable to reposition battlefield.");
+        }
+    }
+
+    handleApplyGridConfiguration() {
+        this.run(this.applyGridConfiguration.bind(this));
+    }
+
+    handleCenterSelectedCharacter() {
+        this.mode.centerCameraOnSelectedCharacter();
+    }
+
+    buildBattleTab() {
+        const parent = this.tabContents.battle;
+        this.buildEncounterControls(parent);
+        this.buildInitiativeControls(parent);
+        this.buildMovementControls(parent);
+        this.buildActionControls(parent);
+        this.buildBonusActionControls(parent);
+        this.buildSpeechControls(parent);
+        this.buildBattleHistoryControls(parent);
+    }
+
+    buildEncounterControls(parent) {
+        this.addSection(parent, "ENCOUNTER MANAGEMENT");
+        this.startBattleButton = this.createButton("START BATTLE", this.handleStartBattle.bind(this));
+        this.advanceButton = this.createButton("ADVANCE INITIATIVE", this.handleAdvanceTurn.bind(this));
+        this.endBattleButton = this.createButton("END BATTLE", this.handleEndBattle.bind(this));
+        this.endBattleButton.style.background = "#713b40";
+        parent.append(this.startBattleButton, this.advanceButton, this.endBattleButton);
+    }
+
+    buildInitiativeControls(parent) {
+        this.addSection(parent, "INITIATIVE ORDER");
+        this.initiativeList = this.element("div");
+        parent.appendChild(this.initiativeList);
+    }
+
+    buildMovementControls(parent) {
+        this.addSection(parent, "MOVEMENT (SEPARATE FROM ACTIONS)");
+        this.previewButton = this.createButton(
+            "ENABLE MOVEMENT PREVIEW",
+            this.handleToggleMovementPreview.bind(this)
+        );
+        parent.appendChild(this.previewButton);
+        this.movementHelp = this.element(
+            "p",
+            "Green: remaining movement. Amber: additional movement available by using Dash (your action)."
+        );
+        this.movementHelp.style.color = "#b7cbd8";
+        parent.appendChild(this.movementHelp);
+    }
+
+    buildActionControls(parent) {
+        this.addSection(parent, "ACTION");
+        this.actionSelect = this.createSelect(parent, "Available actions", ACTION_OPTIONS);
+        this.actionButton = this.createButton("USE ACTION", this.handleUseAction.bind(this));
+        parent.appendChild(this.actionButton);
+    }
+
+    buildBonusActionControls(parent) {
+        this.addSection(parent, "BONUS ACTION");
+        this.bonusSelect = this.createSelect(parent, "Available bonus actions", BONUS_OPTIONS);
+        this.bonusButton = this.createButton("USE BONUS ACTION", this.handleUseBonusAction.bind(this));
+        parent.appendChild(this.bonusButton);
+    }
+
+    buildSpeechControls(parent) {
+        this.addSection(parent, "CHARACTER SPEECH");
+        this.speechInput = this.createTextarea(parent, "Enter character dialogue...");
+        parent.appendChild(this.createButton("RECORD SPEECH", this.handleRecordSpeech.bind(this)));
+    }
+
+    buildBattleHistoryControls(parent) {
+        this.addSection(parent, "BATTLE HISTORY");
+        this.historyList = this.element("div");
+        parent.appendChild(this.historyList);
+    }
+
+    handleStartBattle() {
+        this.run(this.mode.startBattle.bind(this.mode));
+    }
+
+    handleAdvanceTurn() {
+        this.run(this.mode.advanceTurn.bind(this.mode));
+    }
+
+    handleEndBattle() {
+        this.run(this.mode.endBattle.bind(this.mode));
+    }
+
+    handleToggleMovementPreview() {
+        this.mode.setMovementPreview(!this.mode.movementPreview);
+        this.refresh();
+    }
+
+    handleUseAction() {
+        this.run(this.executeSelectedAction.bind(this));
+    }
+
+    executeSelectedAction() {
+        const character = this.requireActiveCharacter();
+        const selected = findOptionByValue(ACTION_OPTIONS, this.actionSelect.value);
+        if (!selected) throw new Error("Select a valid action.");
+        this.mode.performAction(character, selected[1]);
+    }
+
+    handleUseBonusAction() {
+        this.run(this.executeSelectedBonusAction.bind(this));
+    }
+
+    executeSelectedBonusAction() {
+        const character = this.requireActiveCharacter();
+        const selected = findOptionByValue(BONUS_OPTIONS, this.bonusSelect.value);
+        if (!selected) throw new Error("Select a valid bonus action.");
+        this.mode.performBonusAction(character, selected[1]);
+    }
+
+    requireActiveCharacter() {
+        const character = this.mode.getActiveCharacter();
+        if (!character) throw new Error("There is no active character.");
+        return character;
+    }
+
+    handleRecordSpeech() {
+        this.run(this.recordCharacterSpeech.bind(this));
+    }
+
+    recordCharacterSpeech() {
+        const character = this.requireActiveCharacter();
+        const speech = this.speechInput.value.trim();
+        if (!speech) throw new Error("Enter dialogue before recording.");
+        this.mode.speakAsCharacter(character, speech);
+        this.speechInput.value = "";
+    }
+
+    buildCharactersTab() {
+        const parent = this.tabContents.characters;
+        this.buildCharacterCreationForm(parent);
+        this.buildAltitudeControls(parent);
+        this.buildCharacterRoster(parent);
+        this.buildSelectedCharacterDetails(parent);
+    }
+
+    buildCharacterCreationForm(parent) {
+        this.addSection(parent, "CREATE CHARACTER");
+        this.characterName = this.createInput(parent, "Character name");
+        this.characterRace = this.createInput(parent, "Race");
+        this.characterClass = this.createInput(parent, "Class");
+        this.characterLevel = this.createInput(parent, "Level", "number");

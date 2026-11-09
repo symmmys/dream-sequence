@@ -1,0 +1,52 @@
+SOMNIUM — GEOMETRY PHASE 10 STARTUP HOTFIX 1
+Build: 2026-11-08-slice-transition-anomaly-hotfix-1
+Date: 2026-11-08
+
+AUTOMATED TESTS
+Command:
+  node --test tests/*.test.mjs
+
+Result:
+  135 tests
+  135 passed
+  0 failed
+  0 skipped
+
+New regression coverage:
+- Construct the actual geometry demo topology with representative main-world terrain.
+- Verify the main-world and hypercube connections are slice-transition anomalies.
+- Verify both anomalies register through WorldTopology and obtain CorridorChunk records.
+- Verify the browser demo-topology import cache-busts the type-aware WorldTopology module.
+- Verify the application entry chain uses the updated hotfix build identifier.
+
+STATIC SYNTAX CHECK
+Command:
+  find src tests -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n1 node --check
+
+Result:
+  All JavaScript source and test files passed Node syntax checking.
+
+LOCAL MODULE REFERENCE CHECK
+Result:
+  All relative module references under src and tests resolve to existing files
+  after removing browser cache-busting query strings.
+
+ROOT CAUSE CONFIRMED
+Phase 9's world-topology.js directly called createSpatialCorridor(). Phase 10
+changed this module to call createSpatialAnomaly(), but the updated demo topology
+import did not cache-bust world-topology.js. The browser could therefore combine
+the new Phase 10 demo topology with the cached Phase 9 WorldTopology module.
+
+The Phase 9 module passed a slice-transition anomaly to the Bezier-only corridor
+constructor, producing the reported missing-centreline-control-points exception.
+
+FIX
+- Bumped the application build/cache identifier.
+- Versioned the WorldTopology dependency and the changed anomaly-module import
+  edges so the browser loads a coherent Phase 10 module graph.
+- No movement, geometry, slice, anomaly-region, or chunk-address behavior was
+  changed by this startup hotfix.
+
+BROWSER VISUAL CHECK
+Not repeated for this startup-only module-cache fix. Phase 10's prior notes
+record that headless Chromium could not initialize the available GL backend.

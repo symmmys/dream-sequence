@@ -1,0 +1,69 @@
+SOMNIUM — GEOMETRY PHASE 11 INSTALLATION
+Build: somnium-20261108-poincare-chart-main-exit-1
+
+1. Extract the complete project archive into a clean project directory.
+2. Open a terminal in the directory containing index.html.
+3. Start the local server:
+
+     python3 -m http.server 8000
+
+4. Open this address in a desktop browser:
+
+     http://localhost:8000
+
+5. Open the 4D Geometry Demo from the main menu.
+
+MOVEMENT
+
+Ordinary world:
+  WASD              Walk
+  Mouse drag        Look around
+  Space             Jump
+  E/Q               Fourth-axis movement is locked
+
+Inside a slice-transition anomaly:
+  WASD              Move in the 3D slice plane
+  R/F               Move along local Y
+  E/Q               Move along the fourth axis / slice normal
+  Arrow Left/Right  Turn
+  Shift             Sprint
+
+Free inspection camera:
+  C                 Toggle follow/free camera
+  WASD              Move
+  R/F               Vertical movement
+  E/Q               W movement only after entering an anomaly
+  Mouse drag        Look
+  Mouse wheel       Adjust movement speed
+  Shift             Move faster
+  G                 Toggle metric grid
+
+DEMO CONNECTIONS
+
+- Hypercube Chamber: W=75.
+- Poincare Chamber: W=0.
+- Somnium Main World: W=80.
+- Anomaly 01 connects the 4D Hypercube Chamber and Poincare Chamber.
+- Anomaly 02 connects the Poincare Chamber and Main World.
+- Anomaly 03 is labeled "SOMNIUM MAIN WORLD · W +5" in the 4D chamber and
+  connects directly to the existing Main World slice, five ambient W units
+  away. Press E to move toward increasing W from the 4D chamber.
+- All three connections are bidirectional. XYZ movement remains available
+  inside an anomaly, within its bounded 4D region.
+
+The Poincare free camera is constrained to remain strictly inside the open
+ball before inverse projection. The projection's strict boundary validation
+is retained.
+
+World chunk addresses remain three-dimensional: (sliceId, chunkX, chunkZ).
+An anomaly's dedicated CorridorChunk tracks occupancy during 4D traversal;
+W is not introduced as a world-chunk coordinate.
+
+TESTS
+
+From the project root, run:
+
+     node --test tests/*.test.mjs
+
+The Phase 11 build was verified with the test suite and JavaScript syntax
+checks. The browser/WebGL scene should also be opened locally for visual review.

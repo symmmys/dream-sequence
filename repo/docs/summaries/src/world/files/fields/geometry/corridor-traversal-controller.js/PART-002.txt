@@ -1,0 +1,272 @@
+        const axisU = normalize3(axes[0]);
+        const axisV = orthogonalize3(normalize3(axes[1]), axisU);
+        const axisW = normalizeOrZero3(sample.crossSectionAxes?.[2]);
+        const scale = renderer.options?.displayScale ?? 1;
+        const offset = add3(
+            add3(scale3(axisU, offsetU * scale), scale3(axisV, offsetV * scale)),
+            scale3(axisW, offsetW * scale)
+        );
+        const target = add3(sample.position, offset);
+        const travelled = progress * this.corridorLength;
+        const blend = smoothstep(travelled / this.options.entryBlendDistance);
+        const position = lerpPoint(entryPosition, target, blend);
+        const yaw = lerpAngle(entryYaw, getYaw(sample.tangent, direction), blend);
+        const base = sample.spatialPosition4D ?? sample.position4D ?? { x: 0, y: 0, z: 0, w: 0 };
+        const axes4D = sample.axes4D ?? [];
+        const spatialPosition4D = addScaled4(base, axes4D[0], offsetU);
+        const secondPosition4D = addScaled4(spatialPosition4D, axes4D[1], offsetV);
+        const finalPosition4D = addScaled4(secondPosition4D, axes4D[2], offsetW);
+        return { position, yaw, progress, spatialPosition4D: finalPosition4D };
+    }
+
+    getCurrentRadius() {
+        const t = this.direction > 0 ? this.progress : 1 - this.progress;
+        const radius = this.corridor.radiusProfile;
+        for (let index = 1; index < radius.length; index++) {
+            if (t > radius[index].t) continue;
+            const left = radius[index - 1];
+            const right = radius[index];
+            const blend = (t - left.t) / (right.t - left.t);
+            return left.radius + (right.radius - left.radius) * blend;
+        }
+        return radius[radius.length - 1].radius;
+    }
+
+    completeTransit(world) {
+        const arrival = this.createArrivalPosition(world, this.spatialPosition4D);
+        this.player.setSpatialContext(world.transform, world.slice.id, world.layerMask);
+        this.player.yaw = world.slice.id === this.corridor.destination.sliceId ? Math.PI : 0;
+        this.player.spatialPosition4D = null;
+        this.player.setWorldPosition(arrival);
+        this.movement.setTerrain(world.terrain);
+        this.movement.setMovementSuspended(false);
+        this.camera.clearRenderAnchor();
+        this.camera.setSpatialContext(world.transform, world.layerMask);
+        this.currentSliceId = world.slice.id;
+        this.corridorChunk?.leave(this.player);
+        this.state = 'idle';
+        this.progress = 0;
+        this.direction = 0;
+        this.startWorld = null;
+        this.target = null;
+        this.activeRenderer = null;
+        this.offsetU = 0;
+        this.offsetV = 0;
+        this.offsetW = 0;
+        this.spatialPosition4D = null;
+        this.onSliceChanged(this.currentSliceId, { transitioning: false, corridorId: this.corridor.id });
+        return arrival;
+    }
+
+    completeEntityTransit(state) {
+        const { entity, target } = state;
+        const arrival = this.createArrivalPosition(target, entity.spatialPosition4D);
+        setEntitySpatialContext(entity, target);
+        setEntityWorldPosition(entity, arrival, target);
+        entity.spatialPosition4D = null;
+        this.corridorChunk?.leave(entity);
+        this.entityTransits.delete(entity);
+        return arrival;
+    }
+
+    createArrivalPosition(world, spatialPosition4D) {
+        const atDestination = world.slice.id === this.corridor.destination.sliceId;
+        const endpoint = atDestination ? this.corridor.destination : this.corridor.source;
+        const local = spatialPosition4D && world.slice.frame
+            ? ambientToSlice(world.slice.frame, spatialPosition4D).position
+            : endpoint.position;
+        const x = clamp(local.x, world.terrain.min.x, world.terrain.max.x);
+        const z = clamp(local.z + (atDestination ? 5 : -5), world.terrain.min.z, world.terrain.max.z);
+        const sample = world.terrain.sampleAt(x, z);
+        if (!sample) throw new RangeError('Corridor arrival lies outside destination terrain.');
+        return { x, y: sample.y, z };
+    }
+
+    getState() {
+        return {
+            state: this.state,
+            currentSliceId: this.currentSliceId,
+            startSliceId: this.startWorld?.slice.id ?? null,
+            destinationSliceId: this.target?.slice.id ?? null,
+            progress: this.progress,
+            direction: this.direction,
+            corridorLength: this.corridorLength,
+            speed: this.options.speed,
+            position4D: this.spatialPosition4D && { ...this.spatialPosition4D },
+            corridorOccupants: this.corridorChunk?.occupants.size ?? this.entityTransits.size
+        };
+    }
+
+    getEntityTransitState(entity) {
+        const state = this.entityTransits.get(entity);
+        return state ? {
+            fromSliceId: state.fromSliceId,
+            toSliceId: state.target.slice.id,
+            progress: state.progress,
+            direction: state.direction
+        } : null;
+    }
+
+    validateOptions() {
+        const { triggerDistance, speed, sprintSpeed, transverseSpeed, entitySpeed,
+            entryBlendDistance, lengthSegments, headingThreshold } = this.options;
+        if (![triggerDistance, speed, sprintSpeed, transverseSpeed, entitySpeed, entryBlendDistance]
+            .every(Number.isFinite) || triggerDistance <= 0 || speed <= 0 || sprintSpeed < speed ||
+            transverseSpeed <= 0 || entitySpeed <= 0 || entryBlendDistance <= 0 ||
+            !Number.isSafeInteger(lengthSegments) || lengthSegments < 8 || lengthSegments > 4096) {
+            throw new RangeError('Corridor movement speeds and sampling options must be positive and valid.');
+        }
+        if (!Number.isFinite(headingThreshold) || headingThreshold < -1 || headingThreshold > 1) {
+            throw new RangeError('Corridor traversal headingThreshold must be between -1 and 1.');
+        }
+    }
+
+    assertActive() {
+        if (this.disposed || !this.active) throw new Error('Corridor traversal is not active.');
+    }
+
+    dispose() {
+        if (this.disposed) return;
+        this.disposed = true;
+        this.active = false;
+        if (this.state === 'transit') {
+            this.movement.setMovementSuspended(false);
+            this.corridorChunk?.leave(this.player);
+        }
+        for (const entity of this.entityTransits.keys()) this.corridorChunk?.leave(entity);
+        this.entityTransits.clear();
+        this.state = 'disposed';
+        this.target = null;
+        this.startWorld = null;
+    }
+}
+
+function measureCorridor(corridor, segments) {
+    let length = 0;
+    let previous = sampleSpatialCorridor(corridor, 0).position;
+    for (let index = 1; index <= segments; index++) {
+        const current = sampleSpatialCorridor(corridor, index / segments).position;
+        length += Math.hypot(
+            current.x - previous.x, current.y - previous.y,
+            current.z - previous.z, current.w - previous.w
+        );
+        previous = current;
+    }
+    if (!Number.isFinite(length) || length <= 1e-9) throw new RangeError('Corridor length must be positive.');
+    return length * (corridor.intrinsicLengthScale ?? 1);
+}
+
+function getYaw(tangent, direction) {
+    return Math.atan2(tangent.x * direction, tangent.z * direction);
+}
+
+function normalize3(vector) {
+    const length = Math.hypot(vector?.x ?? 0, vector?.y ?? 0, vector?.z ?? 0);
+    return length > 1e-9
+        ? { x: vector.x / length, y: vector.y / length, z: vector.z / length }
+        : { x: 1, y: 0, z: 0 };
+}
+
+function normalizeOrZero3(vector) {
+    const length = Math.hypot(vector?.x ?? 0, vector?.y ?? 0, vector?.z ?? 0);
+    return length > 1e-9
+        ? { x: vector.x / length, y: vector.y / length, z: vector.z / length }
+        : { x: 0, y: 0, z: 0 };
+}
+
+function orthogonalize3(vector, axis) {
+    const dot = vector.x * axis.x + vector.y * axis.y + vector.z * axis.z;
+    return normalize3({
+        x: vector.x - axis.x * dot,
+        y: vector.y - axis.y * dot,
+        z: vector.z - axis.z * dot
+    });
+}
+
+function add3(left, right) {
+    return { x: left.x + right.x, y: left.y + right.y, z: left.z + right.z };
+}
+
+function scale3(vector, amount) {
+    return { x: vector.x * amount, y: vector.y * amount, z: vector.z * amount };
+}
+
+function addScaled4(position, axis, amount) {
+    if (!axis || !amount) return { ...position };
+    return {
+        x: position.x + axis.x * amount,
+        y: position.y + axis.y * amount,
+        z: position.z + axis.z * amount,
+        w: position.w + axis.w * amount
+    };
+}
+
+function lerpPoint(left, right, amount) {
+    return {
+        x: left.x + (right.x - left.x) * amount,
+        y: left.y + (right.y - left.y) * amount,
+        z: left.z + (right.z - left.z) * amount
+    };
+}
+
+function lerpAngle(left, right, amount) {
+    const delta = Math.atan2(Math.sin(right - left), Math.cos(right - left));
+    return left + delta * amount;
+}
+
+function smoothstep(value) {
+    const amount = clamp(value, 0, 1);
+    return amount * amount * (3 - 2 * amount);
+}
+
+function clamp(value, minimum, maximum) {
+    return Math.min(maximum, Math.max(minimum, value));
+}
+
+function getEntityRenderPosition(entity) {
+    if (typeof entity.getRenderPosition === 'function') return entity.getRenderPosition();
+    const position = entity.root?.position ?? entity.mesh?.position ?? entity.position;
+    if (!position) throw new TypeError('Spatial entities require getRenderPosition() or a render position.');
+    return { x: position.x, y: position.y, z: position.z };
+}
+
+function setEntityRenderPosition(entity, position, yaw) {
+    if (typeof entity.setRenderPosition === 'function') {
+        entity.setRenderPosition(position, yaw);
+        return;
+    }
+    const target = entity.root ?? entity.mesh ?? entity;
+    if (typeof target.position?.set !== 'function') throw new TypeError('Spatial entities require setRenderPosition() or a Babylon position.');
+    target.position.set(position.x, position.y, position.z);
+    if (Number.isFinite(yaw) && target.rotation) target.rotation.y = yaw;
+}
+
+function setEntitySpatialContext(entity, world) {
+    if (typeof entity.setSpatialContext === 'function') {
+        entity.setSpatialContext(world.transform, world.slice.id, world.layerMask);
+        return;
+    }
+    entity.transform = world.transform;
+    entity.sliceId = world.slice.id;
+    entity.layerMask = world.layerMask;
+    const target = entity.root ?? entity.mesh ?? entity;
+    if (target.layerMask !== undefined) target.layerMask = world.layerMask;
+    if (target.metadata) target.metadata.sliceId = world.slice.id;
+}
+
+function setEntityWorldPosition(entity, position, world) {
+    if (typeof entity.setWorldPosition === 'function') {
+        entity.setWorldPosition(position);
+        return;
+    }
+    entity.worldPosition = { ...position };
+    const render = world.transform.worldToRender(position);
+    setEntityRenderPosition(entity, render, entity.yaw ?? 0);
+}
+
+function requireObject(value, name) {
+    if (!value || typeof value !== 'object') throw new TypeError(`CorridorTraversalController requires ${name}.`);
+    return value;
+}
+
+export { CorridorTraversalController, measureCorridor };

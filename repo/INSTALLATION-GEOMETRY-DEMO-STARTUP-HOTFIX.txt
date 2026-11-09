@@ -1,0 +1,27 @@
+GEOMETRY DEMO STARTUP HOTFIX
+============================
+
+Recommended installation:
+1. Back up the current Somnium project.
+2. Extract the complete repaired project ZIP.
+3. Serve from the directory containing index.html:
+
+   python3 -m http.server 8081 --bind 127.0.0.1
+
+Patch-only installation:
+1. Extract the replacement ZIP into the directory containing the existing
+   somnium_open_the_door folder, allowing its contents to merge/overwrite.
+2. Verify that these files land at the following paths relative to index.html:
+
+   src/demo/geometry-demo-world.js
+   src/demo/world-manager-visibility.js
+   tests/world-manager-visibility.test.mjs
+   docs/STYLE-CONFORMANCE.md
+
+3. Hard-reload the browser with cache disabled. ES modules can remain cached
+   across ordinary refreshes.
+4. If the same error persists, verify the URL shown in DevTools points to the
+   same project root you just updated. Avoid serving a nested duplicate copy.
+
+The fix is compatible with the current Phase 3 WorldManager and safely handles
+an earlier manager API that does not expose setVisible().

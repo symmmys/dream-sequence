@@ -1,0 +1,300 @@
+        this.characterHP = this.createInput(parent, "Hit points", "number");
+        this.characterAC = this.createInput(parent, "Armor class", "number");
+        this.characterInitiative = this.createInput(parent, "Initiative bonus", "number");
+        this.characterMovement = this.createInput(parent, "Movement allowance", "number");
+        this.characterAltitude = this.createInput(parent, "Starting altitude above ground", "number");
+        this.configureCharacterDefaults();
+        parent.appendChild(this.createButton(
+            "CREATE CHARACTER",
+            this.handleCreateCharacter.bind(this)
+        ));
+    }
+
+    configureCharacterDefaults() {
+        this.characterLevel.value = "1";
+        this.characterHP.value = "12";
+        this.characterAC.value = "10";
+        this.characterInitiative.value = "0";
+        this.characterMovement.value = "30";
+        this.configureNumericInput(this.characterAltitude, ALTITUDE_MIN, ALTITUDE_MAX, 0.5, 0);
+    }
+
+    handleCreateCharacter() {
+        this.run(this.createCharacterFromForm.bind(this));
+    }
+
+    createCharacterFromForm() {
+        const values = this.readCharacterForm();
+        const row = Math.floor(this.mode.gridRows / 2);
+        const col = Math.floor(this.mode.gridColumns / 2);
+        const character = this.mode.addCharacter(values.name, row, col);
+        this.applyCharacterForm(character, values);
+        this.mode.setCharacterAltitude(character, values.altitude);
+        this.mode.saveCharacters();
+        this.mode.refreshUI();
+        this.characterName.value = "";
+    }
+
+    readCharacterForm() {
+        const values = {
+            name: this.characterName.value.trim(),
+            level: Number(this.characterLevel.value),
+            hitPoints: Number(this.characterHP.value),
+            armorClass: Number(this.characterAC.value),
+            initiative: Number(this.characterInitiative.value),
+            movement: Number(this.characterMovement.value),
+            altitude: Number(this.characterAltitude.value)
+        };
+        this.validateCharacterForm(values);
+        return values;
+    }
+
+    validateCharacterForm(values) {
+        if (!values.name) throw new Error("Enter a character name.");
+        if (
+            !Number.isInteger(values.level) || values.level < 1 ||
+            !Number.isFinite(values.hitPoints) || values.hitPoints < 1 ||
+            !Number.isFinite(values.armorClass) || values.armorClass < 0 ||
+            !Number.isFinite(values.initiative) ||
+            !Number.isFinite(values.movement) || values.movement < 0 ||
+            !Number.isFinite(values.altitude) ||
+            values.altitude < ALTITUDE_MIN || values.altitude > ALTITUDE_MAX
+        ) throw new Error("Check the character statistics and altitude.");
+    }
+
+    applyCharacterForm(character, values) {
+        character.race = this.characterRace.value.trim() || "Unknown";
+        character.className = this.characterClass.value.trim() || "Adventurer";
+        character.level = values.level;
+        character.hitPoints = values.hitPoints;
+        character.maxHitPoints = values.hitPoints;
+        character.armorClass = values.armorClass;
+        character.initiative = values.initiative;
+        character.movement = values.movement;
+    }
+
+    buildAltitudeControls(parent) {
+        this.addSection(parent, "FLIGHT & ALTITUDE");
+        this.selectedAltitudeInput = this.createInput(
+            parent,
+            "Selected character altitude above ground (world units)",
+            "number"
+        );
+        this.configureNumericInput(this.selectedAltitudeInput, ALTITUDE_MIN, ALTITUDE_MAX, 0.5, 0);
+        parent.appendChild(this.createButton(
+            "APPLY ALTITUDE TO SELECTED CHARACTER",
+            this.handleApplySelectedAltitude.bind(this)
+        ));
+        this.altitudeHelp = this.element(
+            "p",
+            "Altitude is measured vertically above the sampled terrain surface. Set 0 to place a character on the ground."
+        );
+        this.altitudeHelp.style.color = "#b7cbd8";
+        parent.appendChild(this.altitudeHelp);
+    }
+
+    handleApplySelectedAltitude() {
+        this.run(this.applySelectedAltitude.bind(this));
+    }
+
+    applySelectedAltitude() {
+        const character = this.mode.selectedCharacter;
+        if (!character) throw new Error("Select a character first.");
+        this.mode.setCharacterAltitude(
+            character,
+            Number(this.selectedAltitudeInput.value)
+        );
+    }
+
+    buildCharacterRoster(parent) {
+        this.addSection(parent, "CHARACTER ROSTER");
+        this.characterList = this.element("div");
+        parent.appendChild(this.characterList);
+    }
+
+    buildSelectedCharacterDetails(parent) {
+        this.addSection(parent, "SELECTED CHARACTER");
+        this.characterDetails = this.element("div");
+        parent.appendChild(this.characterDetails);
+    }
+
+    buildSettingsTab() {
+        const parent = this.tabContents.settings;
+        this.buildMovementColorSettings(parent);
+        this.buildInterfaceSettings(parent);
+        this.buildControlHelp(parent);
+    }
+
+    buildMovementColorSettings(parent) {
+        this.addSection(parent, "MOVEMENT COLORS");
+        this.movementColor = this.createInput(parent, "Normal movement", "color");
+        this.dashColor = this.createInput(parent, "Extended / Dash movement", "color");
+        this.movementColor.value = this.colors.movement;
+        this.dashColor.value = this.colors.dash;
+        parent.appendChild(this.createButton(
+            "SAVE MOVEMENT COLORS",
+            this.handleSaveMovementColors.bind(this)
+        ));
+    }
+
+    buildInterfaceSettings(parent) {
+        this.addSection(parent, "INTERFACE");
+        parent.appendChild(this.createButton("HIDE TACTICAL MENU", this.handleHideMenu.bind(this)));
+        parent.appendChild(this.createButton("SHOW TACTICAL MENU", this.handleShowMenu.bind(this)));
+    }
+
+    buildControlHelp(parent) {
+        this.addSection(parent, "CONTROLS");
+        const controls = [
+            "M — Toggle tactical menu",
+            "ESC — Hide tactical menu",
+            "Arrow Left — Previous character",
+            "Arrow Right — Next character",
+            "Mouse wheel — Zoom camera",
+            "Left mouse drag — Camera interaction"
+        ];
+        for (const description of controls) {
+            const item = this.element("p", description);
+            item.style.color = "#b7cbd8";
+            parent.appendChild(item);
+        }
+    }
+
+    handleSaveMovementColors() {
+        this.colors.movement = this.movementColor.value;
+        this.colors.dash = this.dashColor.value;
+        this.saveColors();
+        this.showMessage("Movement colors saved.");
+    }
+
+    handleHideMenu() {
+        this.setVisible(false);
+    }
+
+    handleShowMenu() {
+        this.setVisible(true);
+    }
+
+    handleFocusActiveCharacter() {
+        this.run(this.zoomToActiveCharacter.bind(this));
+    }
+
+    zoomToActiveCharacter() {
+        return this.mode.zoomToActiveCharacter();
+    }
+
+    applyGridConfiguration() {
+        const rows = Number(this.gridRowsInput.value);
+        const columns = Number(this.gridColumnsInput.value);
+        const cellSize = Number(this.cellSizeInput.value);
+
+        this.mode.setGridConfiguration(rows, columns, cellSize);
+    }
+
+    run(callback) {
+        try {
+            const result = callback();
+
+            if (result && typeof result.then === "function") {
+                result.then(
+                    this.handleRunSuccess.bind(this),
+                    this.handleRunFailure.bind(this)
+                );
+            } else {
+                this.refresh();
+            }
+
+            return result;
+        } catch (error) {
+            this.showMessage(error.message);
+            console.error("[DnD UI]", error);
+            return null;
+        }
+    }
+
+    handleRunSuccess() {
+        this.refresh();
+    }
+
+    handleRunFailure(error) {
+        this.showMessage(error.message);
+        console.error("[DnD UI]", error);
+    }
+
+    createTextRow(parent, label, value) {
+        const row = this.element("div");
+
+        Object.assign(row.style, {
+            display: "flex",
+            justifyContent: "space-between",
+            gap: "8px",
+            padding: "5px 2px",
+            borderBottom: "1px solid rgba(120,160,185,0.2)"
+        });
+
+        const left = this.element("span", label);
+        const right = this.element(
+            "span",
+            String(value ?? "—")
+        );
+
+        right.style.color = "#9dd8ed";
+
+        row.appendChild(left);
+        row.appendChild(right);
+        parent.appendChild(row);
+
+        return row;
+    }
+
+    refreshInitiative() {
+        const list = this.initiativeList;
+        list.replaceChildren();
+
+        const battle = this.mode.activeBattle;
+
+        if (!battle?.active) {
+            list.textContent = "No active encounter.";
+            return;
+        }
+
+        for (let index = 0; index < battle.turnOrder.length; index++) {
+            this.appendInitiativeEntry(list, battle.turnOrder[index], index, battle);
+        }
+    }
+
+    appendInitiativeEntry(list, characterId, index, battle) {
+        const character = this.mode.characters.get(characterId);
+        if (!character) return;
+        const active = index === battle.currentTurn;
+        const item = this.createButton(
+            `${active ? "▶ " : ""}${character.name}`,
+            this.handleCharacterSelect.bind(this)
+        );
+        item.dataset.characterId = characterId;
+        item.style.textAlign = "left";
+        item.style.background = active ? "#72551b" : "#193b55";
+        item.style.color = active ? "#fff0b5" : "#d6e6ef";
+        list.appendChild(item);
+    }
+
+    handleCharacterSelect(event) {
+        const characterId = event.currentTarget.dataset.characterId;
+        this.mode.selectCharacter(characterId);
+        this.refresh();
+    }
+
+    handleRemoveCharacter(event) {
+        const characterId = event.currentTarget.dataset.characterId;
+        this.run(this.mode.removeCharacter.bind(this.mode, characterId));
+    }
+
+    refreshCharacters() {
+        const list = this.characterList;
+        list.replaceChildren();
+
+        for (const character of this.mode.characters.values()) {
+            this.appendCharacterRosterRow(list, character);
+        }
+
+        if (!this.mode.characters.size) {

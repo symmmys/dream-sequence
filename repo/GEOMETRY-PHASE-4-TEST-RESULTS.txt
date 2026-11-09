@@ -1,0 +1,36 @@
+SOMNIUM — GEOMETRY PHASE 4 TEST RESULTS
+Date: 2026-11-08
+
+Automated Node regression suite:
+  84 tests passed
+  0 failed
+
+JavaScript syntax checks:
+  108 source modules passed
+  11 test modules passed
+  119 total passed
+
+Relative module import validation:
+  108 source modules inspected
+  0 missing relative import targets
+
+Focused coverage includes:
+- input-controlled forward/backward progress along the sampled R4 corridor arc length
+- holding position when no longitudinal input is supplied
+- retreating through the entering mouth
+- bidirectional destination-to-source traversal and one-way rejection
+- entry facing/proximity/input gate
+- source/destination world-chunk adjacency and corridor chunk occupancy
+- movement along all three transported 4D cross-section axes
+- in-slice cross-section displacement survives the destination slice handoff
+- combined cross-section offsets remain inside the corridor radius
+- slice, transform, layer-mask and terrain-context handoff
+- non-player entity transit through the same corridor runtime chunk
+- player two-axis movement, jumping, and suspended-input snapshots
+- source/destination corridor renderer anchoring and 4D frame orthonormality
+- geometry demo remains free of floor and ceiling plane meshes
+
+Browser/WebGL status:
+  Not verified in this pass. The headless Chromium smoke test timed out before
+  returning DOM output. These automated results do not establish live Babylon
+  rendering, camera appearance, collision/physics behavior, or browser traversal.

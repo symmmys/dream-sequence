@@ -1,0 +1,47 @@
+SOMNIUM — GEOMETRY PHASE 4
+PLAYER-CONTROLLED FOUR-DIMENSIONAL TRAVERSAL
+
+INSTALLATION
+1. Back up the existing Somnium project.
+2. Extract the complete project archive into a clean directory.
+3. Change into the directory containing index.html.
+4. Start the local server:
+
+   python3 -m http.server 8081 --bind 127.0.0.1
+
+5. Open http://127.0.0.1:8081/ and hard-refresh if an older tab is open.
+6. Confirm the console identifies build:
+
+   2026-11-08-four-dimensional-traversal-2
+
+GEOMETRY DEMO CONTROLS
+Ordinary 3D world:
+  W / S             Move forward / backward
+  A / D             Strafe left / right
+  Arrow Left/Right  Rotate
+  Left mouse drag   Turn character
+  Space             Jump
+  Shift             Run
+
+Inside a 4D anomaly:
+  W / S             Move forward / backward along the 4D corridor
+  A / D             Move laterally within the corridor
+  R / F             Move along the second transported cross-section axis
+  E / Q             Move along the third transported cross-section axis
+  Shift             Move faster through the corridor
+
+APPROACHING AN ANOMALY
+Walk toward the corridor mouth, face it, and hold W. The player enters only when
+inside the trigger distance and the corridor is an explicit traversable neighbour
+in the spatial chunk graph. Releasing W/S pauses progress. S retraces the corridor. A/D, R/F, and E/Q
+control the three independent directions perpendicular to the corridor's 4D tangent.
+Reaching the far mouth changes the active world slice and terrain context.
+
+NOTES
+- The current third-person camera continues to follow the player.
+- Space remains the ordinary-world jump key; corridor cross-section movement uses R/F and E/Q.
+- The free-camera toggle and four independent camera-axis controls are not part
+  of this release; they are the next planned camera milestone.
+- The geometry corridor is still one logical chunk, not a sequence of streamed
+  corridor subchunks.
+- If startup behavior differs, check the [Main] and [GeometryDemo] build markers.

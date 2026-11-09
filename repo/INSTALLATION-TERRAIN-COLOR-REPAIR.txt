@@ -1,0 +1,50 @@
+SOMNIUM — TERRAIN COLOR REPAIR
+================================
+
+This update fixes the black terrain caused by non-finite vertex colors.
+
+REPLACEMENT / NEW FILES
+-----------------------
+NEW:       src/world/terrain-color.js
+REPLACE:   src/world/terrain-mesh-worker.js
+REPLACE:   src/world/world-chunk.js
+UPDATE:    docs/STYLE-CONFORMANCE.md
+NEW:       tests/terrain-color.test.mjs
+
+WHAT CHANGED
+------------
+1. The shared color algorithm now clamps interpolation values to [0, 1] by default.
+   The old worker clamp required explicit bounds, while terrain-color blending omitted
+   them. That produced NaN RGB components for every generated terrain vertex.
+2. Soil type is classified from normalized topographic elevation using the existing
+   provisional thresholds and palette.
+3. Worker-generated and synchronous fallback chunks use the same color algorithm.
+4. Worker mesh generation has named operations for vertex sampling, buffer writes,
+   index generation, validation, and message transfer.
+5. Chunk mesh creation validates vertex-buffer lengths and rejects non-finite colors.
+6. The style-conformance ledger now records the terrain files reviewed in this repair.
+
+TESTS
+-----
+Run from the project root:
+
+node --experimental-default-type=module --test tests/*.test.mjs
+
+The repair was syntax-checked across all 89 JavaScript files under src/.
+The Node test suite completed with 14 passing tests.
+
+RUNTIME VERIFICATION
+--------------------
+Babylon.js rendering and browser-worker behavior still need to be checked in the
+running application. Automated tests verify the shared color algorithm, finite
+worker color buffers, and parity between worker and fallback color generation;
+they do not replace visual browser QA.
+
+SOURCE ASSET NOTICE
+-------------------
+The supplied assets/0_somnium_map_topographic.png appears truncated: its PNG stream
+ends without an IEND chunk, and its compressed pixel stream ends before the full
+3000 x 8000 image is decoded. This is independent of the NaN color bug fixed here.
+The asset was preserved unchanged because missing source map data cannot be reliably
+reconstructed. Restore the original complete topographic PNG if the lower portion
+of the world shows missing or inaccurate elevation/soil distribution.

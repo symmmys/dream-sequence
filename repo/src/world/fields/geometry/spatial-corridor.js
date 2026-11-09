@@ -1,0 +1,212 @@
+/** Serializable definition and deterministic sampling for a cubic 4D corridor. */
+
+import {
+    add4,
+    createPerpendicularFrame,
+    createPosition3,
+    createVector4,
+    norm4,
+    normalize4,
+    scale4,
+    subtract4,
+    transportPerpendicularFrame
+} from './spatial-4d.js';
+import { createAnomalyOptics } from './optical-contracts.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+
+const SPATIAL_CORRIDOR_SCHEMA_VERSION = 1;
+const MAX_CORRIDOR_SAMPLES = 4096;
+
+function createSpatialCorridor(options = {}) {
+    const schemaVersion = options.schemaVersion ?? SPATIAL_CORRIDOR_SCHEMA_VERSION;
+    if (schemaVersion !== SPATIAL_CORRIDOR_SCHEMA_VERSION) {
+        throw new RangeError(`Unsupported SpatialCorridor schema version: ${schemaVersion}`);
+    }
+
+    const corridor = {
+        schemaVersion,
+        id: requireId(options.id, 'SpatialCorridor id'),
+        type: 'bezier',
+        revision: options.revision ?? 1,
+        source: createEndpoint(options.source, 'source'),
+        destination: createEndpoint(options.destination, 'destination'),
+        centerline: validateCenterline(options.centerline),
+        radiusProfile: createRadiusProfile(options.radiusProfile),
+        optics: createAnomalyOptics(options.optics),
+        // Scales ambient arc length into proper distance inside an exotic corridor.
+        intrinsicLengthScale: options.intrinsicLengthScale ?? 1,
+        visible: options.visible ?? true,
+        traversable: options.traversable ?? false,
+        bidirectional: options.bidirectional ?? true
+    };
+
+    if (!Number.isSafeInteger(corridor.revision) || corridor.revision < 1) {
+        throw new RangeError('Corridor revision must be a positive safe integer.');
+    }
+    if (!Number.isFinite(corridor.intrinsicLengthScale) ||
+        corridor.intrinsicLengthScale <= 0 || corridor.intrinsicLengthScale > 1) {
+        throw new RangeError('Corridor intrinsicLengthScale must be in (0, 1].');
+    }
+    for (const field of ['visible', 'traversable', 'bidirectional']) {
+        if (typeof corridor[field] !== 'boolean') {
+            throw new TypeError(`Corridor ${field} must be boolean.`);
+        }
+    }
+    if (distance4(corridor.centerline[0], corridor.centerline[3]) <= 1e-12) {
+        throw new RangeError('Corridor endpoints must be distinct in 4D space.');
+    }
+    return corridor;
+}
+
+function sampleSpatialCorridor(corridor, t) {
+    assertUnitParameter(t);
+    const centerline = validateCenterline(corridor.centerline);
+    return {
+        t,
+        position: cubicBezier(centerline, t),
+        tangent: cubicBezierTangent(centerline, t),
+        radius: sampleRadiusProfile(corridor.radiusProfile, t)
+    };
+}
+
+function sampleSpatialCorridorFrames(corridor, segments) {
+    if (!Number.isSafeInteger(segments) || segments < 1 || segments > MAX_CORRIDOR_SAMPLES) {
+        throw new RangeError(`Corridor segments must be between 1 and ${MAX_CORRIDOR_SAMPLES}.`);
+    }
+
+    const samples = [];
+    let previousAxes = null;
+    for (let index = 0; index <= segments; index++) {
+        const sample = sampleSpatialCorridor(corridor, index / segments);
+        sample.axes = previousAxes
+            ? transportPerpendicularFrame(previousAxes, sample.tangent)
+            : createPerpendicularFrame(sample.tangent);
+        previousAxes = sample.axes;
+        samples.push(sample);
+    }
+    return samples;
+}
+
+function cubicBezier(points, t) {
+    assertUnitParameter(t);
+    const [p0, p1, p2, p3] = validateCenterline(points);
+    const inverse = 1 - t;
+    const a = inverse ** 3;
+    const b = 3 * inverse ** 2 * t;
+    const c = 3 * inverse * t ** 2;
+    const d = t ** 3;
+    return add4(
+        add4(scale4(p0, a), scale4(p1, b)),
+        add4(scale4(p2, c), scale4(p3, d))
+    );
+}
+
+function cubicBezierTangent(points, t) {
+    assertUnitParameter(t);
+    const [p0, p1, p2, p3] = validateCenterline(points);
+    const inverse = 1 - t;
+    const derivative = add4(
+        add4(
+            scale4(subtract4(p1, p0), 3 * inverse ** 2),
+            scale4(subtract4(p2, p1), 6 * inverse * t)
+        ),
+        scale4(subtract4(p3, p2), 3 * t ** 2)
+    );
+    if (norm4(derivative) > 1e-12) return normalize4(derivative);
+
+    // A stationary Bezier endpoint can still have a well-defined one-sided tangent.
+    const nearbyT = t < 1 ? Math.min(1, t + 1e-4) : Math.max(0, t - 1e-4);
+    const nearby = cubicBezier(points, nearbyT);
+    const origin = cubicBezier(points, t);
+    const difference = t < 1
+        ? subtract4(nearby, origin)
+        : subtract4(origin, nearby);
+    if (norm4(difference) > 1e-12) return normalize4(difference);
+
+    const chord = subtract4(p3, p0);
+    if (norm4(chord) > 1e-12) return normalize4(chord);
+    throw new RangeError('Corridor centreline has no stable tangent.');
+}
+
+function sampleRadiusProfile(profile, t) {
+    const keyframes = createRadiusProfile(profile);
+    for (let index = 1; index < keyframes.length; index++) {
+        const right = keyframes[index];
+        if (t > right.t) continue;
+        const left = keyframes[index - 1];
+        const blend = (t - left.t) / (right.t - left.t);
+        return left.radius + (right.radius - left.radius) * blend;
+    }
+    return keyframes[keyframes.length - 1].radius;
+}
+
+function createRadiusProfile(profile = null) {
+    const source = profile ?? [
+        { t: 0, radius: 1 },
+        { t: 1, radius: 1 }
+    ];
+    if (!Array.isArray(source) || source.length < 2) {
+        throw new TypeError('Corridor radius profile requires at least two keyframes.');
+    }
+
+    const result = source.map(function normalizeKeyframe(keyframe) {
+        if (!keyframe || !Number.isFinite(keyframe.t) || !Number.isFinite(keyframe.radius)) {
+            throw new TypeError('Invalid corridor radius keyframe.');
+        }
+        if (keyframe.t < 0 || keyframe.t > 1 || keyframe.radius <= 0) {
+            throw new RangeError('Corridor keyframes require t in [0, 1] and positive radius.');
+        }
+        return { t: keyframe.t, radius: keyframe.radius };
+    });
+
+    if (result[0].t !== 0 || result[result.length - 1].t !== 1) {
+        throw new RangeError('Corridor radius profile must cover t = 0 through t = 1.');
+    }
+    for (let index = 1; index < result.length; index++) {
+        if (result[index].t <= result[index - 1].t) {
+            throw new RangeError('Corridor radius profile times must increase strictly.');
+        }
+    }
+    return result;
+}
+
+function createEndpoint(endpoint, label) {
+    if (!endpoint) throw new TypeError(`Corridor ${label} endpoint is required.`);
+    return {
+        sliceId: requireId(endpoint.sliceId, `${label} slice id`),
+        position: createPosition3(endpoint.position)
+    };
+}
+
+function validateCenterline(points) {
+    if (!Array.isArray(points) || points.length !== 4) {
+        throw new TypeError('A cubic 4D corridor requires four centreline control points.');
+    }
+    return points.map(createVector4);
+}
+
+function distance4(a, b) {
+    return norm4(subtract4(a, b));
+}
+
+function requireId(value, label) {
+    if (typeof value !== 'string' || value.trim() === '') {
+        throw new TypeError(`${label} must be a non-empty string.`);
+    }
+    return value.trim();
+}
+
+function assertUnitParameter(t) {
+    if (!Number.isFinite(t) || t < 0 || t > 1) {
+        throw new RangeError('Corridor parameter must be between 0 and 1.');
+    }
+}
+
+export {
+    SPATIAL_CORRIDOR_SCHEMA_VERSION,
+    createSpatialCorridor,
+    cubicBezier,
+    cubicBezierTangent,
+    sampleRadiusProfile,
+    sampleSpatialCorridor,
+    sampleSpatialCorridorFrames
+};

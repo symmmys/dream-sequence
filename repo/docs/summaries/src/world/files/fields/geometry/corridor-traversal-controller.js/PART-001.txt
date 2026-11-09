@@ -1,0 +1,300 @@
+/** Advances entities through an explicit four-dimensional corridor chunk. */
+
+import { ambientToSlice } from './spatial-4d.js';
+import { sampleSpatialCorridor } from './spatial-corridor.js';
+
+class CorridorTraversalController {
+    constructor(options = {}) {
+        this.player = requireObject(options.player, 'player');
+        this.movement = requireObject(options.movementController, 'movementController');
+        this.camera = requireObject(options.cameraController, 'cameraController');
+        this.topology = requireObject(options.topology, 'topology');
+        this.corridor = requireObject(options.corridor, 'corridor');
+        this.renderer = requireObject(options.corridorRenderer, 'corridorRenderer');
+        this.renderers = options.corridorRenderers ?? new Map();
+        this.chunkGraph = options.chunkGraph ?? null;
+        this.corridorChunk = options.corridorChunk ?? this.chunkGraph?.getCorridorChunk(this.corridor.id) ?? null;
+        this.worlds = new Map([
+            [options.source.slice.id, options.source],
+            [options.destination.slice.id, options.destination]
+        ]);
+        this.currentSliceId = options.initialSliceId ?? options.source.slice.id;
+        this.onSliceChanged = options.onSliceChanged ?? function ignoreSliceChange() {};
+        this.options = {
+            triggerDistance: 3.4,
+            headingThreshold: 0.2,
+            speed: 8,
+            sprintSpeed: 12,
+            transverseSpeed: 3.5,
+            entitySpeed: 5,
+            entryBlendDistance: 1.4,
+            lengthSegments: 128,
+            ...options.traversal
+        };
+        this.validateOptions();
+        this.corridorLength = measureCorridor(this.corridor, this.options.lengthSegments);
+        this.active = false;
+        this.disposed = false;
+        this.state = 'idle';
+        this.progress = 0;
+        this.direction = 0;
+        this.startWorld = null;
+        this.target = null;
+        this.activeRenderer = null;
+        this.entryPosition = null;
+        this.entryYaw = 0;
+        this.offsetU = 0;
+        this.offsetV = 0;
+        this.offsetW = 0;
+        this.spatialPosition4D = null;
+        this.entityTransits = new Map();
+    }
+
+    update(deltaSeconds) {
+        if (!this.active || this.disposed) return;
+        const delta = Math.max(0, Math.min(deltaSeconds, 0.1));
+        if (this.state === 'idle') this.tryBeginTransit();
+        else this.advanceTransit(delta);
+        this.advanceOtherEntities(delta);
+    }
+
+    setActive(active) {
+        this.active = Boolean(active) && !this.disposed;
+    }
+
+    getMovementInput() {
+        return this.movement.getMovementInput?.() ?? {
+            forward: 0, strafe: 0, vertical: 0, sprint: false
+        };
+    }
+
+    tryBeginTransit() {
+        const entry = this.findEntry();
+        return entry ? this.beginTransit(entry) : false;
+    }
+
+    findEntry() {
+        const input = this.getMovementInput();
+        if (input.forward <= 0.05) return null;
+        const position = this.player.worldPosition;
+        const yaw = this.player.yaw;
+        const forwardX = Math.sin(yaw);
+        const forwardZ = Math.cos(yaw);
+
+        for (const neighbor of this.topology.getTraversableNeighbors(this.currentSliceId)) {
+            if (neighbor.corridorId !== this.corridor.id) continue;
+            const fromSource = this.corridor.source.sliceId === this.currentSliceId;
+            const endpoint = fromSource ? this.corridor.source : this.corridor.destination;
+            const dx = endpoint.position.x - position.x;
+            const dz = endpoint.position.z - position.z;
+            const distance = Math.hypot(dx, dz);
+            if (distance > this.options.triggerDistance || distance < 1e-6) continue;
+            const heading = (forwardX * dx + forwardZ * dz) / distance;
+            if (heading >= this.options.headingThreshold && this.hasChunkConnection(this.currentSliceId, position)) {
+                return { fromSource, destinationSliceId: neighbor.sliceId };
+            }
+        }
+        return null;
+    }
+
+    beginTransit(entry) {
+        this.startWorld = this.worlds.get(this.currentSliceId);
+        this.target = this.worlds.get(entry.destinationSliceId);
+        if (!this.target || !this.startWorld) throw new Error(`Missing corridor slice for ${this.corridor.id}.`);
+        this.direction = entry.fromSource ? 1 : -1;
+        this.progress = 0;
+        this.offsetU = 0;
+        this.offsetV = 0;
+        this.offsetW = 0;
+        this.entryPosition = this.player.getRenderPosition();
+        this.entryYaw = this.player.yaw;
+        this.activeRenderer = this.renderers.get(this.currentSliceId) ?? this.renderer;
+        this.state = 'transit';
+        this.movement.setMovementSuspended(true);
+        this.player.setSpatialContext?.(
+            this.startWorld.transform,
+            this.startWorld.slice.id,
+            this.startWorld.layerMask
+        );
+        this.camera.setSpatialContext(this.startWorld.transform, this.startWorld.layerMask);
+        this.corridorChunk?.enter(this.player, { direction: this.direction, progress: 0 });
+        this.updatePlayerOnCorridor();
+        this.onSliceChanged(this.currentSliceId, {
+            transitioning: true,
+            corridorId: this.corridor.id,
+            renderSliceId: this.currentSliceId,
+            direction: this.direction
+        });
+        return true;
+    }
+
+    tryBeginEntityTransit(entity, fromSliceId = entity?.sliceId) {
+        this.assertActive();
+        if (!entity?.worldPosition || !Number.isFinite(entity.yaw)) return false;
+        const forwardX = Math.sin(entity.yaw);
+        const forwardZ = Math.cos(entity.yaw);
+        for (const neighbor of this.topology.getTraversableNeighbors(fromSliceId)) {
+            if (neighbor.corridorId !== this.corridor.id) continue;
+            const fromSource = this.corridor.source.sliceId === fromSliceId;
+            const endpoint = fromSource ? this.corridor.source : this.corridor.destination;
+            const dx = endpoint.position.x - entity.worldPosition.x;
+            const dz = endpoint.position.z - entity.worldPosition.z;
+            const distance = Math.hypot(dx, dz);
+            if (distance < 1e-6 || distance > this.options.triggerDistance) continue;
+            const heading = (forwardX * dx + forwardZ * dz) / distance;
+            if (heading >= this.options.headingThreshold) return this.beginEntityTransit(entity, fromSliceId);
+        }
+        return false;
+    }
+
+    beginEntityTransit(entity, fromSliceId = entity?.sliceId) {
+        this.assertActive();
+        if (!entity || entity === this.player) throw new TypeError('Use player traversal for the active player.');
+        if (this.entityTransits.has(entity)) return false;
+        const link = this.topology.getTraversableNeighbors(fromSliceId)
+            .find(function findCorridor(neighbor) { return neighbor.corridorId === this.corridor.id; }, this);
+        if (!link) return false;
+        const position = entity.worldPosition;
+        if (!position || !this.hasChunkConnection(fromSliceId, position)) return false;
+        const fromSource = fromSliceId === this.corridor.source.sliceId;
+        const target = this.worlds.get(link.sliceId);
+        if (!target) throw new Error(`Missing corridor destination slice: ${link.sliceId}`);
+        const speed = entity.corridorSpeed ?? this.options.entitySpeed;
+        if (!Number.isFinite(speed) || speed <= 0) throw new RangeError('Entity corridorSpeed must be positive.');
+        const state = {
+            entity, fromSliceId, target, direction: fromSource ? 1 : -1,
+            progress: 0, speed,
+            entryPosition: getEntityRenderPosition(entity),
+            entryYaw: entity.yaw ?? 0,
+            renderer: this.renderers.get(fromSliceId) ?? this.renderer
+        };
+        this.entityTransits.set(entity, state);
+        this.corridorChunk?.enter(entity, { direction: state.direction, progress: 0 });
+        return true;
+    }
+
+    hasChunkConnection(sliceId, position) {
+        if (!this.chunkGraph) return true;
+        const address = this.chunkGraph.getAddress(sliceId, position);
+        for (let offsetX = -1; offsetX <= 1; offsetX++) {
+            for (let offsetZ = -1; offsetZ <= 1; offsetZ++) {
+                const nearby = {
+                    sliceId,
+                    chunkX: address.chunkX + offsetX,
+                    chunkZ: address.chunkZ + offsetZ
+                };
+                const connected = this.chunkGraph.getNeighbors(nearby).some(function isThisCorridor(node) {
+                    return node.kind === 'corridor' && node.id === this.corridor.id;
+                }, this);
+                if (connected) return true;
+            }
+        }
+        return false;
+    }
+
+    advanceTransit(deltaSeconds) {
+        const input = this.getMovementInput();
+        const forward = clamp(Number(input.forward) || 0, -1, 1);
+        const strafe = clamp(Number(input.strafe) || 0, -1, 1);
+        const vertical = clamp(Number(input.vertical) || 0, -1, 1);
+        const crossSectionW = clamp(Number(input.crossSectionW) || 0, -1, 1);
+        const speed = input.sprint ? this.options.sprintSpeed : this.options.speed;
+        const next = this.progress + forward * speed * deltaSeconds / this.corridorLength;
+        if (next >= 1) {
+            this.progress = 1;
+            this.updatePlayerOnCorridor();
+            this.completeTransit(this.target);
+            return;
+        }
+        if (next < 0 && this.progress > 0) {
+            this.progress = 0;
+            this.updatePlayerOnCorridor();
+            this.completeTransit(this.startWorld);
+            return;
+        }
+        this.progress = clamp(next, 0, 1);
+        const radius = this.getCurrentRadius();
+        const transverseLimit = radius * 0.62;
+        this.offsetU = clamp(
+            this.offsetU + strafe * this.options.transverseSpeed * deltaSeconds,
+            -transverseLimit,
+            transverseLimit
+        );
+        this.offsetV = clamp(
+            this.offsetV + vertical * this.options.transverseSpeed * deltaSeconds,
+            -transverseLimit,
+            transverseLimit
+        );
+        this.offsetW = clamp(
+            this.offsetW + crossSectionW * this.options.transverseSpeed * deltaSeconds,
+            -transverseLimit,
+            transverseLimit
+        );
+        this.constrainCrossSection(transverseLimit);
+        this.updatePlayerOnCorridor();
+    }
+
+    updatePlayerOnCorridor() {
+        const sample = this.getTransitSample(
+            this.activeRenderer,
+            this.progress,
+            this.direction,
+            this.offsetU,
+            this.offsetV,
+            this.offsetW,
+            this.entryPosition,
+            this.entryYaw
+        );
+        this.spatialPosition4D = sample.spatialPosition4D;
+        this.player.spatialPosition4D = { ...sample.spatialPosition4D };
+        this.player.setRenderPosition(sample.position, sample.yaw);
+        this.corridorChunk?.updateOccupant(this.player, this.progress, sample.spatialPosition4D);
+        this.camera.setRenderAnchor(sample.position, sample.yaw, this.getCameraLookTarget());
+    }
+
+    getCameraLookTarget() {
+        const ahead = Math.min(0.985, Math.max(0.76, this.progress + 0.18));
+        const t = this.direction > 0 ? ahead : 1 - ahead;
+        const sample = this.activeRenderer.getDisplaySample(t);
+        const axes = sample.axes ?? [];
+        const cross = sample.crossSectionAxes ?? [];
+        const scale = this.activeRenderer.options?.displayScale ?? 1;
+        const axisU = normalize3(axes[0] ?? cross[0]);
+        const axisV = orthogonalize3(normalize3(axes[1] ?? cross[1]), axisU);
+        const axisW = normalizeOrZero3(cross[2]);
+        return add3(
+            add3(
+                add3(sample.position, scale3(axisU, this.offsetU * scale)),
+                scale3(axisV, this.offsetV * scale)
+            ),
+            scale3(axisW, this.offsetW * scale)
+        );
+    }
+
+    advanceOtherEntities(deltaSeconds) {
+        for (const state of this.entityTransits.values()) {
+            state.progress = Math.min(1, state.progress + state.speed * deltaSeconds / this.corridorLength);
+            const sample = this.getTransitSample(
+                state.renderer, state.progress, state.direction, 0, 0,
+                0, state.entryPosition, state.entryYaw
+            );
+            state.entity.spatialPosition4D = { ...sample.spatialPosition4D };
+            setEntityRenderPosition(state.entity, sample.position, sample.yaw);
+            this.corridorChunk?.updateOccupant(state.entity, state.progress, sample.spatialPosition4D);
+            if (state.progress >= 1) this.completeEntityTransit(state);
+        }
+    }
+
+    constrainCrossSection(limit) {
+        const length = Math.hypot(this.offsetU, this.offsetV, this.offsetW);
+        if (length <= limit || length <= 1e-9) return;
+        const scale = limit / length;
+        this.offsetU *= scale;
+        this.offsetV *= scale;
+        this.offsetW *= scale;
+    }
+
+    getTransitSample(renderer, progress, direction, offsetU, offsetV, offsetW, entryPosition, entryYaw) {
+        const t = direction > 0 ? progress : 1 - progress;
+        const sample = renderer.getDisplaySample(t);
+        const axes = sample.axes ?? [];

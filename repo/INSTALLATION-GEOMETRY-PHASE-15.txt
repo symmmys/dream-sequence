@@ -1,0 +1,55 @@
+SOMNIUM — GEOMETRY PHASE 15
+Main-World anomaly re-entry and per-slice metric grid
+
+INSTALLATION
+
+1. Extract the complete ZIP into a clean project directory.
+2. Serve the directory containing index.html:
+
+   cd /path/to/somnium-project-root
+   python3 -m http.server 8081
+
+3. Open http://127.0.0.1:8081/.
+4. Phase 15 uses the cache-busting identifier:
+   somnium-20261108-phase15-main-world-reentry-metric-grid-1
+   Hard-refresh after replacing an existing project directory.
+
+MAIN-WORLD ANOMALY RE-ENTRY
+
+- After arriving in Somnium Main World, the traversal network resolves ambient R4
+  coordinates through a controller that actually owns the Main-World slice.
+- Connected anomaly influence fields remain available on the Main-World side.
+- Move at least 1.25 world units away from the arrival point to clear the anti-bounce
+  exit lock, then approach the anomaly mouth while facing it and moving forward.
+- Both connected Main-World anomalies are evaluated through explicit topology routes.
+
+METRIC GRID
+
+- Press G or click METRIC GRID (G) in the Geometry Demo HUD to toggle the grid.
+- The grid follows the active view slice: Poincare chamber, 4D Hypercube chamber,
+  or Somnium Main World.
+- The Main-World grid is sampled from live terrain elevation and is offset slightly
+  above the terrain surface.
+- The grid preference is shared across the slices; only the currently viewed slice's
+  grid is active and rendered.
+
+TESTS
+
+Run from the project root:
+
+   node --test tests/*.test.mjs
+
+Phase 15 automated and static verification is included in
+GEOMETRY-PHASE-15-TEST-RESULTS.txt.
+
+VISUAL VERIFICATION
+
+A live browser/WebGL session was not available in the build environment. Locally:
+
+- Exit the direct Hypercube-to-Main-World anomaly, move away from the arrival mouth,
+  then face and approach it again to re-enter.
+- Confirm the HUD reports W FREEDOM ACTIVE when the Main-World influence field is
+  available and that E/Q movement can move in both W directions.
+- Press G and use the HUD button in all three slices. Confirm only the active slice's
+  grid appears and that the Main-World grid conforms to terrain elevation.
+- Check the browser console for projection or visibility errors.

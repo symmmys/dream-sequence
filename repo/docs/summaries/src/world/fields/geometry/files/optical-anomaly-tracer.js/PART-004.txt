@@ -1,0 +1,201 @@
+    }
+    if (!anomaly.influence?.center || !Number.isFinite(anomaly.influence.horizonRadius) ||
+        !Number.isFinite(anomaly.influence.innerRadius)) {
+        throw new TypeError(`Anomaly ${anomaly.id} has no resolved optical influence field.`);
+    }
+}
+
+function validateBinding(binding, expectedSliceId, label) {
+    if (!binding?.slice?.id || binding.slice.id !== expectedSliceId || !binding.slice.frame ||
+        typeof binding.spatialTransform?.metricAtWorld !== 'function') {
+        throw new TypeError(`Anomaly optical ${label} binding is incomplete or belongs to another slice.`);
+    }
+}
+
+function intersectSphereEntry(from, to, center, radius) {
+    const direction = subtract3(to, from);
+    const offset = subtract3(from, center);
+    const a = dot3(direction, direction);
+    if (a <= 1e-16) return null;
+    const b = 2 * dot3(offset, direction);
+    const c = dot3(offset, offset) - radius * radius;
+    const discriminant = b * b - 4 * a * c;
+    if (discriminant < 0) return null;
+    const root = Math.sqrt(Math.max(0, discriminant));
+    const roots = [(-b - root) / (2 * a), (-b + root) / (2 * a)].sort((x, y) => x - y);
+    for (const parameter of roots) {
+        if (parameter < 0 || parameter > 1) continue;
+        const point = add3(from, scale3(direction, parameter));
+        const radial = normalize3OrFallback(subtract3(point, center), [1, 0, 0]);
+        if (dot3(direction, radial) < -1e-10) return { parameter, point, normal: radial };
+    }
+    return null;
+}
+
+function segmentAabbExitParameter(from, to, bounds) {
+    const direction = subtract4(to, from);
+    let best = Infinity;
+    for (const axis of AXES4) {
+        if (to[axis] > bounds.max[axis] && direction[axis] > 0) {
+            best = Math.min(best, (bounds.max[axis] - from[axis]) / direction[axis]);
+        } else if (to[axis] < bounds.min[axis] && direction[axis] < 0) {
+            best = Math.min(best, (bounds.min[axis] - from[axis]) / direction[axis]);
+        }
+    }
+    return Number.isFinite(best) && best >= 0 && best <= 1 ? best : null;
+}
+
+function segmentSphereExitParameter(from, to, center, radius) {
+    const direction = subtract4(to, from);
+    const offset = subtract4(from, center);
+    const startDistance = norm4(offset);
+    const endDistance = norm4(subtract4(to, center));
+    if (startDistance >= radius - 1e-8 || endDistance < radius) return null;
+    const a = dot4(direction, direction);
+    if (a <= 1e-16) return null;
+    const b = 2 * dot4(offset, direction);
+    const c = dot4(offset, offset) - radius * radius;
+    const discriminant = b * b - 4 * a * c;
+    if (discriminant < 0) return null;
+    const root = Math.sqrt(discriminant);
+    const parameter = (-b + root) / (2 * a);
+    return parameter >= 0 && parameter <= 1 ? parameter : null;
+}
+
+function readMetric(metric) {
+    const values = Array.isArray(metric) || ArrayBuffer.isView(metric) ? metric : metric?.values;
+    if ((!Array.isArray(values) && !ArrayBuffer.isView(values)) || values.length !== 9) {
+        throw new TypeError('SpatialTransform.metricAtWorld() must provide a 3x3 metric.');
+    }
+    const result = Array.from(values, Number);
+    if (!result.every(Number.isFinite)) throw new TypeError('Slice optical metric contains non-finite values.');
+    return result;
+}
+
+function rebaseMetric3(metric, fromAxes, toAxes) {
+    const rotation = Array.from({ length: 3 }, (_, row) =>
+        Array.from({ length: 3 }, (_, column) => dot4(toAxes[row], fromAxes[column]))
+    );
+    const result = new Array(9).fill(0);
+    for (let row = 0; row < 3; row++) {
+        for (let column = 0; column < 3; column++) {
+            for (let a = 0; a < 3; a++) {
+                for (let b = 0; b < 3; b++) {
+                    result[row * 3 + column] += rotation[row][a] * metric[a * 3 + b] * rotation[column][b];
+                }
+            }
+        }
+    }
+    return result;
+}
+
+function projectCovectorToFrame(vector, axes) {
+    return axes.map((axis) => dot4(vector, axis));
+}
+
+function projectAmbientVectorToFrame(to, from, axes) {
+    const delta = subtract4(to, from);
+    return axes.map((axis) => dot4(delta, axis));
+}
+
+function liftCovectorFromFrame(axes, vector) {
+    let result = { x: 0, y: 0, z: 0, w: 0 };
+    for (let index = 0; index < 3; index++) {
+        result = {
+            x: result.x + axes[index].x * vector[index],
+            y: result.y + axes[index].y * vector[index],
+            z: result.z + axes[index].z * vector[index],
+            w: result.w + axes[index].w * vector[index]
+        };
+    }
+    return result;
+}
+
+function multiply4(matrix, vector) {
+    const axes = ['x', 'y', 'z', 'w'];
+    const values = new Array(4);
+    for (let row = 0; row < 4; row++) {
+        values[row] = 0;
+        for (let column = 0; column < 4; column++) {
+            values[row] += matrix[row * 4 + column] * vector[axes[column]];
+        }
+    }
+    return { x: values[0], y: values[1], z: values[2], w: values[3] };
+}
+
+function multiply3(matrix, vector) {
+    return [
+        matrix[0] * vector[0] + matrix[1] * vector[1] + matrix[2] * vector[2],
+        matrix[3] * vector[0] + matrix[4] * vector[1] + matrix[5] * vector[2],
+        matrix[6] * vector[0] + matrix[7] * vector[1] + matrix[8] * vector[2]
+    ];
+}
+
+function quadratic3(matrix, vector) {
+    return dot3(vector, multiply3(matrix, vector));
+}
+
+function add3(a, b) {
+    return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+}
+
+function subtract3(a, b) {
+    return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+}
+
+function scale3(vector, factor) {
+    return [vector[0] * factor, vector[1] * factor, vector[2] * factor];
+}
+
+function dot3(a, b) {
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+function normalize3OrFallback(vector, fallback) {
+    const length = Math.hypot(vector[0], vector[1], vector[2]);
+    if (length > 1e-12) return vector.map((value) => value / length);
+    const fallbackLength = Math.hypot(fallback[0], fallback[1], fallback[2]);
+    if (fallbackLength <= 1e-12) return [1, 0, 0];
+    return fallback.map((value) => value / fallbackLength);
+}
+
+function interpolate4(a, b, t) {
+    return {
+        x: a.x + (b.x - a.x) * t,
+        y: a.y + (b.y - a.y) * t,
+        z: a.z + (b.z - a.z) * t,
+        w: a.w + (b.w - a.w) * t
+    };
+}
+
+function smootherstep(value) {
+    const t = clamp(value, 0, 1);
+    // The polynomial can overshoot by a few ulps at t≈1. Keep the convex
+    // interpolation weights exactly inside [0, 1] before blending SPD metrics.
+    if (t === 0 || t === 1) return t;
+    return clamp(t * t * t * (t * (t * 6 - 15) + 10), 0, 1);
+}
+
+function clamp(value, minimum, maximum) {
+    return Math.min(maximum, Math.max(minimum, value));
+}
+
+function renderTopologyDebug(result, sliceRegistry, debugRenderer, style) {
+    // Slice segments are rendered with their own transforms. The anomaly
+    // segments remain authoritative R4 in the returned result; a dedicated
+    // 4D projected debug view is added separately from this CPU transport pass.
+    for (const segment of result.pathSegments) {
+        if (segment.kind !== 'slice') continue;
+        const binding = sliceRegistry.require(segment.sliceId);
+        debugRenderer.renderTrace(segment.result, {
+            slice: binding.slice,
+            spatialTransform: binding.spatialTransform,
+            ...style
+        });
+    }
+}
+
+export {
+    createAnomalyOpticalField,
+    createAnomalyOpticalTracer
+};

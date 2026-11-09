@@ -1,0 +1,53 @@
+SOMNIUM GEOMETRY PHASE 7 — INSTALLATION
+Build: 2026-11-08-hypercube-chamber-1
+
+RECOMMENDED INSTALLATION
+1. Back up the current Somnium working directory.
+2. Extract somnium_geometry_phase7_hypercube_chamber_project.zip into a new directory.
+3. Change into the extracted directory containing index.html.
+4. Start the local server:
+
+   python3 -m http.server 8081 --bind 127.0.0.1
+
+5. Open http://127.0.0.1:8081/ in the browser.
+6. Check the console for:
+
+   [Main] Build: 2026-11-08-hypercube-chamber-1
+   [GeometryDemo] Build: 2026-11-08-hypercube-chamber-1
+
+7. Choose 4D GEOMETRY DEMO. It should start in the 4D HYPERCUBE CHAMBER with the camera following the player.
+
+Press C or click FREE CAMERA (C) to enter inspection mode.
+
+CONTROLS IN THE 4D CHAMBER (FREE CAMERA)
+W / S       Move forward / backward in the 3D view
+A / D       Strafe left / right
+R / F       Move vertically
+E / Q       Move along the fourth spatial coordinate W
+Mouse       Look around
+Mouse wheel Adjust movement speed
+Shift       Move faster
+C           Toggle free camera / follow-player camera
+G           Toggle the metric debug grid
+
+CONTROLS INSIDE AN ANOMALY
+W / S       Move along the corridor tangent
+A / D       First transported cross-section axis
+R / F       Second transported cross-section axis
+E / Q       Third transported cross-section axis
+
+CONNECTED ROUTE
+4D Hypercube Chamber -> 4D corridor chunk -> Poincare Chamber
+Poincare Chamber -> original corridor chunk -> Somnium Main World
+Both corridors are bidirectional.
+
+TROUBLESHOOTING
+- Stop any older Python server before starting the extracted project.
+- Ensure the server's working directory is the folder containing this archive's index.html.
+- Hard-refresh with the browser cache disabled if the build marker is stale.
+- If a runtime error occurs, capture the first console error and the build marker lines.
+
+VERIFICATION LIMIT
+Automated Node and static checks pass, but this release has not completed a live
+browser/WebGL visual pass in the build environment. Please verify the tesseract,
+free-camera W movement, portal views, and both corridor handoffs in the target browser.

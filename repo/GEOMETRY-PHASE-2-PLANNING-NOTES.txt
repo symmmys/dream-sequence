@@ -1,0 +1,28 @@
+SOMNIUM — GEOMETRY INTEGRATION / PHASE 2 PLAN
+============================================
+
+This is a planning-only update. Application source is unchanged.
+
+Read:
+  GEOMETRY-PHASE-2-IMPLEMENTATION-PLAN.md
+
+The plan covers:
+  - Babylon.js binding for Phase 1 world slices and corridors.
+  - Per-slice geometry transforms and material-safe GPU/CPU paths.
+  - Poincare local conformal expansion and debug grid.
+  - Spherical and guarded inverted-Poincare projection profiles.
+  - Topographic map loading, elevation decoding and world generation.
+  - A compact third-person room demo linked to a topographic destination.
+  - Portal preview rendering and its non-activation rules.
+  - Test strategy, explicit Phase 2 exclusions, and style conformance.
+
+Baseline verification:
+  node --test tests/*.test.mjs       34 passed
+  node --check src/tests JS files    97 passed
+
+Asset warning:
+  assets/0_somnium_map_topographic.png is truncated in this archive. A separate valid
+  deterministic topographic fixture is specified for the Phase 2 demo. The original asset
+  remains untouched until its complete source is available.
+
+No application implementation has been performed in this planning pass.

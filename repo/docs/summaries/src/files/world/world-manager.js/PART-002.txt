@@ -1,0 +1,300 @@
+        const chunk = this.chunks.get(job.key);
+
+        if (
+            !chunk ||
+            chunk.disposed ||
+            chunk.revision !== job.revision
+        ) {
+            this.pumpWorker();
+            return;
+        }
+
+        this.currentTask = job;
+        this.workerBusy = true;
+
+        this.worker.postMessage({
+            type: "generate",
+            id: job.id,
+            revision: job.revision,
+            job
+        });
+    }
+
+	processFallbackQueue() {
+    if (
+        this.fallbackScheduled ||
+        this.meshQueue.length === 0 ||
+        !this.enabled
+    ) {
+        return;
+    }
+
+    this.fallbackScheduled = true;
+
+    setTimeout(() => {
+        this.fallbackScheduled = false;
+
+        const job = this.meshQueue.shift();
+
+        if (job) {
+            const chunk = this.chunks.get(job.key);
+
+            if (
+                chunk &&
+                !chunk.disposed &&
+                chunk.revision === job.revision
+            ) {
+                try {
+                    chunk.generateMesh(
+                        job.lod,
+                        this.material
+                    );
+                } catch (error) {
+                    console.error(
+                        "[WorldManager] Synchronous terrain generation failed:",
+                        error
+                    );
+                }
+            }
+        }
+
+        this.stats.pendingMeshes = this.meshQueue.length;
+        this.processFallbackQueue();
+
+    }, 0);
+}
+
+    getNeighbors(chunk) {
+        return {
+            north: this.getChunk(chunk.x, chunk.z - 1),
+            south: this.getChunk(chunk.x, chunk.z + 1),
+            east: this.getChunk(chunk.x + 1, chunk.z),
+            west: this.getChunk(chunk.x - 1, chunk.z)
+        };
+    }
+
+    getSpatialNeighbors(chunk, position4D = null) {
+        if (!this.chunkGraph) return [];
+        const neighbors = this.chunkGraph.getNeighbors(chunk.address);
+        const worldChunks = position4D && this.chunkGraph.getReachableAdjacentWorldChunks
+            ? this.chunkGraph.getReachableAdjacentWorldChunks(chunk.address, position4D)
+            : this.chunkGraph.getAdjacentWorldChunks(chunk.address);
+        chunk.setSpatialNeighbors(neighbors, worldChunks);
+        return neighbors;
+    }
+
+    rebuildChunk(chunk) {
+        this.scheduleMesh(
+            chunk,
+            chunk.lod < 0 ? 3 : chunk.lod
+        );
+    }
+
+    createChunk(x, z, lod) {
+        if (!this.isInsideWorld(x, z)) return null;
+
+        const chunk = new WorldChunk(
+            x,
+            z,
+            this.chunkSize,
+            this.terrain,
+            this.scene,
+            {
+                sliceId: this.sliceId,
+                spatialAdapter: this.spatialAdapter,
+                opticalScene: this.opticalScene,
+                layerMask: this.layerMask,
+                visible: this.visible
+            }
+        );
+
+        this.chunks.set(
+            this.getKey(x, z),
+            chunk
+        );
+        this.chunkGraph?.registerChunk(chunk.address, chunk);
+        chunk.setSpatialNeighbors(this.getSpatialNeighbors(chunk));
+
+        this.stats.generated++;
+        this.stats.loaded++;
+
+        this.scheduleMesh(chunk, lod);
+
+        // Existing neighbors may need new boundary stitching.
+        for (const neighbor of Object.values(
+            this.getNeighbors(chunk)
+        )) {
+            if (neighbor) {
+                this.rebuildChunk(neighbor);
+            }
+        }
+
+        return chunk;
+    }
+
+    getLOD(x, z, cameraPosition) {
+        const centerX = (x + 0.5) * this.chunkSize;
+        const centerZ = (z + 0.5) * this.chunkSize;
+
+        const distance = Math.hypot(
+            centerX - cameraPosition.x,
+            centerZ - cameraPosition.z
+        );
+
+if (
+    distance <=
+    this.chunkSize * (this.highDetailRadius + 0.5)
+) return 0;
+
+if (
+    distance <=
+    this.chunkSize * (this.highDetailRadius + 2)
+) return 1;
+
+if (distance <= this.chunkSize * 8) return 2;
+
+        return 3;
+    }
+
+    getPriority(x, z, cameraPosition, forward) {
+        const centerX = (x + 0.5) * this.chunkSize;
+        const centerZ = (z + 0.5) * this.chunkSize;
+
+        const dx = centerX - cameraPosition.x;
+        const dz = centerZ - cameraPosition.z;
+
+        const distance = Math.hypot(dx, dz);
+
+        const length = Math.max(distance, 1);
+
+        const directionDot = (
+            dx / length * forward.x +
+            dz / length * forward.z
+        );
+
+        // Lower scores are generated first.
+        return distance -
+            Math.max(0, directionDot) *
+            this.chunkSize * 4;
+    }
+
+    update(cameraPosition, forward = null, reachabilityContext = null) {
+        if (!this.enabled || !this.terrain.ready) return;
+
+        const center = this.getCoordinates(cameraPosition);
+
+        const direction = forward ?? {
+            x: 0,
+            z: 1
+        };
+
+        const required = [];
+        const requiredKeys = new Set();
+
+        for (
+            let x = Math.max(
+                this.minChunkX,
+                center.x - this.renderRadius
+            );
+            x <= Math.min(
+                this.maxChunkX,
+                center.x + this.renderRadius
+            );
+            x++
+        ) {
+            for (
+                let z = Math.max(
+                    this.minChunkZ,
+                    center.z - this.renderRadius
+                );
+                z <= Math.min(
+                    this.maxChunkZ,
+                    center.z + this.renderRadius
+                );
+                z++
+            ) {
+                const dx = x - center.x;
+                const dz = z - center.z;
+
+                if (
+                    dx * dx + dz * dz >
+                    this.renderRadius * this.renderRadius
+                ) continue;
+
+                required.push({
+                    x,
+                    z,
+                    priority: this.getPriority(
+                        x,
+                        z,
+                        cameraPosition,
+                        direction
+                    ),
+                    lod: this.getLOD(x, z, cameraPosition)
+                });
+                requiredKeys.add(`${x}:${z}`);
+            }
+        }
+
+        this.lastReachableRemoteChunks = 0;
+        const currentlyReachableKeys = new Set();
+        if (this.chunkGraph?.getReachableChunkCandidates && reachabilityContext?.sourceSliceId &&
+            reachabilityContext.sourceSliceId !== this.sliceId && reachabilityContext.position4D) {
+            const candidates = this.chunkGraph.getReachableChunkCandidates(
+                reachabilityContext.sourceSliceId, reachabilityContext.position4D,
+                { ...(reachabilityContext.influenceOptions ?? {}), targetSliceId: this.sliceId }
+            );
+            for (const candidate of candidates) {
+                const address = candidate.address;
+                if (!this.isInsideWorld(address.chunkX, address.chunkZ)) continue;
+                const key = `${address.chunkX}:${address.chunkZ}`;
+                currentlyReachableKeys.add(key);
+                this.remoteChunkRetention.set(key, this.remoteRetentionFrames);
+                this.lastReachableRemoteChunks++;
+                if (requiredKeys.has(key)) continue;
+                required.push({
+                    x: address.chunkX,
+                    z: address.chunkZ,
+                    priority: -1e6 + candidate.reachability.spatialDistance * this.chunkSize +
+                        candidate.reachability.wDistance,
+                    lod: this.getLOD(
+                        address.chunkX, address.chunkZ,
+                        candidate.reachability.projectedPosition ?? cameraPosition
+                    ),
+                    reachableViaAnomaly: candidate.reachability.anomalyId
+                });
+                requiredKeys.add(key);
+            }
+        }
+        for (const [key, frames] of this.remoteChunkRetention) {
+            if (currentlyReachableKeys.has(key)) continue;
+            if (frames <= 1) this.remoteChunkRetention.delete(key);
+            else this.remoteChunkRetention.set(key, frames - 1);
+        }
+
+        required.sort((a, b) => a.priority - b.priority);
+
+        let scheduled = 0;
+
+        for (const item of required) {
+            const chunk = this.getChunk(item.x, item.z);
+
+            if (!chunk) {
+                if (scheduled >= this.maxChunksPerUpdate) {
+                    continue;
+                }
+
+                this.createChunk(
+                    item.x,
+                    item.z,
+                    item.lod
+                );
+
+                scheduled++;
+                continue;
+            }
+
+            if (chunk.lod !== item.lod) {
+                if (scheduled >= this.maxChunksPerUpdate) {
+                    continue;
+                }

@@ -1,0 +1,300 @@
+
+            this.camera.dispose();
+            this.camera = null;
+        }
+
+
+        this.targetMovementMesh?.dispose();
+        this.targetMovementMesh = null;
+
+        this.targetMovementMaterial?.dispose();
+
+        this.clearMovementMeshes();
+    }
+
+    createProjectedCellMesh({
+        name,
+        row,
+        col,
+        material,
+        verticalOffset = 0.8,
+        pickable = false,
+        metadata = null
+    }) {
+        // Exact world-space boundaries of this grid cell.
+        const x0 = this.gridOrigin.x + col * this.cellSize;
+        const x1 = x0 + this.cellSize;
+
+        const z0 = this.gridOrigin.z + row * this.cellSize;
+        const z1 = z0 + this.cellSize;
+
+        const worldCorners = [
+            { x: x0, z: z0 },
+            { x: x1, z: z0 },
+            { x: x1, z: z1 },
+            { x: x0, z: z1 }
+        ];
+
+        // Project every corner independently. This is important
+        // for nonlinear spatial transformations.
+        const positions = [];
+
+        for (const corner of worldCorners) {
+            const sample = this.terrain.sampleAt(
+                corner.x,
+                corner.z
+            );
+
+            if (!sample) return null;
+
+            const projected = this.transform.worldToRender({
+                x: corner.x,
+                y: sample.y + verticalOffset,
+                z: corner.z
+            });
+
+            if (
+                !Number.isFinite(projected.x) ||
+                !Number.isFinite(projected.y) ||
+                !Number.isFinite(projected.z)
+            ) {
+                return null;
+            }
+
+            positions.push(
+                projected.x,
+                projected.y,
+                projected.z
+            );
+        }
+
+        const mesh = new BABYLON.Mesh(name, this.scene);
+
+        const vertexData = new BABYLON.VertexData();
+
+        vertexData.positions = positions;
+
+        vertexData.indices = [
+            0, 1, 2,
+            0, 2, 3
+        ];
+
+        const normals = [];
+
+        BABYLON.VertexData.ComputeNormals(
+            positions,
+            vertexData.indices,
+            normals
+        );
+
+        vertexData.normals = normals;
+
+        vertexData.applyToMesh(mesh);
+
+        mesh.material = material;
+        mesh.isPickable = pickable;
+        mesh.renderingGroupId = 1;
+
+        mesh.metadata = metadata;
+
+        return mesh;
+    }
+
+    setGridConfiguration(rows, columns, cellSize) {
+        const configuration = this.normalizeGridConfiguration(
+            rows,
+            columns,
+            cellSize
+        );
+
+        if (!configuration) return false;
+        if (!this.charactersFitGrid(configuration)) return false;
+
+        const previous = this.captureGridConfiguration();
+
+        try {
+            this.applyGridConfiguration(configuration, previous);
+            this.refreshUI();
+
+            const saved = this.saveGridConfiguration();
+            this.saveCharacters();
+
+            this.showMessage(saved
+                ? this.formatGridConfigurationMessage(configuration)
+                : "Grid updated, but settings could not be saved."
+            );
+
+            return true;
+        } catch (error) {
+            this.restoreGridConfigurationState(previous);
+            this.reportGridConfigurationError(error);
+            return false;
+        }
+    }
+
+    normalizeGridConfiguration(rows, columns, cellSize) {
+        // Preserve integrations using the former (size, cellSize) API.
+        if (cellSize === undefined) {
+            cellSize = columns;
+            columns = rows;
+        }
+
+        if (!this.validateGridDimensions(rows, columns)) {
+            this.showMessage(
+                `Grid rows and columns must each be between ${MIN_GRID_DIMENSION} and ${MAX_GRID_DIMENSION}.`
+            );
+            return null;
+        }
+
+        if (!this.isValidCellSize(cellSize)) {
+            this.showMessage(
+                `Cell size must be between ${MIN_CELL_SIZE} and ${MAX_CELL_SIZE} world units.`
+            );
+            return null;
+        }
+
+        const configuration = { rows, columns, cellSize };
+
+        if (!this.validateTerrainCoverage(
+            rows,
+            columns,
+            cellSize,
+            this.gridOrigin
+        )) {
+            this.showMessage(
+                "The proposed grid extends beyond available terrain."
+            );
+            return null;
+        }
+
+        return configuration;
+    }
+
+    charactersFitGrid({ rows, columns }) {
+        for (const character of this.characters.values()) {
+            const { row, col } = character.position;
+
+            if (row >= rows || col >= columns || row < 0 || col < 0) {
+                this.showMessage(
+                    `Grid resize would exclude ${character.name}.`
+                );
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    captureGridConfiguration() {
+        return {
+            rows: this.gridRows,
+            columns: this.gridColumns,
+            cellSize: this.cellSize,
+            radius: this.camera?.radius,
+            alpha: this.camera?.alpha,
+            beta: this.camera?.beta
+        };
+    }
+
+    applyGridConfiguration(configuration, previous) {
+        this.gridRows = configuration.rows;
+        this.gridColumns = configuration.columns;
+        this.cellSize = configuration.cellSize;
+
+        this.createGrid();
+        this.syncAllCharacters();
+        this.refreshMovementPreview();
+
+        this.recenterCameraPreservingOrbit(previous);
+    }
+
+    restoreGridConfigurationState(previous) {
+        this.gridRows = previous.rows;
+        this.gridColumns = previous.columns;
+        this.cellSize = previous.cellSize;
+
+        this.createGrid();
+        this.syncAllCharacters();
+        this.refreshMovementPreview();
+
+        this.recenterCameraPreservingOrbit(previous);
+    }
+
+    formatGridConfigurationMessage({ rows, columns, cellSize }) {
+        return (
+            `Grid updated: ${rows} rows × ${columns} columns; ` +
+            `${cellSize} world units per cell.`
+        );
+    }
+
+    reportGridConfigurationError(error) {
+        console.warn("[DnD] Grid configuration rejected.", error);
+        this.showMessage(error.message);
+    }
+
+    setGridDimensions(rows, columns, cellSize) {
+        return this.setGridConfiguration(rows, columns, cellSize);
+    }
+
+    validateTerrainCoverage(rows, columns, cellSize, origin) {
+        for (let row = 0; row <= rows; row++) {
+            for (let col = 0; col <= columns; col++) {
+                const x = origin.x + col * cellSize;
+                const z = origin.z + row * cellSize;
+
+                if (!this.terrain.sampleAt(x, z)) return false;
+            }
+        }
+
+        return true;
+    }
+
+    syncAllCharacters() {
+        for (const character of this.characters.values()) {
+            this.syncCharacter(character);
+        }
+    }
+
+    restoreCameraOrbit(previous) {
+        if (!this.camera || !previous) return;
+
+        if (Number.isFinite(previous.radius)) {
+            this.camera.radius = previous.radius;
+        }
+        if (Number.isFinite(previous.alpha)) {
+            this.camera.alpha = previous.alpha;
+        }
+        if (Number.isFinite(previous.beta)) {
+            this.camera.beta = previous.beta;
+        }
+    }
+
+    isValidCellSize(cellSize) {
+        return (
+            Number.isFinite(cellSize) &&
+            cellSize >= MIN_CELL_SIZE &&
+            cellSize <= MAX_CELL_SIZE
+        );
+    }
+
+
+    get gridSize() {
+        // Legacy read-only alias; rectangular grids deliberately return null.
+        return this.gridRows === this.gridColumns
+            ? this.gridRows
+            : null;
+    }
+
+    isValidGridCoordinate(row, col) {
+        return (
+            Number.isInteger(row) &&
+            Number.isInteger(col) &&
+            row >= 0 &&
+            col >= 0 &&
+            row < this.gridRows &&
+            col < this.gridColumns
+        );
+    }
+
+    validateGridDimensions(rows, columns) {
+        return (

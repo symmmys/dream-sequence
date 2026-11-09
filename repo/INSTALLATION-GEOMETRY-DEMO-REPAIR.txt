@@ -1,0 +1,37 @@
+SOMNIUM - GEOMETRY DEMO REPAIR
+==============================
+
+Recommended: replace your existing project with the complete updated project ZIP.
+
+1. Back up your current Somnium directory.
+2. Extract somnium_geometry_demo_repaired_project.zip.
+3. Enter the extracted directory containing index.html.
+4. Start the server:
+
+   python3 -m http.server 8081 --bind 127.0.0.1
+
+5. Open http://localhost:8081 and launch GEOMETRY DEMO.
+
+Controls:
+  WASD       Move
+  Shift      Run
+  Left drag  Turn the player / third-person view
+  Mouse wheel Zoom
+  G          Toggle the metric debug grid
+  Esc        Pause / return to menu
+
+The primary topographic image has been repaired from its recoverable PNG rows.
+The geometry demo chamber is now open-sided, larger, and has in-world labels.
+The camera is constrained to the active slice's projection bounds so camera-boom
+movement cannot cause the Poincare projector to reject a derived camera point.
+
+The replacement-files ZIP contains the changed files at their original relative
+paths. Back up the project before applying it. The complete project ZIP is safer.
+
+Verification in this build:
+  48/48 Node tests passed
+  104/104 source syntax checks passed
+  6/6 test syntax checks passed
+  Primary PNG decoded and verified as a complete 3000 x 6203 image
+
+Browser/WebGL visual verification was not completed by this build process.

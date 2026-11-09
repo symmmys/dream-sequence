@@ -1,0 +1,21 @@
+SOMNIUM — GEOMETRY PHASE 16C INSTALLATION
+
+1. Extract the complete Phase 16C archive into a clean project directory.
+2. Ensure you are serving the directory that contains index.html (the project root, not an outer ZIP wrapper directory).
+3. From that directory, start the local server:
+
+   python3 -m http.server 8081
+
+4. Open:
+
+   http://127.0.0.1:8081/
+
+5. Hard-refresh the browser once after replacing a prior Phase 16 build. The Phase 16C-2 build identifier is included in the application entry point and versioned imports.
+
+Phase 16C adds the CPU anomaly optical transport API but does not turn on visible sunlight or shadow rendering. Those are planned Phase 16E deliverables; Phase 16D delivers view-dependent anomaly apertures. The scene exposes the optical registry and a topology-aware tracer factory through scene.metadata for console/dev-tool testing.
+
+Run the complete automated suite from the extracted project directory:
+
+   node --test tests/*.test.mjs
+
+See GEOMETRY-PHASE-16C-ANOMALY-OPTICAL-BRIDGES.md for the transport model, API boundaries, and limitations.

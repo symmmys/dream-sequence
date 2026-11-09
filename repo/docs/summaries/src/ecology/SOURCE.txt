@@ -1,0 +1,1380 @@
+SOMNIUM — DIRECTORY SOURCE DUMP
+========================================================================
+
+Directory: src/ecology/
+Generated: 2026-11-09T03:15:29
+
+This file contains recursively collected UTF-8 text files.
+Binary files and excluded directories are omitted.
+File paths are relative to the project root.
+
+
+========================================================================
+FILE: src/ecology/forest.js
+========================================================================
+
+import { Environment } from "../environment/environment.js";
+import { TerrainSampler } from "../environment/terrain.js";
+import { SpatialGrid } from "../environment/spatial-grid.js";
+import { GeologicalManager } from "../geology/geological-manager.js";
+import { GeologicalField } from "../geology/geological-field.js";
+import { TreeRenderer, FoliageRenderer } from "../rendering/tree-renderers.js";
+import { RockRenderer } from "../rendering/rock-renderer.js";
+import { Tree } from "./tree.js";
+import { TreeGenerator } from "./tree-generator.js";
+import { Genetics } from "../core/genetics.js";
+import { CloudSpecies } from  "../atmosphere/cloud-species.js";
+import { CloudGenerator } from "../atmosphere/cloud-generator.js";
+import { WaterSystem } from "../water/water-system.js";
+import { Hydrology } from "../water/hydrology.js";
+import { RainSystem } from "../water/rain-system.js";
+import { CloudSystem } from "../atmosphere/cloud-system.js";
+import { WorldFieldSystem } from "../world/fields/world-field-system.js";
+
+class Forest {
+
+
+	constructor(
+    scene,
+    ground,
+    sunDirection,
+    shadowGenerator,
+    seaLevel = -100
+) {
+        this.scene = scene;
+
+	this.shadowGenerator = shadowGenerator;
+
+        this.environment = new Environment(sunDirection);
+
+        this.terrain = new TerrainSampler(scene, ground);
+
+	this.lastRenderTime = 0;
+	this.renderInterval = 5;
+	this.simulationSteps = 0;
+	this.renderEverySteps = 3;
+	this.renderDirty = true;
+
+        this.minSpacing = 2.5;
+	this.spatialGrid = new SpatialGrid(this.minSpacing);
+	
+        this.trees = [];
+
+
+	this.geology = new GeologicalManager( scene, this.terrain, shadowGenerator );
+	// Initialize centralized environmental fields.
+
+this.worldFields = new WorldFieldSystem({
+
+    terrain: this.terrain,
+
+    geologicalField: this.geology.field
+
+});
+
+        this.renderers = {
+
+oak: new TreeRenderer(
+    scene,
+    "oakBranches",
+    shadowGenerator
+),
+
+pine: new TreeRenderer(
+    scene,
+    "pineBranches",
+    shadowGenerator
+)
+        };
+	
+this.rockRenderer = new RockRenderer(
+    scene,
+    shadowGenerator
+);
+
+
+
+	// Initialize the water system.
+
+this.waterSystem = new WaterSystem(
+    scene,
+    this.terrain,
+    -100
+);
+
+
+// Initialize soil hydrology.
+
+this.hydrology = new Hydrology(
+    this.terrain,
+    this.waterSystem,
+    20
+);
+
+
+// Initialize precipitation rendering.
+
+this.rainSystem = new RainSystem(
+    scene
+);
+
+
+// Initialize atmospheric simulation.
+
+this.cloudSystem = new CloudSystem(
+    scene,
+    this.terrain,
+    this.waterSystem,
+    this.hydrology,
+    this.rainSystem
+);
+
+	this.foliageRenderers = {
+oak: new FoliageRenderer(
+    scene,
+    "oakLeaves",
+    new BABYLON.Color3(0.18, 0.22, 0.12),
+    shadowGenerator
+),
+
+pine: new FoliageRenderer(
+    scene,
+    "pineLeaves",
+    new BABYLON.Color3(0.12, 0.32, 0.16),
+    shadowGenerator
+)
+
+};
+
+        const oakMaterial = new BABYLON.StandardMaterial(
+            "oakMaterial",
+            scene
+        );
+
+        oakMaterial.diffuseColor =
+            new BABYLON.Color3(0.30, 0.16, 0.07);
+
+        this.renderers.oak.mesh.material = oakMaterial;
+
+        const pineMaterial = new BABYLON.StandardMaterial(
+            "pineMaterial",
+            scene
+        );
+
+        pineMaterial.diffuseColor =
+            new BABYLON.Color3(0.40, 0.27, 0.13);
+
+        this.renderers.pine.mesh.material = pineMaterial;
+    }
+
+
+isPositionAvailable(position) {
+
+    return this.spatialGrid.isAvailable(
+        position,
+        this.minSpacing
+    );
+
+}
+
+addTree(tree) {
+
+    this.trees.push(tree);
+
+    this.spatialGrid.insert(tree);
+
+    return tree;
+
+}
+
+generate(numTrees = 80) {
+
+    let attempts = 0;
+
+    let livingCount = this.trees.reduce(
+        (count, tree) => count + (tree.alive ? 1 : 0),
+        0
+    );
+
+    while (
+        livingCount < numTrees &&
+        attempts < numTrees * 50
+    ) {
+
+        attempts++;
+
+        const position = this.terrain.sample();
+
+        if (!position) continue;
+	
+	if (this.waterSystem.isUnderwater(position)) {
+		continue;
+	}
+
+        if (!this.isPositionAvailable(position)) {
+            continue;
+        }
+
+        const speciesName =
+            Math.random() < 0.55 ? "oak" : "pine";
+
+        const tree = new Tree(
+            speciesName,
+            position,
+            Genetics.createGenome(),
+            null,
+            Math.random() * 20
+        );
+
+        this.addTree(tree);
+
+        livingCount++;
+    }
+
+// Generate geological formations.
+this.geology.generateAll();
+
+// Generate atmospheric objects.
+this.generateWorldObjects(35);
+
+// Render the forest.
+this.renderAll();
+    console.log("Initial forest:", livingCount);
+}
+
+    spawnOffspring(parent) {
+
+        const numSeeds = parent.produceSeeds();
+
+        let successful = 0;
+
+        for (let i = 0; i < numSeeds; i++) {
+
+// Check available light at the parent location
+const parentLight =
+    this.environment.sampleLight(parent.position);
+
+// Establish a minimum germination requirement
+const minimumGerminationLight = 0.30;
+
+if (parentLight.intensity < minimumGerminationLight) {
+    continue;
+}
+
+// Germination probability increases with available light
+const germinationChance =
+    0.65 *
+    BABYLON.Scalar.Clamp(
+        parentLight.intensity,
+        0,
+        1
+    );
+
+if (Math.random() > germinationChance) {
+    continue;
+}
+// Only successful germination attempts
+// need a terrain sample.
+const position = this.terrain.sampleNear(
+    parent.position,
+    10
+);
+
+if (!position) continue;
+
+if (this.waterSystem.isUnderwater(position)) {
+    continue;
+}
+
+
+// Check actual germination location
+const seedLight =
+    this.environment.sampleLight(position);
+
+if (seedLight.intensity < minimumGerminationLight) {
+    continue;
+}
+
+            // Inherit and mutate the parent's genome
+            const childGenome = Genetics.inherit(
+                parent.genome,
+                0.8
+            );
+
+            const child = new Tree(
+                parent.speciesName,
+                position,
+                childGenome,
+                parent.id,
+                0
+            );
+
+            this.addTree(child);
+
+            parent.children.push(child.id);
+
+            successful++;
+        }
+
+        return successful;
+    }
+
+
+advance(deltaYears) {
+
+	   // Advance water and atmospheric systems.
+
+    this.waterSystem.update(deltaYears);
+
+    this.hydrology.update(deltaYears);
+
+    this.cloudSystem.update(deltaYears);
+
+
+	// Advance geological processes.
+	this.geology.advance(deltaYears);
+
+    const initialTreeCount = this.trees.length;
+
+    // Rebuild environmental canopy information
+    this.environment.rebuildCanopyGrid(
+        this.trees
+    );
+
+    for (
+        let i = 0;
+        i < initialTreeCount;
+        i++
+    ) {
+
+        const tree = this.trees[i];
+
+        if (!tree.alive) continue;
+
+        const wasAlive = tree.alive;
+
+tree.update(
+    deltaYears,
+    this.environment,
+    this.hydrology
+);
+        if (!tree.alive && wasAlive) {
+
+            this.renderDirty = true;
+
+        }
+
+        if (tree.alive && tree.isMature) {
+
+            const offspring =
+                this.spawnOffspring(tree);
+
+            if (offspring > 0) {
+                this.renderDirty = true;
+            }
+
+        }
+
+    }
+
+    this.simulationSteps++;
+
+    if (
+        this.renderDirty ||
+        this.simulationSteps >= this.renderEverySteps
+    ) {
+
+        this.renderAll();
+
+        this.renderDirty = false;
+
+        this.simulationSteps = 0;
+
+    }
+
+}
+
+
+updateRendering() {
+
+    if (!this.renderDirty) return;
+
+    this.renderAll();
+
+    this.renderDirty = false;
+}
+
+renderAll() {
+
+    this.renderers.oak.matrices = [];
+    this.renderers.pine.matrices = [];
+
+    this.foliageRenderers.oak.matrices = [];
+    this.foliageRenderers.pine.matrices = [];
+
+	
+const camera = this.scene.activeCamera;
+
+const cameraPosition = camera
+    ? camera.globalPosition
+    : BABYLON.Vector3.Zero();
+
+const maxRenderDistance = 250;
+
+const nearDistance = 80;
+const mediumDistance = 180;
+
+const maxRenderDistanceSquared =
+    maxRenderDistance * maxRenderDistance;
+
+const nearDistanceSquared =
+    nearDistance * nearDistance;
+
+const mediumDistanceSquared =
+    mediumDistance * mediumDistance;
+
+for (const tree of this.trees) {
+
+    if (!tree.alive) continue;
+
+    const dx =
+        tree.position.x - cameraPosition.x;
+
+    const dz =
+        tree.position.z - cameraPosition.z;
+
+    const distanceSquared =
+        dx * dx + dz * dz;
+
+    // Cull distant trees
+    if (
+        distanceSquared >
+        maxRenderDistanceSquared
+    ) {
+        continue;
+    }
+
+    // Determine geometry detail
+    let detailLevel;
+
+    if (distanceSquared < nearDistanceSquared) {
+
+        detailLevel = 2;
+
+    } else if (
+        distanceSquared < mediumDistanceSquared
+    ) {
+
+        detailLevel = 1;
+
+    } else {
+
+        detailLevel = 0;
+
+    }
+
+    const generator = new TreeGenerator(
+        tree.species,
+        this.environment,
+        tree.genome
+    );
+
+    const branches = generator.generate(
+        tree.position,
+        tree.ageFactor,
+        tree.thicknessFactor,
+        detailLevel
+    );
+
+    this.renderers[tree.speciesName]
+        .addMatrices(branches);
+
+    const foliage = generator.foliage;
+
+    const renderer =
+        this.foliageRenderers[tree.speciesName];
+
+    for (const cluster of foliage) {
+
+        let scale = cluster.scale;
+
+        if (tree.speciesName === "oak") {
+
+            scale *= 1.5;
+
+        } else {
+
+            scale *= 1.15;
+
+        }
+
+        renderer.add(
+            cluster.position,
+            scale
+        );
+
+    }
+
+}
+
+
+    // Upload branch buffers
+    this.renderers.oak.update();
+    this.renderers.pine.update();
+
+    // Upload foliage buffers
+    this.foliageRenderers.oak.update();
+    this.foliageRenderers.pine.update();
+
+
+	// Update geological formations.
+this.rockRenderer.update();
+// Update atmospheric rendering.
+
+this.cloudSystem.updateRendering();
+}
+
+
+generateWorldObjects(cloudCount = 35) {
+
+    this.cloudSystem.generate(cloudCount);
+
+}
+
+
+
+
+}
+export { Forest }
+
+
+========================================================================
+FILE: src/ecology/tree-generator.js
+========================================================================
+
+function generateCanopy(tree, ageFactor, thicknessFactor = ageFactor) {
+
+    const species = tree.species;
+    const genome = tree.genome;
+
+    const canopy = species.canopy;
+
+    const height =
+        species.trunkLength *
+        ageFactor *
+        genome.maxHeight;
+
+    const growth = Math.max(0.04, ageFactor);
+
+    const centerY = tree.position.y + height * (canopy.startHeight + canopy.height * 0.5);
+
+    const canopyHeight =
+        height * canopy.height;
+
+    const canopyWidth =
+        height *
+        canopy.width *
+        genome.canopyWidth *
+        growth;
+
+    const clusters = [];
+
+    const layers = canopy.layers;
+
+    for (let layer = 0; layer < layers; layer++) {
+
+        const t = layers === 1
+            ? 0.5
+            : layer / (layers - 1);
+
+        const y = centerY +
+            (t - 0.5) * canopyHeight;
+
+        let layerRadius;
+
+        if (canopy.shape === "round") {
+
+            // Broad crown: widest around the middle
+            layerRadius =
+                canopyWidth *
+                Math.sqrt(Math.max(0, 1 -
+                    Math.pow(2 * t - 1, 2)));
+
+        } else {
+
+            // Conical crown: widest at the bottom
+            layerRadius =
+                canopyWidth * (1 - t) * 0.95 +
+                canopyWidth * 0.05;
+
+        }
+
+        const count = Math.max(
+            3,
+            Math.round(8 * canopy.density)
+        );
+
+        for (let i = 0; i < count; i++) {
+
+            const angle =
+                2 * Math.PI * i / count +
+                layer * 0.35;
+
+            const radius =
+                layerRadius *
+                (0.65 + Math.random() * 0.35);
+
+            const position = new BABYLON.Vector3(
+                tree.position.x +
+                    Math.cos(angle) * radius,
+
+                y,
+
+                tree.position.z +
+                    Math.sin(angle) * radius
+            );
+
+            const leafScale =
+                Math.max(0.04, height * 0.055) *
+                genome.leafSize *
+                growth;
+
+            clusters.push({
+                position,
+                scale: leafScale
+            });
+        }
+    }
+
+    return clusters;
+}
+
+function DirectionRotation(direction) {
+
+    const up = BABYLON.Axis.Y;
+
+    const dir = direction.normalize();
+
+    const dot = BABYLON.Scalar.Clamp(
+        BABYLON.Vector3.Dot(up, dir),
+        -1,
+        1
+    );
+
+    if (dot > 0.99999) {
+        return BABYLON.Quaternion.Identity();
+    }
+
+    if (dot < -0.99999) {
+        return BABYLON.Quaternion.RotationAxis(
+            BABYLON.Axis.X,
+            Math.PI
+        );
+    }
+
+    const axis = BABYLON.Vector3.Cross(
+        up,
+        dir
+    ).normalize();
+
+    return BABYLON.Quaternion.RotationAxis(
+        axis,
+        Math.acos(dot)
+    );
+}
+
+
+
+function makeBranchMatrix(
+    start,
+    direction,
+    length,
+    baseRadius
+) {
+
+    const dir = direction.normalize();
+
+    const rotation = DirectionRotation(dir);
+
+    const center = start.add(
+        dir.scale(length / 2)
+    );
+
+    // Prototype bottom radius is 0.5
+    const radialScale = baseRadius / 0.5;
+
+    const scale = new BABYLON.Vector3(
+        radialScale,
+        length,
+        radialScale
+    );
+
+    return BABYLON.Matrix.Compose(
+        scale,
+        rotation,
+        center
+    );
+}
+
+
+// Create a coordinate system perpendicular to a direction
+function getRadialDirection(direction, phi) {
+
+    const reference =
+        Math.abs(direction.y) < 0.95
+            ? BABYLON.Axis.Y
+            : BABYLON.Axis.X;
+
+    const tangent = BABYLON.Vector3.Cross(
+        direction,
+        reference
+    ).normalize();
+
+    const bitangent = BABYLON.Vector3.Cross(
+        direction,
+        tangent
+    ).normalize();
+
+    return tangent.scale(Math.cos(phi))
+        .add(bitangent.scale(Math.sin(phi)))
+        .normalize();
+}
+
+class TreeGenerator {
+
+    constructor(species, environment, genome) {
+
+        this.species = species;
+        this.environment = environment;
+        this.genome = genome;
+	this.currentAgeFactor = 0;
+
+        this.matrices = [];
+	this.foliage = [];
+    }
+
+
+generate(
+    position,
+    ageFactor = 1,
+    thicknessFactor = 1,
+    detailLevel = 2
+) {
+
+	this.matrices = [];
+	this.foliage = [];
+	this.currentAgeFactor = ageFactor;
+
+
+const growth = ageFactor * ageFactor *
+    (3 - 2 * ageFactor);
+
+const s = this.species;
+const g = this.genome;
+
+// Height
+const trunkLength =
+    s.trunkLength * growth * g.maxHeight;
+
+// Thickness
+const trunkRadius =
+    s.trunkRadius *
+    Math.sqrt(Math.max(ageFactor, 0.001)) *
+    g.trunkThickness;
+
+// Branch dimensions
+const branchLength =
+    s.branchLength * growth * g.maxHeight;
+
+const branchRadius =
+    s.branchRadius *
+    Math.sqrt(Math.max(ageFactor, 0.001)) *
+    g.branchThickness;
+//generate the trunk
+this.matrices.push(
+    makeBranchMatrix(
+        position,
+        BABYLON.Axis.Y,
+        trunkLength,
+        trunkRadius
+    )
+);
+        const trunkEnd = position.add(
+            BABYLON.Axis.Y.scale(trunkLength)
+        );
+	const canopyScale =
+    growth *
+    this.genome.canopyWidth *
+    this.genome.leafSize;
+
+	// Simplified distant canopy
+if (detailLevel === 0 && ageFactor >= 0.2) {
+
+    this.foliage.push({
+
+        position: trunkEnd.clone(),
+
+        scale: Math.max(
+            0.2,
+            canopyScale * 2.0
+        )
+
+    });
+
+}
+
+
+if (ageFactor < 0.2) {
+
+    this.foliage.push({
+        position: trunkEnd.clone(),
+        scale: Math.max(0.08, canopyScale * 1.2)
+    });
+
+}
+
+        // Branch complexity increases with age
+let maxDepth =
+    ageFactor < 0.2 ? 0 :
+    ageFactor < 0.5 ? 1 :
+    s.maxDepth;
+
+// Distance-based geometry reduction
+if (detailLevel === 1) {
+
+    maxDepth = Math.min(maxDepth, 1);
+
+} else if (detailLevel === 0) {
+
+    maxDepth = 0;
+
+}
+        this.growBranch(
+            trunkEnd,
+            BABYLON.Axis.Y,
+            branchLength,
+            branchRadius,
+            0,
+            maxDepth
+        );
+
+        return this.matrices;
+    }
+
+
+    growBranch(
+        start,
+        parentDirection,
+        length,
+        radius,
+        depth,
+        maxDepth
+    ) {
+
+        if (depth >= maxDepth) {
+            return;
+        }
+
+        const s = this.species;
+        const g = this.genome;
+
+        const branchCount = Math.max(
+            1,
+            Math.round(s.branchCount * g.branchDensity)
+        );
+
+        for (let i = 0; i < branchCount; i++) {
+
+            const phi =
+                2 * Math.PI * i / branchCount;
+
+            const radial = getRadialDirection(
+                parentDirection,
+                phi
+            );
+
+            const angle =
+                s.branchAngle * g.branchAngle;
+
+            const intrinsicDirection =
+                parentDirection.scale(
+                    Math.cos(angle)
+                ).add(
+                    radial.scale(
+                        Math.sin(angle)
+                    )
+                ).normalize();
+
+            const light =
+                this.environment.sampleLight(start);
+
+            const direction = BABYLON.Vector3.Lerp(
+                intrinsicDirection,
+                light.direction,
+                s.lightSensitivity *
+                g.lightSensitivity *
+                light.intensity
+            ).normalize();
+
+this.matrices.push(
+    makeBranchMatrix(
+        start,
+        direction,
+        length,
+        radius
+    )
+);
+            const end = start.add(
+                direction.scale(length)
+            );
+
+		const ageFactor = this.currentAgeFactor;
+
+let foliageScale =
+    (0.25 + ageFactor * 0.75) *
+    this.genome.leafSize *
+    this.genome.canopyWidth;
+
+if (s.branching === "radial") {
+
+    // Oak: broad, substantial foliage clusters
+    foliageScale *= 1.5;
+
+} else if (s.branching === "whorled") {
+
+    // Pine: smaller, more compact clusters
+    foliageScale *= 1.15;
+
+}
+
+if ( depth === maxDepth - 1 ) {
+
+    this.foliage.push({
+        position: end.clone(),
+        scale: foliageScale
+    });
+
+}
+
+if (s.branching === "whorled") {
+
+    const leader = BABYLON.Vector3.Lerp(
+        parentDirection,
+        light.direction,
+        s.lightSensitivity *
+        g.lightSensitivity *
+        light.intensity
+    ).normalize();
+
+    // Keep the visual leader branch
+    this.matrices.push(
+        makeBranchMatrix(
+            end,
+            leader,
+            length * s.lengthDecay,
+            radius * s.radiusDecay
+        )
+    );
+
+    // Do not recursively grow another leader branch.
+}
+
+// Continue normal branch growth
+this.growBranch(
+    end,
+    direction,
+    length * s.lengthDecay,
+    radius * s.radiusDecay,
+    depth + 1,
+    maxDepth
+);
+        }
+    }
+
+}
+export { TreeGenerator , DirectionRotation }
+
+
+========================================================================
+FILE: src/ecology/tree.js
+========================================================================
+
+import { Species } from "../core/species.js";
+import { Genetics } from "../core/genetics.js";
+import { TreeGenerator } from "./tree-generator.js";
+let nextTreeId = 0;
+
+class Tree {
+
+	constructor(
+    speciesName,
+    position,
+    genome = Genetics.createGenome(),
+    parentId = null,
+    initialAge = 0
+) {
+
+    this.id = nextTreeId++;
+
+    this.speciesName = speciesName;
+
+    this.species = Species[speciesName];
+
+    this.position = position.clone();
+
+    this.genome = genome;
+
+    this.parentId = parentId;
+
+    this.age = initialAge;
+
+    this.seedTimer = 0;
+
+this.soilSample = null;
+this.soilSampleTimer = 0;
+this.soilSuitability = 1.0;
+    // Environmental conditions
+
+    this.lightLevel = 1.0;
+
+    this.lightStress = 0;
+
+    this.lowLightYears = 0;
+
+    this.growthMultiplier = 1.0;
+
+
+    // Hydrological conditions
+
+    this.soilMoisture = 0.35;
+
+    this.moistureMultiplier = 1.0;
+
+    this.droughtYears = 0;
+
+    this.waterloggingYears = 0;
+
+
+    this.children = [];
+
+    this.alive = true;
+
+}
+
+	get thicknessFactor() {
+
+    return BABYLON.Scalar.Clamp(
+        this.age / (this.maturityAge * 2),
+        0,
+        1
+    );
+}
+
+    get maturityAge() {
+
+        return 10 / this.genome.growthRate;
+    }
+
+
+    get maximumAge() {
+
+        return 100 * this.genome.lifespan;
+    }
+
+
+    get ageFactor() {
+
+        return BABYLON.Scalar.Clamp(
+            this.age / this.maturityAge,
+            0,
+            1
+        );
+    }
+
+
+    get isMature() {
+
+        return this.age >= this.maturityAge;
+    }
+
+
+    get isElder() {
+
+        return this.age >= this.maximumAge * 0.85;
+    }
+
+
+
+update(deltaYears, environment, hydrology) {
+
+    if (!this.alive) {
+        return;
+    }
+
+
+    // --------------------------------
+    // LIGHT CONDITIONS
+    // --------------------------------
+
+    const light = environment.sampleLight(
+        this.position
+    );
+
+    this.lightLevel = light.intensity;
+
+
+    const minimumLight =
+        this.species.lightSensitivity * 0.20;
+
+
+    this.growthMultiplier =
+        BABYLON.Scalar.Clamp(
+
+            0.25 + this.lightLevel * 0.75,
+
+            0.25,
+
+            1.0
+
+        );
+
+
+    if (this.lightLevel < minimumLight) {
+
+        this.lowLightYears += deltaYears;
+
+    } else {
+
+        this.lowLightYears = Math.max(
+
+            0,
+
+            this.lowLightYears - deltaYears * 0.5
+
+        );
+
+    }
+
+
+    if (this.lowLightYears >= 15) {
+
+        this.alive = false;
+
+        return;
+
+    }
+
+
+    // --------------------------------
+    // SOIL MOISTURE
+    // --------------------------------
+
+	this.soilSampleTimer -= deltaYears;
+
+if (
+    hydrology &&
+    this.soilSampleTimer <= 0
+) {
+    this.soilSample = hydrology.sampleSoil(
+        this.position
+    );
+
+    this.soilSampleTimer = 5.0;
+}
+
+	const optimalMoisture = this.species.optimalMoisture;
+
+
+	const droughtTolerance = this.species.droughtTolerance;
+
+
+	const waterloggingTolerance = this.species.waterloggingTolerance;
+
+if (hydrology && typeof hydrology.sampleSoil === "function") {
+	const soil = this.soilSample;
+
+    if (soil) {
+        const affinity = this.species.soilAffinity;
+
+        const textureScore = affinity.preferred.includes(
+            soil.surfaceSoil
+        ) ? 1.0 : affinity.tolerance;
+
+        const fertilityScore = 1.0 - Math.abs(
+            soil.fertility - affinity.fertility
+        );
+
+        const drainageScore = 1.0 - Math.abs(
+            soil.drainage - affinity.drainage
+        );
+
+        const moistureScore = 1.0 - Math.abs(
+            this.soilMoisture - affinity.moisture
+        );
+
+        this.soilSuitability = BABYLON.Scalar.Clamp(
+            textureScore * 0.40 +
+            fertilityScore * 0.20 +
+            drainageScore * 0.20 +
+            moistureScore * 0.20,
+            0.15,
+            1.0
+        );
+	    }
+	}
+
+
+
+
+    // Growth is best near the species'
+    // preferred soil moisture level.
+
+    this.moistureMultiplier =
+        BABYLON.Scalar.Clamp(
+
+            0.45 +
+            0.55 * Math.min(
+                1,
+                this.soilMoisture /
+                optimalMoisture
+            ),
+
+            0.45,
+
+            1.0
+
+        );
+
+
+    // Drought stress
+
+    if (
+        this.soilMoisture <
+        droughtTolerance
+    ) {
+
+        this.droughtYears += deltaYears;
+
+    } else {
+
+        this.droughtYears = Math.max(
+
+            0,
+
+            this.droughtYears - deltaYears * 0.5
+
+        );
+
+    }
+
+
+    // Waterlogging stress
+
+    if (
+        this.soilMoisture >
+        waterloggingTolerance
+    ) {
+
+        this.waterloggingYears += deltaYears;
+
+    } else {
+
+        this.waterloggingYears = Math.max(
+
+            0,
+
+            this.waterloggingYears - deltaYears * 0.5
+
+        );
+
+    }
+
+
+    // Prolonged environmental stress.
+
+    if (
+        this.droughtYears >= 20 ||
+        this.waterloggingYears >= 15
+    ) {
+
+        this.alive = false;
+
+        return;
+
+    }
+
+
+    // --------------------------------
+    // COMBINED GROWTH
+    // --------------------------------
+
+const combinedGrowth =
+    this.growthMultiplier *
+    this.moistureMultiplier *
+    this.soilSuitability;
+
+    this.age += deltaYears * combinedGrowth;
+
+
+    if (this.age >= this.maximumAge) {
+
+        this.alive = false;
+
+    }
+
+
+    this.seedTimer += deltaYears;
+
+}
+
+
+    generateGeometry(environment) {
+
+        const generator = new TreeGenerator(
+            this.species,
+            environment,
+            this.genome
+        );
+
+        return generator.generate(
+            this.position,
+            this.ageFactor
+        );
+    }
+
+	
+produceSeeds() {
+
+    if (!this.alive || !this.isMature || this.isElder) {
+        return 0;
+    }
+
+    // One reproductive opportunity every five years
+    const seedInterval = 5;
+
+    if (this.seedTimer < seedInterval) {
+        return 0;
+    }
+
+    this.seedTimer -= seedInterval;
+
+    // Genetic influence on reproduction
+    const seedProduction = this.genome.seedProduction;
+
+    // Number of seeds produced in this event
+    return Math.max(
+        1,
+        Math.round(2 * seedProduction)
+    );
+}
+
+
+}
+export { Tree }
+
+
+========================================================================
+END OF DIRECTORY SOURCE DUMP
+Files included: 3
+Binary/unreadable files skipped: 0
+========================================================================

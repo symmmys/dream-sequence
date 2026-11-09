@@ -1,0 +1,23 @@
+SOMNIUM — GEOMETRY PHASE 16D INSTALLATION
+
+1. Extract the complete Phase 16D archive into a clean project directory.
+2. Serve the directory containing index.html (the project root, not an outer ZIP wrapper directory).
+3. From that directory, start the local server:
+
+   python3 -m http.server 8081
+
+4. Open:
+
+   http://127.0.0.1:8081/
+
+5. Hard-refresh the browser after replacing a previous Phase 16 build. The entry point and versioned modules use the Phase 16D-2 build identifier.
+
+Phase 16D replaces the fixed remote preview-camera pose with an endpoint-frame camera mapping that follows the active viewer. The direct Hypercube-to-Main-World aperture uses a circular surface and a Euclidean 4D-ball cross-section derived from the resolved anomaly centre. Viewer camera translation and orientation are transported continuously into the remote slice camera. Render targets refresh every frame and preserve aperture aspect ratio. Other demo slice-transition anomalies use their declared view profiles. The Euclidean 4D-ball cross-section is opt-in per anomaly; other anomaly geometries are not forced to use sphere mathematics.
+
+To inspect portal state, examine the GeometryDemoWorld diagnostics and the `portalViews` entries. These include the mapped preview camera pose, aperture shape/scale, and remote render-list size.
+
+Run the complete automated suite from the extracted project directory:
+
+   node --test tests/*.test.mjs
+
+The automated tests validate the view mapping and presentation wiring, but they do not replace live browser/WebGL inspection of the actual portal appearance.

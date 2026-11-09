@@ -1,0 +1,2308 @@
+SOMNIUM — DIRECTORY SOURCE DUMP
+========================================================================
+
+Directory: src/editor/
+Generated: 2026-11-09T03:15:29
+
+This file contains recursively collected UTF-8 text files.
+Binary files and excluded directories are omitted.
+File paths are relative to the project root.
+
+
+========================================================================
+FILE: src/editor/building-editor.js
+========================================================================
+
+
+import { EditorCamera } from "./editor-camera.js";
+import { BuildingPlacement } from "./building-placement.js";
+import { FloorPlanReference } from "./floor-plan-reference.js";
+import { FloorPlanBuilder } from "./floor-plan-builder.js";
+import {
+    FloorPlanHeightControl
+} from "./floor-plan-height-control.js";
+import {
+    BuildingPreviewRenderer
+} from "./building-preview-renderer.js";
+
+class BuildingEditor {
+    constructor(scene, buildingSystem, spatialTransform) {
+        this.scene = scene;
+        this.system = buildingSystem;
+        this.transform = spatialTransform;
+
+        // Building geometry must use the authoritative
+        // world-to-render coordinate transformation.
+        this.system.renderer.transform = spatialTransform;
+
+        this.editorCamera = new EditorCamera(
+            scene,
+            spatialTransform
+        );
+
+        this.placement = new BuildingPlacement(
+            buildingSystem,
+            this.editorCamera
+        );
+
+        this.floorPlan = new FloorPlanReference(
+            scene,
+            spatialTransform
+        );
+this.floorPlanBuilder = new FloorPlanBuilder({
+    wallHeight: 3.2,
+    doorHeight: 2.1,
+    windowHeight: 1.2,
+    windowSill: 0.9
+});
+
+        this.mode = "room";
+        this.gridSize = 1;
+        this.activeBuilding = null;
+        this.selectedRoom = null;
+        this.startPoint = null;
+        this.enabled = false;
+
+        this.createInterface();
+this.previewRenderer = new BuildingPreviewRenderer(
+    scene,
+    buildingSystem.geometryRenderer
+);
+
+this.floorPlanHeightControl =
+    new FloorPlanHeightControl(
+        this.container,
+        this.floorPlanBuilder,
+        () => {
+            if (
+                this.activeBuilding &&
+                this.floorPlan.mesh
+            ) {
+                this.buildFloorFromPlan();
+            }
+        }
+    );
+
+this.installFloorPlanWorkflowControls();
+
+        this.pointerObserver =
+            scene.onPointerObservable.add(info => {
+                if (!this.enabled) return;
+
+                if (
+                    info.type === BABYLON.PointerEventTypes.POINTERDOWN
+                ) {
+                    this.pointerDown();
+                }
+
+                if (
+                    info.type === BABYLON.PointerEventTypes.POINTERUP
+                ) {
+                    this.pointerUp();
+                }
+            });
+    }
+
+	setGameManager(manager) {
+    this.gameManager = manager;
+
+    manager.registerEditor(this.editorCamera.camera);
+
+    this.unsubscribeMode = manager.onModeChanged(mode => {
+        const active = mode === "editor";
+
+        this.enabled = active;
+        this.container.style.display =
+            active ? "block" : "none";
+
+        if (active && this.activeBuilding) {
+            this.editorCamera.focus(
+                this.activeBuilding.position
+            );
+        }
+    });
+}
+
+    createInterface() {
+        this.container = document.createElement("div");
+
+        Object.assign(this.container.style, {
+            position: "fixed",
+            top: "70px",
+            left: "18px",
+            width: "280px",
+            maxHeight: "85vh",
+            overflowY: "auto",
+            padding: "16px",
+            background: "rgba(19,29,40,0.97)",
+            border: "1px solid #536779",
+            borderRadius: "8px",
+            color: "#fff",
+            fontFamily: "Arial,sans-serif",
+            zIndex: "1600",
+            display: "none"
+        });
+
+        this.container.innerHTML = `
+            <h3>BUILDING EDITOR</h3>
+
+<div style="display:grid;gap:7px">
+    <button data-mode="room">DRAW ROOM</button>
+    <button data-mode="door">ADD DOOR</button>
+    <button data-mode="window">ADD WINDOW</button>
+    <button data-mode="furniture">PLACE FURNITURE</button>
+    <button data-mode="floor-plan">POSITION FLOOR PLAN</button>
+</div>
+            <hr>
+
+            <h4>FLOOR PLAN</h4>
+            <input type="file" id="floor-image" accept="image/*">
+
+            <label>Width
+                <input id="floor-width" type="number" min="0.1" value="20">
+            </label>
+	<label>
+    Floor Plan Altitude Offset
+
+    <input
+        id="floor-altitude"
+        type="number"
+        step="0.1"
+        value="0"
+    >
+</label>
+
+	<button id="build-floor" style="width:100%">
+		BUILD FLOOR FROM PLAN
+	</button>
+
+            <label>Depth
+                <input id="floor-depth" type="number" min="0.1" value="20">
+            </label>
+
+            <label>Opacity
+                <input id="floor-opacity" type="range"
+                    min="0" max="1" step="0.05" value="0.8">
+            </label>
+
+            <label>
+                <input id="floor-visible" type="checkbox" checked>
+                Show floor plan
+            </label>
+
+            <hr>
+
+            <h4>BUILDING POSITION</h4>
+
+            <label>X
+                <input id="position-x" type="number" step="0.1" value="0">
+            </label>
+
+            <label>Z
+                <input id="position-z" type="number" step="0.1" value="0">
+            </label>
+
+            <label>Elevation
+                <input id="position-y" type="number" step="0.1" value="0">
+            </label>
+
+            <label>Rotation (degrees)
+                <input id="position-rotation" type="number"
+                    step="1" value="0">
+            </label>
+
+            <hr>
+
+            <label>Grid size
+                <input id="building-grid" type="number"
+                    min="0.1" step="0.1" value="1">
+            </label>
+
+            <p id="building-status" style="font-size:12px;color:#b8c8d7">
+                Select a construction tool.
+            </p>
+
+            <button id="building-close" style="width:100%">
+                CLOSE EDITOR
+            </button>
+        `;
+
+        document.body.appendChild(this.container);
+
+        this.status = this.container.querySelector(
+            "#building-status"
+        );
+
+        this.container.querySelectorAll("[data-mode]")
+            .forEach(button => {
+                button.onclick = () => this.setMode(
+                    button.dataset.mode
+                );
+            });
+
+        const element = id =>
+            this.container.querySelector(`#${id}`);
+
+        element("building-grid").onchange = event => {
+            this.gridSize = Math.max(
+                0.1,
+                Number(event.target.value) || 1
+            );
+        };
+
+	element("floor-image").onchange = async event => {
+    try {
+	if (
+    this.activeBuilding?.metadata?.editorPreview
+) {
+    this.setStatus(
+        "Please place the current building before importing another plan."
+    );
+
+    event.target.value = "";
+    return;
+}
+        await this.floorPlan.load(
+            event.target.files[0]
+        );
+	const width = Number(
+    this.container.querySelector("#floor-width").value
+);
+
+const depth = width *
+    this.floorPlan.image.naturalHeight /
+    this.floorPlan.image.naturalWidth;
+
+this.container.querySelector(
+    "#floor-depth"
+).value = depth.toFixed(2);
+
+this.aspectLock.checked = true;
+
+this.floorPlan.setDimensions(width, depth);
+
+        this.ensureBuildingForFloorPlan();
+        this.updateFloorPlanPosition();
+	if (
+    this.activeBuilding?.metadata?.editorPreview
+) {
+    this.previewRenderer.show(this.activeBuilding);
+}
+
+        this.setStatus(
+            "Floor plan imported. Position it, then build the floor."
+        );
+    } catch (error) {
+        this.setStatus(error.message);
+    }
+};
+element("floor-altitude").addEventListener(
+    "input",
+    event => {
+        this.floorPlan.setAltitudeOffset(
+            Number(event.target.value) || 0
+        );
+    }
+);
+
+element("build-floor").onclick = () =>
+    this.buildFloorFromPlan();
+
+        element("floor-opacity").oninput = event =>
+            this.floorPlan.setOpacity(Number(event.target.value));
+
+        element("floor-visible").onchange = event =>
+            this.floorPlan.setVisible(event.target.checked);
+
+        for (const id of ["floor-width", "floor-depth"]) {
+            element(id).onchange = () => {
+                this.updateFloorPlanPosition({
+                    width: Number(element("floor-width").value),
+                    depth: Number(element("floor-depth").value)
+                });
+            };
+        }
+
+const updatePlacement = () => {
+    if (!this.activeBuilding) return;
+
+    this.placement.update({
+        x: Number(element("position-x").value),
+        z: Number(element("position-z").value),
+        y: Number(element("position-y").value),
+        rotation:
+            Number(element("position-rotation").value) *
+            Math.PI / 180
+    });
+
+    this.updateFloorPlanPosition();
+
+    if (
+        this.activeBuilding.metadata?.editorPreview
+    ) {
+        this.previewRenderer.show(
+            this.activeBuilding
+        );
+    }
+};
+        for (const id of [
+            "position-x",
+            "position-z",
+            "position-y",
+            "position-rotation"
+        ]) {
+            element(id).onchange = updatePlacement;
+        }
+
+        element("building-close").onclick = () => this.close();
+
+        this.launcher = document.createElement("button");
+        this.launcher.textContent = "BUILD";
+
+        Object.assign(this.launcher.style, {
+            position: "fixed",
+            top: "18px",
+            left: "18px",
+            zIndex: "1601",
+            padding: "12px 20px",
+            cursor: "pointer"
+        });
+
+        this.launcher.onclick = () => this.open();
+        document.body.appendChild(this.launcher);
+    }
+
+    setStatus(message) {
+        this.status.textContent = message;
+    }
+
+    setMode(mode) {
+        this.mode = mode;
+        this.startPoint = null;
+        this.setStatus(`Active tool: ${mode}`);
+    }
+
+    open() {
+        this.container.style.display = "block";
+        this.enabled = true;
+        this.gameManager?.startEditor();
+
+        if (this.activeBuilding) {
+            this.editorCamera.focus(this.activeBuilding.position);
+        }
+    }
+
+    close() {
+        this.container.style.display = "none";
+        this.enabled = false;
+        this.startPoint = null;
+        this.gameManager?.exitEditor();
+    }
+
+    snap(value) {
+        return Math.round(value / this.gridSize) *
+            this.gridSize;
+    }
+
+    pickWorldPosition() {
+        const pick = this.scene.pick(
+            this.scene.pointerX,
+            this.scene.pointerY,
+            mesh => mesh.isPickable &&
+                mesh.metadata?.terrainChunk === true
+        );
+
+        if (!pick?.hit || !pick.pickedPoint) return null;
+
+        return this.transform.renderToWorld({
+            x: pick.pickedPoint.x,
+            y: pick.pickedPoint.y,
+            z: pick.pickedPoint.z
+        });
+    }
+
+    pointerDown() {
+	    if (
+    this.mode === "floor-plan" ||
+    this.mode !== "room"
+) {
+    return;
+}
+        const point = this.pickWorldPosition();
+
+        if (this.mode !== "room") return;
+
+        if (!point) {
+            this.setStatus("Cannot pick terrain.");
+            return;
+        }
+
+        this.startPoint = point;
+        this.setStatus("Drag to define the room footprint.");
+    }
+
+    pointerUp() {
+	if (this.mode === "floor-plan") {
+    return;
+}
+        const point = this.pickWorldPosition();
+
+        if (!point) {
+            if (this.startPoint) {
+                this.startPoint = null;
+                this.setStatus("No surface detected.");
+            }
+            return;
+        }
+
+        if (this.mode === "room") {
+            if (!this.startPoint) return;
+
+            const start = this.startPoint;
+            this.startPoint = null;
+
+            try {
+                this.createRoomFromPoints(start, point);
+            } catch (error) {
+                console.error("[BuildingEditor]", error);
+                this.setStatus(error.message);
+            }
+
+            return;
+        }
+
+        if (this.mode === "door" || this.mode === "window") {
+            this.placeOpening(this.mode, point);
+        }
+
+        if (this.mode === "furniture") {
+            this.placeFurniture(point);
+        }
+    }
+
+
+createRoomFromPoints(a, b) {
+    const minX = this.snap(Math.min(a.x, b.x));
+    const maxX = this.snap(Math.max(a.x, b.x));
+    const minZ = this.snap(Math.min(a.z, b.z));
+    const maxZ = this.snap(Math.max(a.z, b.z));
+
+    if (
+        maxX - minX < this.gridSize ||
+        maxZ - minZ < this.gridSize
+    ) {
+        this.setStatus("Room is too small.");
+        return;
+    }
+
+    // -----------------------------------------
+    // VALIDATE ACTIVE BUILDING REGISTRATION
+    // -----------------------------------------
+
+    let building = this.activeBuilding;
+
+    if (building) {
+        const registered = this.system.getBuilding(
+            building.id
+        );
+
+        if (registered) {
+            // Adopt the authoritative registered instance.
+            building = registered;
+            this.activeBuilding = registered;
+        } else {
+            // The building was removed, possibly by
+            // restoring another world.
+            console.warn(
+                "[BuildingEditor] Active building is no longer registered.",
+                building.id
+            );
+
+            this.activeBuilding = null;
+            this.selectedRoom = null;
+
+            this.placement.select(null);
+
+            building = null;
+        }
+    }
+
+    // -----------------------------------------
+    // CREATE BUILDING IF NECESSARY
+    // -----------------------------------------
+
+    if (!building) {
+        building = this.system.createBuilding({
+            name: "My Building",
+            position: {
+                x: minX,
+                y: a.y,
+                z: minZ
+            }
+        });
+
+        this.activeBuilding = building;
+
+        this.placement.select(building);
+        this.syncPositionInputs();
+    }
+
+    // -----------------------------------------
+    // CREATE ROOM
+    // -----------------------------------------
+
+    // Final registration invariant.
+    if (
+        this.system.getBuilding(building.id) !== building
+    ) {
+        throw new Error(
+            "Building registration mismatch."
+        );
+    }
+
+    const room = this.system.createRoom(
+        building.id,
+        {
+            name: `Room ${building.rooms.length + 1}`,
+
+            minX: minX - building.position.x,
+            maxX: maxX - building.position.x,
+
+            minZ: minZ - building.position.z,
+            maxZ: maxZ - building.position.z
+        }
+    );
+
+    this.selectedRoom = room;
+
+    this.updateFloorPlanPosition();
+
+    this.setStatus(
+        `Created ${room.name}: ` +
+        `${maxX - minX} × ${maxZ - minZ}`
+    );
+}
+
+    placeOpening(type, point) {
+        if (!this.activeBuilding || !this.selectedRoom) {
+            this.setStatus("Create a room first.");
+            return;
+        }
+
+        const building = this.activeBuilding;
+        const bounds = this.selectedRoom.bounds;
+
+        const x = point.x - building.position.x;
+        const z = point.z - building.position.z;
+
+        const distances = [
+            { side: "north", distance: Math.abs(z - bounds.minZ),
+                offset: (x - bounds.minX) /
+                    (bounds.maxX - bounds.minX) },
+            { side: "south", distance: Math.abs(z - bounds.maxZ),
+                offset: (x - bounds.minX) /
+                    (bounds.maxX - bounds.minX) },
+            { side: "west", distance: Math.abs(x - bounds.minX),
+                offset: (z - bounds.minZ) /
+                    (bounds.maxZ - bounds.minZ) },
+            { side: "east", distance: Math.abs(x - bounds.maxX),
+                offset: (z - bounds.minZ) /
+                    (bounds.maxZ - bounds.minZ) }
+        ];
+
+        distances.sort((a, b) => a.distance - b.distance);
+
+        const nearest = distances[0];
+
+        if (nearest.offset < 0 || nearest.offset > 1) {
+            this.setStatus("Position is outside the selected wall.");
+            return;
+        }
+
+        const opening = this.system.addOpening(
+            building.id,
+            this.selectedRoom.id,
+            {
+                type,
+                side: nearest.side,
+                offset: nearest.offset,
+                width: type === "door" ? 0.9 : 1.4,
+                height: type === "door" ? 2.1 : 1.2,
+                sill: type === "door" ? 0 : 0.9
+            }
+        );
+
+        this.setStatus(`Added ${type}: ${opening.id}`);
+    }
+
+    placeFurniture(position) {
+        if (!this.activeBuilding) {
+            this.setStatus("Create a building first.");
+            return;
+        }
+
+        this.system.addFurniture(
+            this.activeBuilding.id,
+            {
+                type: "table",
+                position: {
+                    x: position.x - this.activeBuilding.position.x,
+                    y: position.y - this.activeBuilding.position.y + 0.5,
+                    z: position.z - this.activeBuilding.position.z
+                },
+                dimensions: { x: 1.6, y: 0.9, z: 1 },
+                material: "wood"
+            }
+        );
+
+        this.setStatus("Furniture placed.");
+    }
+
+    syncPositionInputs() {
+        if (!this.activeBuilding) return;
+
+        const p = this.activeBuilding.position;
+        const set = (id, value) => {
+            this.container.querySelector(`#${id}`).value = value;
+        };
+
+        set("position-x", p.x);
+        set("position-y", p.y);
+        set("position-z", p.z);
+        set(
+            "position-rotation",
+            this.activeBuilding.rotation * 180 / Math.PI
+        );
+    }
+
+
+updateFloorPlanPosition(dimensions = {}) {
+    if (!this.activeBuilding) return;
+
+    this.floorPlan.updateTransform(
+        this.activeBuilding.position,
+        dimensions,
+        this.activeBuilding.rotation
+    );
+}
+
+    dispose() {
+        this.enabled = false;
+
+        if (this.pointerObserver) {
+            this.scene.onPointerObservable.remove(
+                this.pointerObserver
+            );
+        }
+
+        this.floorPlan.dispose();
+        this.editorCamera.dispose();
+	this.floorPlanHeightControl?.dispose();
+
+        this.container?.remove();
+        this.launcher?.remove();
+
+        this.container = null;
+        this.launcher = null;
+
+	this.unsubscribeMode?.();
+	this.previewRenderer?.dispose();
+    }
+
+worldToBuildingLocal(position) {
+    const building = this.activeBuilding;
+    const dx = position.x - building.position.x;
+    const dz = position.z - building.position.z;
+
+    const angle = building.rotation;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+
+    return {
+        x: dx * cos + dz * sin,
+        y: position.y - building.position.y,
+        z: -dx * sin + dz * cos
+    };
+}
+
+
+ensureBuildingForFloorPlan() {
+    if (this.activeBuilding) return;
+
+    const element = id =>
+        this.container.querySelector(`#${id}`);
+
+    this.activeBuilding = this.system.createBuilding({
+        name: "Floor Plan Building",
+        position: {
+            x: Number(element("position-x").value) || 0,
+            y: Number(element("position-y").value) || 0,
+            z: Number(element("position-z").value) || 0
+        },
+        rotation:
+            Number(element("position-rotation").value || 0) *
+            Math.PI / 180
+    });
+	this.activeBuilding.metadata ??= {};
+
+this.activeBuilding.metadata.editorPreview = true;
+
+    this.placement.select(this.activeBuilding);
+    this.syncPositionInputs();
+}
+
+async buildFloorFromPlan() {
+    try {
+	if (!this.floorPlan.mesh || !this.floorPlan.image) {
+    this.setStatus(
+        "Import a floor-plan image before constructing a building."
+    );
+
+    return null;
+}
+
+        this.ensureBuildingForFloorPlan();
+
+        const element = id =>
+            this.container.querySelector(`#${id}`);
+
+        const imageData = await this.floorPlan.readPixels();
+
+        const result = this.floorPlanBuilder.build(
+            this.activeBuilding,
+            imageData,
+            {
+                width: Number(element("floor-width").value),
+                depth: Number(element("floor-depth").value),
+                floor: 0
+            }
+        );
+
+        this.system.rebuild(this.activeBuilding);
+	this.activeBuilding.metadata ??= {};
+
+this.activeBuilding.metadata.editorPreview = true;
+
+const outlineCount =
+    this.previewRenderer.show(this.activeBuilding);
+
+this.placeButton.disabled = false;
+
+this.setStatus(
+    `Preview ready: ${result.walls} walls, ` +
+    `${result.doors} doors, ${result.windows} windows. ` +
+    `${outlineCount} highlighted components. ` +
+    `Adjust dimensions or place the building.`
+);
+
+
+        return result;
+    } catch (error) {
+        console.error("[BuildingEditor] Floor construction:", error);
+        this.setStatus(error.message);
+        return null;
+    }
+}
+
+
+installFloorPlanWorkflowControls() {
+    const buildButton =
+        this.container.querySelector("#build-floor");
+
+    const placeButton = document.createElement("button");
+
+    placeButton.id = "place-building";
+    placeButton.textContent =
+        "PLACE BUILDING & START NEXT";
+
+    placeButton.disabled = true;
+
+    placeButton.style.width = "100%";
+    placeButton.style.marginTop = "8px";
+
+    buildButton.after(placeButton);
+
+    placeButton.onclick = () => {
+        this.placeCurrentBuilding();
+    };
+
+    this.placeButton = placeButton;
+
+    const depthInput =
+        this.container.querySelector("#floor-depth");
+
+    const aspectLabel = document.createElement("label");
+
+    aspectLabel.style.display = "block";
+    aspectLabel.style.margin = "8px 0";
+
+    this.aspectLock = document.createElement("input");
+    this.aspectLock.type = "checkbox";
+    this.aspectLock.checked = true;
+
+    aspectLabel.append(
+        this.aspectLock,
+        document.createTextNode(
+            " Maintain image aspect ratio"
+        )
+    );
+
+    depthInput.parentElement.after(aspectLabel);
+
+    const updateDimensions = source => {
+        const width = Number(
+            this.container.querySelector("#floor-width").value
+        );
+
+        let depth = Number(depthInput.value);
+
+        if (
+            this.aspectLock.checked &&
+            this.floorPlan.image
+        ) {
+            if (source === "depth") {
+                this.aspectLock.checked = false;
+            } else {
+                depth = width *
+                    this.floorPlan.image.naturalHeight /
+                    this.floorPlan.image.naturalWidth;
+
+                depthInput.value = depth.toFixed(2);
+            }
+        }
+
+        if (
+            !Number.isFinite(width) ||
+            !Number.isFinite(depth) ||
+            width <= 0 ||
+            depth <= 0
+        ) {
+            return;
+        }
+
+        this.updateFloorPlanPosition({
+            width,
+            depth
+        });
+if (
+    this.activeBuilding?.metadata?.editorPreview === true &&
+    this.floorPlan.mesh &&
+    this.floorPlan.image
+) {
+    this.buildFloorFromPlan();
+}
+    };
+
+    this.container.querySelector(
+        "#floor-width"
+    ).onchange = () => updateDimensions("width");
+
+    depthInput.onchange = () => updateDimensions("depth");
+
+    this.aspectLock.onchange = () => {
+        updateDimensions("width");
+    };
+}
+
+placeCurrentBuilding() {
+    const building = this.activeBuilding;
+
+    if (
+        !building ||
+        building.metadata?.editorPreview !== true
+    ) {
+        this.setStatus(
+            "There is no provisional building to place."
+        );
+        return false;
+    }
+
+    // Commit the preview.
+    this.previewRenderer.commit(building);
+
+    building.metadata.editorPreview = false;
+
+    this.system.refresh();
+
+    // Release the current building selection.
+    this.activeBuilding = null;
+    this.selectedRoom = null;
+    this.startPoint = null;
+
+    this.placement.select(null);
+
+    // Reset construction controls.
+    this.placeButton.disabled = true;
+
+    // Keep the previous image available as a reference,
+    // but require an explicit new build operation.
+    this.setStatus(
+        "Building placed successfully. " +
+        "Import another floor plan to construct the next building."
+    );
+
+    return true;
+}
+
+
+
+resetAfterWorldLoad() {
+    this.activeBuilding = null;
+    this.selectedRoom = null;
+    this.startPoint = null;
+
+    this.placement.select(null);
+
+    if (this.placeButton) {
+        this.placeButton.disabled = true;
+    }
+
+    this.previewRenderer?.clear?.();
+
+    this.setStatus(
+        "World loaded. Select a construction tool to begin."
+    );
+}
+
+
+}
+
+export { BuildingEditor };
+
+
+========================================================================
+FILE: src/editor/building-placement.js
+========================================================================
+
+
+class BuildingPlacement {
+    constructor(system, editorCamera) {
+        this.system = system;
+        this.editorCamera = editorCamera;
+
+        this.activeBuilding = null;
+    }
+
+    select(building) {
+        this.activeBuilding = building;
+
+        if (building) {
+            this.editorCamera.focus(
+                building.position
+            );
+        }
+    }
+
+    update(patch = {}) {
+        const building = this.activeBuilding;
+
+        if (!building) {
+            throw new Error("No building selected.");
+        }
+
+        const position = building.position;
+
+        if (Number.isFinite(patch.x)) {
+            position.x = patch.x;
+        }
+
+        if (Number.isFinite(patch.z)) {
+            position.z = patch.z;
+        }
+
+        if (Number.isFinite(patch.y)) {
+            position.y = patch.y;
+        }
+
+        if (Number.isFinite(patch.rotation)) {
+            building.rotation = patch.rotation;
+        }
+
+        this.system.rebuild(building);
+
+        this.editorCamera.focus(position);
+    }
+
+    setHorizontal(x, z) {
+        this.update({ x, z });
+    }
+
+    setElevation(y) {
+        this.update({ y });
+    }
+
+    setRotation(rotation) {
+        this.update({ rotation });
+    }
+
+    getState() {
+        if (!this.activeBuilding) return null;
+
+        return {
+            position: { ...this.activeBuilding.position },
+            rotation: this.activeBuilding.rotation
+        };
+    }
+}
+
+export { BuildingPlacement };
+
+
+========================================================================
+FILE: src/editor/building-preview-renderer.js
+========================================================================
+
+
+/**
+ * BuildingPreviewRenderer
+ *
+ * Draws temporary architectural outlines without modifying
+ * authoritative building geometry or shared render materials.
+ */
+class BuildingPreviewRenderer {
+    constructor(scene, geometryRenderer) {
+        if (!scene || !geometryRenderer) {
+            throw new Error(
+                "Preview renderer requires scene and GeometryRenderer."
+            );
+        }
+
+        this.scene = scene;
+        this.geometryRenderer = geometryRenderer;
+        this.lines = [];
+        this.buildingId = null;
+
+        this.color = new BABYLON.Color3(
+            0.15, 1.0, 0.75
+        );
+    }
+
+    createComponentLines(component, building) {
+        const p = component.position;
+        const d = component.dimensions;
+
+        if (
+            !p || !d ||
+            ![
+                p.x, p.y, p.z,
+                d.x, d.y, d.z,
+                building.position.x,
+                building.position.y,
+                building.position.z
+            ].every(Number.isFinite) ||
+            d.x <= 0 || d.y <= 0 || d.z <= 0
+        ) {
+            return null;
+        }
+
+        const angle = building.rotation ?? 0;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+
+        const worldPosition = new BABYLON.Vector3(
+            building.position.x + p.x * cos - p.z * sin,
+            building.position.y + p.y,
+            building.position.z + p.x * sin + p.z * cos
+        );
+
+        const rotation = BABYLON.Quaternion.RotationAxis(
+            BABYLON.Axis.Y,
+            angle + (component.rotation ?? 0)
+        );
+
+        const matrix = BABYLON.Matrix.Compose(
+            new BABYLON.Vector3(d.x, d.y, d.z),
+            rotation,
+            worldPosition
+        );
+
+        const projected =
+            this.geometryRenderer.transformInstanceMatrix(matrix);
+
+        if (!projected) return null;
+
+        const corners = [];
+
+        for (let i = 0; i < 8; i++) {
+            const local = new BABYLON.Vector3(
+                (i & 1) ? 0.5 : -0.5,
+                (i & 2) ? 0.5 : -0.5,
+                (i & 4) ? 0.5 : -0.5
+            );
+
+            corners.push(
+                BABYLON.Vector3.TransformCoordinates(
+                    local,
+                    projected
+                )
+            );
+        }
+
+        const edges = [
+            [0, 1], [0, 2], [0, 4],
+            [1, 3], [1, 5],
+            [2, 3], [2, 6],
+            [3, 7], [4, 5],
+            [4, 6], [5, 7], [6, 7]
+        ];
+
+        return edges.map(([a, b]) => [
+            corners[a],
+            corners[b]
+        ]);
+    }
+
+    show(building) {
+        this.clear();
+
+        if (!building?.generatedGeometry) {
+            throw new Error(
+                "Building has no generated geometry to preview."
+            );
+        }
+
+        this.buildingId = building.id;
+
+        for (const component of building.generatedGeometry) {
+            const edges = this.createComponentLines(
+                component,
+                building
+            );
+
+            if (!edges) continue;
+
+            const mesh = BABYLON.MeshBuilder.CreateLineSystem(
+                "building-preview-outline",
+                { lines: edges },
+                this.scene
+            );
+
+            mesh.color = this.color;
+            mesh.alpha = 1;
+            mesh.isPickable = false;
+            mesh.renderingGroupId = 2;
+
+            mesh.metadata = {
+                type: "building-preview-outline",
+                buildingId: building.id
+            };
+
+            this.lines.push(mesh);
+        }
+
+        return this.lines.length;
+    }
+
+    clear() {
+        for (const mesh of this.lines) {
+            mesh.dispose();
+        }
+
+        this.lines.length = 0;
+        this.buildingId = null;
+    }
+
+    commit(building) {
+        if (
+            building &&
+            building.id !== this.buildingId
+        ) {
+            throw new Error(
+                "Cannot commit a different preview building."
+            );
+        }
+
+        this.clear();
+    }
+
+    dispose() {
+        this.clear();
+    }
+}
+
+export { BuildingPreviewRenderer };
+
+
+========================================================================
+FILE: src/editor/editor-camera.js
+========================================================================
+
+
+class EditorCamera {
+    constructor(scene, spatialTransform, options = {}) {
+        this.scene = scene;
+        this.transform = spatialTransform;
+
+        this.camera = new BABYLON.ArcRotateCamera(
+            "BuildingEditorCamera",
+            -Math.PI / 2,
+            Math.PI / 3,
+            options.radius ?? 80,
+            BABYLON.Vector3.Zero(),
+            scene
+        );
+
+        this.camera.minZ = 0.01;
+        this.camera.maxZ = 1e9;
+
+        // Permit extremely close and distant inspection.
+        this.camera.lowerRadiusLimit = 0.1;
+        this.camera.upperRadiusLimit = Number.MAX_VALUE;
+
+        this.camera.wheelPrecision = 5;
+        this.camera.panningSensibility = 40;
+        this.camera.angularSensibilityX = 1000;
+        this.camera.angularSensibilityY = 1000;
+
+        this.camera.inertia = 0.8;
+        this.camera.detachControl();
+    }
+
+    focus(position, radius) {
+        const rendered = this.transform.worldToRender(
+            position
+        );
+
+        this.camera.setTarget(
+            new BABYLON.Vector3(
+                rendered.x,
+                rendered.y,
+                rendered.z
+            )
+        );
+
+        if (Number.isFinite(radius)) {
+            this.camera.radius = Math.max(0.1, radius);
+        }
+    }
+
+    attach(canvas) {
+        this.camera.attachControl(canvas, true);
+    }
+
+    detach() {
+        this.camera.detachControl();
+    }
+
+    dispose() {
+        this.detach();
+        this.camera.dispose();
+    }
+}
+
+export { EditorCamera };
+
+
+========================================================================
+FILE: src/editor/floor-plan-builder.js
+========================================================================
+
+
+class FloorPlanBuilder {
+    constructor(options = {}) {
+        this.wallHeight = options.wallHeight ?? 4;
+        this.wallThickness = options.wallThickness ?? 0.35;
+        this.doorHeight = options.doorHeight ?? 2.1;
+        this.windowHeight = options.windowHeight ?? 1.2;
+        this.windowSill = options.windowSill ?? 0.9;
+        this.minimumSegmentPixels =
+            options.minimumSegmentPixels ?? 5;
+    }
+
+    setWallHeight(value) {
+        if (
+            !Number.isFinite(value) ||
+            value < 2.4 ||
+            value > 1000
+        ) {
+            throw new Error(
+                "Wall height must be between 2.4 and 1000."
+            );
+        }
+
+        this.wallHeight = value;
+        return value;
+    }
+
+    setWallThickness(value) {
+        if (
+            !Number.isFinite(value) ||
+            value < 0.1 ||
+            value > 1000
+        ) {
+            throw new Error(
+                "Wall thickness must be between 0.1 and 1000."
+            );
+        }
+
+        this.wallThickness = value;
+        return value;
+    }
+
+    classify(r, g, b, a) {
+        if (a < 128) return null;
+
+        if (r < 75 && g < 75 && b < 75) {
+            return "wall";
+        }
+
+        if (r > 150 && g < 110 && b < 110) {
+            return "door";
+        }
+
+        if (g > 130 && r < 120 && b < 130) {
+            return "window";
+        }
+
+        return null;
+    }
+
+    extractSegments(imageData) {
+        const { data, width, height } = imageData;
+
+        if (
+            !data ||
+            !Number.isInteger(width) ||
+            !Number.isInteger(height) ||
+            width <= 0 ||
+            height <= 0 ||
+            data.length < width * height * 4
+        ) {
+            throw new Error("Invalid floor-plan image data.");
+        }
+
+        const active = new Map();
+        const completed = [];
+
+        for (let y = 0; y < height; y++) {
+            const current = new Set();
+            let x = 0;
+
+            while (x < width) {
+                const index = (y * width + x) * 4;
+
+                const kind = this.classify(
+                    data[index],
+                    data[index + 1],
+                    data[index + 2],
+                    data[index + 3]
+                );
+
+                if (!kind) {
+                    x++;
+                    continue;
+                }
+
+                const start = x;
+
+                while (x < width) {
+                    const i = (y * width + x) * 4;
+
+                    if (
+                        this.classify(
+                            data[i],
+                            data[i + 1],
+                            data[i + 2],
+                            data[i + 3]
+                        ) !== kind
+                    ) {
+                        break;
+                    }
+
+                    x++;
+                }
+
+                const end = x - 1;
+                const key = `${kind}:${start}:${end}`;
+
+                current.add(key);
+
+                const previous = active.get(key);
+
+                if (previous) {
+                    previous.maxY = y;
+                } else {
+                    active.set(key, {
+                        kind,
+                        minX: start,
+                        maxX: end,
+                        minY: y,
+                        maxY: y
+                    });
+                }
+            }
+
+            for (const [key, segment] of active) {
+                if (!current.has(key)) {
+                    completed.push(segment);
+                    active.delete(key);
+                }
+            }
+        }
+
+        completed.push(...active.values());
+
+        return completed.filter(segment => {
+            const w = segment.maxX - segment.minX + 1;
+            const h = segment.maxY - segment.minY + 1;
+
+            return Math.max(w, h) >= this.minimumSegmentPixels;
+        });
+    }
+
+    build(building, imageData, options = {}) {
+        if (
+            !building ||
+            typeof building.addComponent !== "function" ||
+            !Array.isArray(building.components)
+        ) {
+            throw new Error("Invalid building model.");
+        }
+
+        const width = options.width ?? 20;
+        const depth = options.depth ?? 20;
+        const floorIndex = options.floor ?? 0;
+
+        if (
+            !Number.isFinite(width) ||
+            !Number.isFinite(depth) ||
+            width <= 0 ||
+            depth <= 0 ||
+            !Number.isInteger(floorIndex) ||
+            floorIndex < 0
+        ) {
+            throw new Error("Invalid floor dimensions.");
+        }
+
+        const segments = this.extractSegments(imageData);
+
+        if (!segments.length) {
+            throw new Error(
+                "No architectural lines detected."
+            );
+        }
+
+        const scaleX = width / imageData.width;
+        const scaleZ = depth / imageData.height;
+
+        const floorY = floorIndex * this.wallHeight;
+        const prefix = `floor-plan-${floorIndex}-`;
+
+        const generated = [];
+
+        const counts = {
+            walls: 0,
+            doors: 0,
+            windows: 0,
+            floors: 0
+        };
+
+        const add = (
+            kind,
+            type,
+            position,
+            dimensions,
+            material
+        ) => {
+            generated.push({
+                kind,
+                type: prefix + type,
+                position,
+                dimensions,
+                material
+            });
+        };
+
+        add(
+            "floors",
+            "floor",
+            { x: 0, y: floorY - 0.075, z: 0 },
+            { x: width, y: 0.15, z: depth },
+            "floor"
+        );
+
+        counts.floors++;
+
+        for (const segment of segments) {
+            const pixelWidth =
+                segment.maxX - segment.minX + 1;
+
+            const pixelHeight =
+                segment.maxY - segment.minY + 1;
+
+            const horizontal = pixelWidth >= pixelHeight;
+
+            const centerPixelX =
+                (segment.minX + segment.maxX + 1) * 0.5;
+
+            const centerPixelY =
+                (segment.minY + segment.maxY + 1) * 0.5;
+
+            const x =
+                (centerPixelX / imageData.width - 0.5) * width;
+
+            const z =
+                (centerPixelY / imageData.height - 0.5) * depth;
+
+            const length = horizontal
+                ? pixelWidth * scaleX
+                : pixelHeight * scaleZ;
+
+            const detectedThickness = Math.max(
+                0.08,
+                Math.min(
+                    0.35,
+                    horizontal
+                        ? pixelHeight * scaleZ
+                        : pixelWidth * scaleX
+                )
+            );
+
+            const thickness = segment.kind === "wall"
+                ? this.wallThickness
+                : detectedThickness;
+
+            const dimensions = horizontal
+                ? { x: length, z: thickness }
+                : { x: thickness, z: length };
+
+            if (segment.kind === "wall") {
+                add(
+                    "walls",
+                    "wall",
+                    {
+                        x,
+                        y: floorY + this.wallHeight * 0.5,
+                        z
+                    },
+                    {
+                        ...dimensions,
+                        y: this.wallHeight
+                    },
+                    "wall"
+                );
+
+                counts.walls++;
+                continue;
+            }
+
+            if (segment.kind === "door") {
+                add(
+                    "doors",
+                    "door",
+                    {
+                        x,
+                        y: floorY + this.doorHeight * 0.5,
+                        z
+                    },
+                    {
+                        ...dimensions,
+                        y: this.doorHeight
+                    },
+                    "wood"
+                );
+
+                counts.doors++;
+                continue;
+            }
+
+            if (segment.kind === "window") {
+                const windowDepth = Math.max(
+                    0.035,
+                    detectedThickness * 0.25
+                );
+
+                add(
+                    "glazing",
+                    "window",
+                    {
+                        x,
+                        y: floorY + this.windowSill +
+                            this.windowHeight * 0.5,
+                        z
+                    },
+                    horizontal
+                        ? {
+                            x: length,
+                            y: this.windowHeight,
+                            z: windowDepth
+                        }
+                        : {
+                            x: windowDepth,
+                            y: this.windowHeight,
+                            z: length
+                        },
+                    "glass"
+                );
+
+                counts.windows++;
+            }
+        }
+
+        const legacyTypes = new Set([
+            "floor-plan-floor",
+            "floor-plan-wall",
+            "floor-plan-door",
+            "floor-plan-window"
+        ]);
+
+        building.components = building.components.filter(
+            component =>
+                !legacyTypes.has(component.type) &&
+                !component.type?.startsWith(prefix)
+        );
+
+        for (const component of generated) {
+            building.addComponent(component);
+        }
+
+        return {
+            ...counts,
+            floor: floorIndex,
+            totalSegments: segments.length,
+            wallHeight: this.wallHeight,
+            wallThickness: this.wallThickness,
+            generatedComponents: generated.length
+        };
+    }
+}
+
+export { FloorPlanBuilder };
+
+
+========================================================================
+FILE: src/editor/floor-plan-height-control.js
+========================================================================
+
+
+/**
+ * FloorPlanHeightControl
+ *
+ * Controls architectural wall height and thickness.
+ * FloorPlanBuilder remains the authoritative owner.
+ */
+class FloorPlanHeightControl {
+    constructor(container, builder, onCommit = null) {
+        if (!container || !builder) {
+            throw new Error(
+                "Wall controls require a container and builder."
+            );
+        }
+
+        this.container = container;
+        this.builder = builder;
+        this.onCommit = onCommit;
+
+        this.element = document.createElement("section");
+
+        Object.assign(this.element.style, {
+            display: "grid",
+            gap: "9px",
+            margin: "12px 0",
+            padding: "12px",
+            background: "rgba(255,255,255,0.07)",
+            borderRadius: "6px"
+        });
+
+        this.element.innerHTML = `
+            <strong>ARCHITECTURAL WALLS</strong>
+
+            <label>
+                Wall height
+                <output data-value="height"></output>
+                <input data-setting="height"
+                    type="range"
+                    min="2.4"
+                    max="1000"
+                    step="0.1">
+                <input data-number="height"
+                    type="number"
+                    min="2.4"
+                    max="1000"
+                    step="0.1">
+            </label>
+
+            <label>
+                Wall thickness
+                <output data-value="thickness"></output>
+                <input data-setting="thickness"
+                    type="range"
+                    min="0.1"
+                    max="1000"
+                    step="0.1">
+                <input data-number="thickness"
+                    type="number"
+                    min="0.1"
+                    max="1000"
+                    step="0.1">
+            </label>
+
+            <small>
+                Thickness controls the horizontal depth
+                of generated walls.
+            </small>
+        `;
+
+        const buildButton =
+            container.querySelector("#build-floor");
+
+        if (buildButton) {
+            buildButton.after(this.element);
+        } else {
+            container.appendChild(this.element);
+        }
+
+        this.controls = {
+            height: {
+                slider: this.element.querySelector(
+                    '[data-setting="height"]'
+                ),
+                number: this.element.querySelector(
+                    '[data-number="height"]'
+                ),
+                output: this.element.querySelector(
+                    '[data-value="height"]'
+                ),
+                setter: value =>
+                    builder.setWallHeight(value),
+                initial: builder.wallHeight
+            },
+            thickness: {
+                slider: this.element.querySelector(
+                    '[data-setting="thickness"]'
+                ),
+                number: this.element.querySelector(
+                    '[data-number="thickness"]'
+                ),
+                output: this.element.querySelector(
+                    '[data-value="thickness"]'
+                ),
+                setter: value =>
+                    builder.setWallThickness(value),
+                initial: builder.wallThickness
+            }
+        };
+
+        for (const [name, control] of Object.entries(
+            this.controls
+        )) {
+            control.slider.value = control.initial;
+            control.number.value = control.initial;
+
+            control.slider.addEventListener(
+                "input",
+                () => {
+                    control.number.value =
+                        control.slider.value;
+
+                    this.updateLabel(name);
+                }
+            );
+
+            control.number.addEventListener(
+                "change",
+                () => {
+                    control.slider.value =
+                        control.number.value;
+
+                    this.commit(name);
+                }
+            );
+
+            control.slider.addEventListener(
+                "change",
+                () => this.commit(name)
+            );
+
+            this.updateLabel(name);
+        }
+    }
+
+    updateLabel(name) {
+        const control = this.controls[name];
+
+        control.output.textContent =
+            `${Number(control.slider.value).toFixed(1)} units`;
+    }
+
+    commit(name) {
+        const control = this.controls[name];
+
+        try {
+            const value = Number(control.number.value);
+
+            if (!Number.isFinite(value)) {
+                throw new Error("Invalid wall dimension.");
+            }
+
+            control.setter(value);
+
+            control.slider.value = value;
+            control.number.value = value;
+
+            this.updateLabel(name);
+            this.onCommit?.(name, value);
+
+        } catch (error) {
+            console.error(
+                "[FloorPlanHeightControl]",
+                error
+            );
+
+            control.slider.value =
+                String(control.initial = (
+                    name === "height"
+                        ? this.builder.wallHeight
+                        : this.builder.wallThickness
+                ));
+
+            control.number.value = control.slider.value;
+
+            this.updateLabel(name);
+        }
+    }
+
+    dispose() {
+        this.element.remove();
+    }
+}
+
+export { FloorPlanHeightControl };
+
+
+========================================================================
+FILE: src/editor/floor-plan-reference.js
+========================================================================
+
+/**
+ * FloorPlanReference
+ *
+ * Manages an independently positioned architectural
+ * reference image in the Somnium building editor.
+ *
+ * Authoritative coordinates remain in simulation space.
+ * SpatialTransform handles rendering coordinates.
+ *
+ * Babylon CreateGround uses local X-Z dimensions.
+ */
+class FloorPlanReference {
+    constructor(scene, spatialTransform) {
+        this.scene = scene;
+        this.transform = spatialTransform;
+
+        this.mesh = null;
+        this.material = null;
+        this.texture = null;
+        this.objectURL = null;
+        this.image = null;
+
+        this.width = 20;
+        this.depth = 20;
+
+        this.opacity = 0.65;
+        this.visible = true;
+
+        this.position = {
+            x: 0,
+            y: 0,
+            z: 0
+        };
+
+        this.altitudeOffset = 0;
+        this.rotation = 0;
+        this.loaded = false;
+    }
+
+    validatePosition(position) {
+        if (
+            !position ||
+            !Number.isFinite(position.x) ||
+            !Number.isFinite(position.y) ||
+            !Number.isFinite(position.z)
+        ) {
+            throw new Error(
+                "Invalid floor-plan position."
+            );
+        }
+    }
+
+    async load(file) {
+        if (
+            !file ||
+            typeof file.type !== "string" ||
+            !file.type.startsWith("image/")
+        ) {
+            throw new Error(
+                "Please select a valid image file."
+            );
+        }
+
+        this.remove();
+
+        try {
+            this.objectURL = URL.createObjectURL(file);
+            this.image = new Image();
+
+            await new Promise((resolve, reject) => {
+                this.image.onload = resolve;
+                this.image.onerror = () => reject(
+                    new Error(
+                        "Could not load floor-plan image."
+                    )
+                );
+
+                this.image.src = this.objectURL;
+            });
+
+            if (
+                !this.image.naturalWidth ||
+                !this.image.naturalHeight
+            ) {
+                throw new Error(
+                    "Floor-plan image has invalid dimensions."
+                );
+            }
+
+            this.texture = new BABYLON.Texture(
+                this.objectURL,
+                this.scene,
+                false,
+                false,
+                BABYLON.Texture.TRILINEAR_SAMPLINGMODE
+            );
+
+            await new Promise((resolve, reject) => {
+                if (this.texture.isReady()) {
+                    resolve();
+                    return;
+                }
+
+                this.texture.onLoadObservable.addOnce(resolve);
+
+                this.texture.onError = message => {
+                    reject(
+                        new Error(
+                            message ||
+                            "Floor-plan texture failed."
+                        )
+                    );
+                };
+            });
+
+            this.material = new BABYLON.StandardMaterial(
+                "building-floor-plan-material",
+                this.scene
+            );
+
+            this.material.diffuseTexture = this.texture;
+            this.material.emissiveTexture = this.texture;
+            this.material.disableLighting = true;
+            this.material.backFaceCulling = false;
+            this.material.alpha = this.opacity;
+            this.material.transparencyMode =
+                BABYLON.Material.MATERIAL_ALPHABLEND;
+
+            this.mesh = BABYLON.MeshBuilder.CreateGround(
+                "building-floor-plan",
+                {
+                    width: 1,
+                    height: 1,
+                    subdivisions: 1
+                },
+                this.scene
+            );
+
+            this.mesh.material = this.material;
+            this.mesh.isPickable = false;
+            this.mesh.receiveShadows = false;
+            this.mesh.renderingGroupId = 1;
+
+            this.mesh.metadata = {
+                type: "floor-plan-reference",
+                reference: true
+            };
+
+            this.loaded = true;
+
+            this.setVisible(this.visible);
+            this.updateTransform();
+
+            return this;
+
+        } catch (error) {
+            this.remove();
+            throw error;
+        }
+    }
+
+    async readPixels() {
+        if (!this.image || !this.loaded) {
+            throw new Error(
+                "Load a floor-plan image first."
+            );
+        }
+
+        const canvas = document.createElement("canvas");
+
+        canvas.width = this.image.naturalWidth;
+        canvas.height = this.image.naturalHeight;
+
+        const context = canvas.getContext("2d", {
+            willReadFrequently: true
+        });
+
+        if (!context) {
+            throw new Error(
+                "Image processing canvas unavailable."
+            );
+        }
+
+        context.drawImage(this.image, 0, 0);
+
+        return context.getImageData(
+            0,
+            0,
+            canvas.width,
+            canvas.height
+        );
+    }
+
+    setPosition(position) {
+        this.validatePosition(position);
+
+        this.position = {
+            x: position.x,
+            y: position.y,
+            z: position.z
+        };
+
+        this.updateTransform();
+    }
+
+    setAltitudeOffset(offset) {
+        if (!Number.isFinite(offset)) {
+            throw new Error(
+                "Invalid altitude offset."
+            );
+        }
+
+        this.altitudeOffset = offset;
+        this.updateTransform();
+    }
+
+    setDimensions(width, depth) {
+        if (
+            !Number.isFinite(width) ||
+            !Number.isFinite(depth) ||
+            width <= 0 ||
+            depth <= 0
+        ) {
+            throw new Error(
+                "Invalid floor-plan dimensions."
+            );
+        }
+
+        this.width = width;
+        this.depth = depth;
+
+        this.updateTransform();
+    }
+
+    setRotation(rotation) {
+        if (!Number.isFinite(rotation)) {
+            throw new Error(
+                "Invalid floor-plan rotation."
+            );
+        }
+
+        this.rotation = rotation;
+        this.updateTransform();
+    }
+
+    updateTransform(
+        position = this.position,
+        dimensions = {},
+        rotation = this.rotation
+    ) {
+        if (!this.mesh) return;
+
+        if (!this.transform) {
+            throw new Error(
+                "SpatialTransform is unavailable."
+            );
+        }
+
+        if (position) {
+            this.validatePosition(position);
+
+            this.position = {
+                x: position.x,
+                y: position.y,
+                z: position.z
+            };
+        }
+
+        const width = dimensions.width ?? this.width;
+        const depth = dimensions.depth ?? this.depth;
+
+        if (
+            !Number.isFinite(width) ||
+            !Number.isFinite(depth) ||
+            width <= 0 ||
+            depth <= 0 ||
+            !Number.isFinite(rotation)
+        ) {
+            throw new Error(
+                "Invalid floor-plan transformation."
+            );
+        }
+
+        this.width = width;
+        this.depth = depth;
+        this.rotation = rotation;
+
+        const worldPosition = {
+            x: this.position.x,
+            y: this.position.y + this.altitudeOffset,
+            z: this.position.z
+        };
+
+        const rendered = this.transform.worldToRender(
+            worldPosition
+        );
+
+        const cos = Math.cos(rotation);
+        const sin = Math.sin(rotation);
+
+        const xAxis = this.transform.transformDirection(
+            worldPosition,
+            {
+                x: cos,
+                y: 0,
+                z: -sin
+            }
+        );
+
+        const zAxis = this.transform.transformDirection(
+            worldPosition,
+            {
+                x: sin,
+                y: 0,
+                z: cos
+            }
+        );
+
+        const xScale = Math.hypot(
+            xAxis.x,
+            xAxis.y,
+            xAxis.z
+        );
+
+        const zScale = Math.hypot(
+            zAxis.x,
+            zAxis.y,
+            zAxis.z
+        );
+
+        if (
+            !Number.isFinite(xScale) ||
+            !Number.isFinite(zScale) ||
+            xScale <= 0 ||
+            zScale <= 0
+        ) {
+            throw new Error(
+                "Invalid projected floor-plan dimensions."
+            );
+        }
+
+        this.mesh.position.set(
+            rendered.x,
+            rendered.y + 0.08,
+            rendered.z
+        );
+
+        // CreateGround occupies local X-Z, not X-Y.
+        this.mesh.scaling.set(
+            width * xScale,
+            1,
+            depth * zScale
+        );
+
+        // Align the ground plane to its projected X axis.
+        const projectedYaw = Math.atan2(
+            -xAxis.z,
+            xAxis.x
+        );
+
+        this.mesh.rotation.set(
+            0,
+            projectedYaw,
+            0
+        );
+
+        this.mesh.isVisible = this.visible;
+        this.mesh.computeWorldMatrix(true);
+    }
+
+    setOpacity(value) {
+        if (!Number.isFinite(value)) {
+            throw new Error(
+                "Invalid floor-plan opacity."
+            );
+        }
+
+        this.opacity = Math.max(
+            0,
+            Math.min(1, value)
+        );
+
+        if (this.material) {
+            this.material.alpha = this.opacity;
+        }
+    }
+
+    setVisible(value) {
+        this.visible = Boolean(value);
+
+        if (this.mesh) {
+            this.mesh.setEnabled(this.visible);
+        }
+    }
+
+    toggleVisibility() {
+        this.setVisible(!this.visible);
+        return this.visible;
+    }
+
+    remove() {
+        this.mesh?.dispose();
+        this.material?.dispose();
+        this.texture?.dispose();
+
+        this.mesh = null;
+        this.material = null;
+        this.texture = null;
+
+        if (this.objectURL) {
+            URL.revokeObjectURL(this.objectURL);
+            this.objectURL = null;
+        }
+
+        this.image = null;
+        this.loaded = false;
+    }
+
+    dispose() {
+        this.remove();
+    }
+}
+
+export { FloorPlanReference };
+export default FloorPlanReference;
+
+
+========================================================================
+END OF DIRECTORY SOURCE DUMP
+Files included: 7
+Binary/unreadable files skipped: 0
+========================================================================

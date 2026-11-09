@@ -1,0 +1,52 @@
+SOMNIUM — GEOMETRY PHASE 10 TEST RESULTS
+Build: 2026-11-08-slice-transition-anomaly-hotfix-1
+Date: 2026-11-08
+
+AUTOMATED TESTS
+Command:
+  node --test tests/*.test.mjs
+
+Result:
+  135 tests
+  135 passed
+  0 failed
+  0 skipped
+
+STATIC SYNTAX CHECK
+Command:
+  find src tests -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n1 node --check
+
+Result:
+  All JavaScript source and test files passed Node syntax checking.
+
+LOCAL MODULE REFERENCE CHECK
+Result:
+  All relative module references under src/ resolved to existing files after
+  removing browser cache-busting query strings.
+
+COVERAGE ADDED OR UPDATED
+- New anomaly factory defaults to slice-transition.
+- Explicit Bezier anomalies and legacy centreline records remain supported.
+- Slice-transition region bounds must be finite and contain both endpoints.
+- Topology rejects a transition between coincident slice planes.
+- Entry checks all four region bounds before starting traversal.
+- X, Y, Z, and W movement are independent during anomaly traversal.
+- Movement clamps to the bounded ambient 4D region.
+- Destination and reverse-source slice handoffs update player context and terrain.
+- Anomaly occupancy is recorded in the existing CorridorChunk.
+- World chunk addresses remain sliceId/chunkX/chunkZ and contain no W field.
+- Ordinary player movement and ordinary free-camera movement do not change W.
+- Free-camera W movement is enabled only after entering a slice-transition anomaly.
+- Both current demo connections use bounded slice-transition anomalies.
+- Demo-topology startup integration registers both links through the type-aware topology factory.
+- Browser module cache-busting loads the Phase 10 WorldTopology implementation rather than a cached Phase 9 module.
+- The main-world terrain's local elevation is ambient-aligned without enlarging
+  the anomaly's vertical bounds.
+- Legacy Bezier traversal tests continue to pass.
+
+BROWSER VISUAL CHECK
+A headless Chromium smoke test was attempted. Chromium exited during GL
+initialization because the available software GL backend was not usable in this
+container. No successful WebGL visual verification is claimed. Please perform
+the interactive visual check in a normal desktop browser using the included
+installation instructions.

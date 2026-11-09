@@ -1,0 +1,86 @@
+SOMNIUM — DIRECTORY SUMMARY
+================================================================
+
+Directory: src/scene/
+Generated: 2026-11-09T03:15:29
+
+PURPOSE
+----------------------------------------------------------------
+Automatically generated source inventory.
+See individual modules for detailed responsibilities.
+
+SOURCE FILES (DIRECT CHILDREN)
+----------------------------------------------------------------
+- create-scene.js
+
+DIRECT DEPENDENCIES
+----------------------------------------------------------------
+- src/buildings/building-system.js
+- src/demo/geometry-demo-world.js
+- src/editor/building-editor.js
+- src/environment/celestial-system.js
+- src/environment/heightmap-terrain.js
+- src/game/camera-controller.js
+- src/game/dnd-mode.js
+- src/game/game-manager.js
+- src/game/player-character.js
+- src/game/player-controller.js
+- src/rendering/adaptive-graphics-controller.js
+- src/ui/main-menu.js
+- src/water/hydrology.js
+- src/water/rain-system.js
+- src/water/water-system.js
+- src/world/chunk-cloud-system.js
+- src/world/chunk-ecology-system.js
+- src/world/chunk-geology-system.js
+- src/world/fields/geometry/geometry-renderer.js
+- src/world/fields/geometry/geometry-shader-manager.js
+- src/world/fields/geometry/hyperbolic-camera-controller.js
+- src/world/fields/geometry/optical-anomaly-tracer.js
+- src/world/fields/geometry/optical-debug-renderer.js
+- src/world/fields/geometry/optical-scene-registry.js
+- src/world/fields/geometry/optical-slice-tracer.js
+- src/world/fields/geometry/spatial-transform.js
+- src/world/persistence/world-library-ui.js
+- src/world/persistence/world-persistence.js
+- src/world/persistence/world-session.js
+- src/world/world-manager.js
+
+DEPENDENTS
+----------------------------------------------------------------
+- src/main.js
+
+INDIVIDUAL SOURCE FILE MANIFEST
+----------------------------------------------------------------
+
+Documentation root: docs/summaries/src/scene/files/
+Maximum chunk size: 300 lines
+Text files documented: 1
+Binary/unreadable files skipped: 0
+
+Each source file has its own documentation directory.
+INDEX.txt identifies the original file and maps every
+numbered part to its exact original source line range.
+
+SOURCE: src/scene/create-scene.js
+  Lines: 837
+  Parts: 3
+  Index: docs/summaries/src/scene/files/create-scene.js/INDEX.txt
+    docs/summaries/src/scene/files/create-scene.js/PART-001.txt
+    docs/summaries/src/scene/files/create-scene.js/PART-002.txt
+    docs/summaries/src/scene/files/create-scene.js/PART-003.txt
+
+RECURSIVE SOURCE DUMP
+----------------------------------------------------------------
+- SOURCE.txt contains recursively collected text files.
+- Individual files are available under files/.
+- Individual PART files contain at most 300 lines.
+- Binary files are excluded from both representations.
+
+NOTES
+----------------------------------------------------------------
+- Dependencies are extracted from relative JavaScript imports.
+- External packages and browser globals are not represented.
+- Dynamic imports using computed paths may not be detected.
+- This inventory does not establish runtime initialization order.
+- Generated documentation is not authoritative application state.

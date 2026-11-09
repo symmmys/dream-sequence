@@ -1,0 +1,118 @@
+SOMNIUM — DIRECTORY SUMMARY
+================================================================
+
+Directory: src/demo/
+Generated: 2026-11-09T03:15:29
+
+PURPOSE
+----------------------------------------------------------------
+Automatically generated source inventory.
+See individual modules for detailed responsibilities.
+
+SOURCE FILES (DIRECT CHILDREN)
+----------------------------------------------------------------
+- corridor-traversal-network.js
+  Exports: CorridorTraversalNetwork
+- geometry-demo-camera-controller.js
+  Exports: GeometryDemoCameraController
+- geometry-demo-topology.js
+  Exports: CORRIDOR_ID, HYPERCUBE_CORRIDOR_ID, HYPERCUBE_MAIN_CORRIDOR_ID, HYPERCUBE_SLICE_ID, MAIN_WORLD_SLICE_ID, SOURCE_SLICE_ID, createGeometryDemoTopology
+- geometry-demo-world.js
+  Exports: GeometryDemoWorld, MAIN_WORLD_SLICE_ID, createGeometryDemoWorld
+- hypercube-4d-renderer.js
+  Exports: Hypercube4DRenderer
+- world-manager-visibility.js
+  Exports: setWorldManagerVisibility
+
+DIRECT DEPENDENCIES
+----------------------------------------------------------------
+- src/game/camera-controller.js
+- src/game/player-character.js
+- src/game/player-controller.js
+- src/world/fields/geometry/anomaly-influence-field.js
+- src/world/fields/geometry/babylon-geometry-adapter.js
+- src/world/fields/geometry/corridor-renderer.js
+- src/world/fields/geometry/corridor-traversal-controller.js
+- src/world/fields/geometry/geometry-debug-grid.js
+- src/world/fields/geometry/hypercube-4d.js
+- src/world/fields/geometry/portal-preview-renderer.js
+- src/world/fields/geometry/slice-transition-traversal-controller.js
+- src/world/fields/geometry/spatial-4d.js
+- src/world/fields/geometry/spatial-anomaly.js
+- src/world/fields/geometry/spatial-transform.js
+- src/world/fields/geometry/world-slice.js
+- src/world/fields/geometry/world-topology.js
+- src/world/slice-world-registry.js
+- src/world/spatial-chunk-graph.js
+
+DEPENDENTS
+----------------------------------------------------------------
+- src/scene/create-scene.js
+
+INDIVIDUAL SOURCE FILE MANIFEST
+----------------------------------------------------------------
+
+Documentation root: docs/summaries/src/demo/files/
+Maximum chunk size: 300 lines
+Text files documented: 6
+Binary/unreadable files skipped: 0
+
+Each source file has its own documentation directory.
+INDEX.txt identifies the original file and maps every
+numbered part to its exact original source line range.
+
+SOURCE: src/demo/corridor-traversal-network.js
+  Lines: 232
+  Parts: 1
+  Index: docs/summaries/src/demo/files/corridor-traversal-network.js/INDEX.txt
+    docs/summaries/src/demo/files/corridor-traversal-network.js/PART-001.txt
+
+SOURCE: src/demo/geometry-demo-camera-controller.js
+  Lines: 768
+  Parts: 3
+  Index: docs/summaries/src/demo/files/geometry-demo-camera-controller.js/INDEX.txt
+    docs/summaries/src/demo/files/geometry-demo-camera-controller.js/PART-001.txt
+    docs/summaries/src/demo/files/geometry-demo-camera-controller.js/PART-002.txt
+    docs/summaries/src/demo/files/geometry-demo-camera-controller.js/PART-003.txt
+
+SOURCE: src/demo/geometry-demo-topology.js
+  Lines: 275
+  Parts: 1
+  Index: docs/summaries/src/demo/files/geometry-demo-topology.js/INDEX.txt
+    docs/summaries/src/demo/files/geometry-demo-topology.js/PART-001.txt
+
+SOURCE: src/demo/geometry-demo-world.js
+  Lines: 970
+  Parts: 4
+  Index: docs/summaries/src/demo/files/geometry-demo-world.js/INDEX.txt
+    docs/summaries/src/demo/files/geometry-demo-world.js/PART-001.txt
+    docs/summaries/src/demo/files/geometry-demo-world.js/PART-002.txt
+    docs/summaries/src/demo/files/geometry-demo-world.js/PART-003.txt
+    docs/summaries/src/demo/files/geometry-demo-world.js/PART-004.txt
+
+SOURCE: src/demo/hypercube-4d-renderer.js
+  Lines: 295
+  Parts: 1
+  Index: docs/summaries/src/demo/files/hypercube-4d-renderer.js/INDEX.txt
+    docs/summaries/src/demo/files/hypercube-4d-renderer.js/PART-001.txt
+
+SOURCE: src/demo/world-manager-visibility.js
+  Lines: 45
+  Parts: 1
+  Index: docs/summaries/src/demo/files/world-manager-visibility.js/INDEX.txt
+    docs/summaries/src/demo/files/world-manager-visibility.js/PART-001.txt
+
+RECURSIVE SOURCE DUMP
+----------------------------------------------------------------
+- SOURCE.txt contains recursively collected text files.
+- Individual files are available under files/.
+- Individual PART files contain at most 300 lines.
+- Binary files are excluded from both representations.
+
+NOTES
+----------------------------------------------------------------
+- Dependencies are extracted from relative JavaScript imports.
+- External packages and browser globals are not represented.
+- Dynamic imports using computed paths may not be detected.
+- This inventory does not establish runtime initialization order.
+- Generated documentation is not authoritative application state.

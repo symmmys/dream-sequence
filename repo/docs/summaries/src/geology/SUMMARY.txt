@@ -1,0 +1,95 @@
+SOMNIUM — DIRECTORY SUMMARY
+================================================================
+
+Directory: src/geology/
+Generated: 2026-11-09T03:15:29
+
+PURPOSE
+----------------------------------------------------------------
+Automatically generated source inventory.
+See individual modules for detailed responsibilities.
+
+SOURCE FILES (DIRECT CHILDREN)
+----------------------------------------------------------------
+- geological-field.js
+  Exports: GeologicalField, MATERIALS
+- geological-manager.js
+  Exports: GeologicalManager
+- rock-generator.js
+  Exports: RecursiveObjectGenerator, RockGenerator
+- rock-species.js
+  Exports: RockSpecies
+- surface-deposit-system.js
+  Exports: SurfaceDepositSystem
+
+DIRECT DEPENDENCIES
+----------------------------------------------------------------
+- src/core/noise.js
+- src/core/random.js
+- src/rendering/surface-deposit-renderer.js
+- src/rendering/thin-instance-renderer.js
+
+DEPENDENTS
+----------------------------------------------------------------
+- src/ecology/forest.js
+- src/world/chunk-geology-system.js
+
+INDIVIDUAL SOURCE FILE MANIFEST
+----------------------------------------------------------------
+
+Documentation root: docs/summaries/src/geology/files/
+Maximum chunk size: 300 lines
+Text files documented: 5
+Binary/unreadable files skipped: 0
+
+Each source file has its own documentation directory.
+INDEX.txt identifies the original file and maps every
+numbered part to its exact original source line range.
+
+SOURCE: src/geology/geological-field.js
+  Lines: 420
+  Parts: 2
+  Index: docs/summaries/src/geology/files/geological-field.js/INDEX.txt
+    docs/summaries/src/geology/files/geological-field.js/PART-001.txt
+    docs/summaries/src/geology/files/geological-field.js/PART-002.txt
+
+SOURCE: src/geology/geological-manager.js
+  Lines: 774
+  Parts: 3
+  Index: docs/summaries/src/geology/files/geological-manager.js/INDEX.txt
+    docs/summaries/src/geology/files/geological-manager.js/PART-001.txt
+    docs/summaries/src/geology/files/geological-manager.js/PART-002.txt
+    docs/summaries/src/geology/files/geological-manager.js/PART-003.txt
+
+SOURCE: src/geology/rock-generator.js
+  Lines: 142
+  Parts: 1
+  Index: docs/summaries/src/geology/files/rock-generator.js/INDEX.txt
+    docs/summaries/src/geology/files/rock-generator.js/PART-001.txt
+
+SOURCE: src/geology/rock-species.js
+  Lines: 175
+  Parts: 1
+  Index: docs/summaries/src/geology/files/rock-species.js/INDEX.txt
+    docs/summaries/src/geology/files/rock-species.js/PART-001.txt
+
+SOURCE: src/geology/surface-deposit-system.js
+  Lines: 256
+  Parts: 1
+  Index: docs/summaries/src/geology/files/surface-deposit-system.js/INDEX.txt
+    docs/summaries/src/geology/files/surface-deposit-system.js/PART-001.txt
+
+RECURSIVE SOURCE DUMP
+----------------------------------------------------------------
+- SOURCE.txt contains recursively collected text files.
+- Individual files are available under files/.
+- Individual PART files contain at most 300 lines.
+- Binary files are excluded from both representations.
+
+NOTES
+----------------------------------------------------------------
+- Dependencies are extracted from relative JavaScript imports.
+- External packages and browser globals are not represented.
+- Dynamic imports using computed paths may not be detected.
+- This inventory does not establish runtime initialization order.
+- Generated documentation is not authoritative application state.

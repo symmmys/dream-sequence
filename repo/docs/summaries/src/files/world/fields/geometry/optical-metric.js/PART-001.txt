@@ -1,0 +1,300 @@
+/**
+ * CPU-side optical metric construction in authoritative ambient R4.
+ * This module has no Babylon.js/render-space dependencies.
+ */
+
+import {
+    ambientToSlice,
+    assertVector4,
+    createCanonicalSliceFrame,
+    createSliceFrame
+} from './spatial-4d.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+
+const AXES = ['x', 'y', 'z', 'w'];
+const MATRIX3_SIZE = 9;
+const MATRIX4_SIZE = 16;
+const SPD_EPSILON = 1e-14;
+const DEFAULT_GRADIENT_STEP = 1e-4;
+
+/**
+ * Creates an optical metric field over ambient four-space.
+ *
+ * sliceMetricAt(localPosition, context) returns a 3x3 intrinsic slice metric,
+ * either as a nine-value row-major array or an object with a `values` array.
+ * refractiveIndexAt and wCouplingAt may be constants or callbacks.
+ *
+ * At exact zero W coupling, `metric` is null and `cometric` remains finite and
+ * positive-semidefinite. This represents a genuinely constrained normal
+ * direction without inserting Infinity into a matrix.
+ */
+function createOpticalMetricField(options = {}) {
+    const frame = options.sliceFrame
+        ? createSliceFrame(options.sliceFrame)
+        : createCanonicalSliceFrame(options.sliceW ?? 0);
+    const sliceMetricAt = options.sliceMetricAt ?? identityMetric3;
+    const refractiveIndexAt = options.refractiveIndexAt ?? options.refractiveIndex ?? 1;
+    const wCouplingAt = options.wCouplingAt ?? options.wCoupling ?? 0;
+    const normalMetricScaleAt = options.normalMetricScaleAt ?? options.normalMetricScale ?? 1;
+    const gradientStep = options.gradientStep ?? DEFAULT_GRADIENT_STEP;
+    const containsPosition = options.containsPosition ?? (() => true);
+
+    if (typeof sliceMetricAt !== 'function') {
+        throw new TypeError('sliceMetricAt must be a function.');
+    }
+    if (typeof containsPosition !== 'function') {
+        throw new TypeError('containsPosition must be a function.');
+    }
+    validatePositive(gradientStep, 'Optical metric gradient step');
+
+    function sample(position) {
+        assertVector4(position);
+        const local = ambientToSlice(frame, position);
+        const context = {
+            ambientPosition: copy4(position),
+            localPosition: { ...local.position },
+            normalOffset: local.normalOffset,
+            frame
+        };
+        const baseMetric = readMetric3(sliceMetricAt(local.position, context));
+        const refractiveIndex = evaluateScalar(refractiveIndexAt, position, context, 'Refractive index');
+        const wCoupling = evaluateScalar(wCouplingAt, position, context, 'W optical coupling');
+        const baseNormalMetricScale = typeof normalMetricScaleAt === 'function'
+            ? normalMetricScaleAt(copy4(position), context, baseMetric.slice())
+            : normalMetricScaleAt;
+        validatePositive(refractiveIndex, 'Refractive index');
+        validateUnitInterval(wCoupling, 'W optical coupling');
+        validatePositive(baseNormalMetricScale, 'Normal optical metric scale');
+        // The fourth coordinate shares the same ambient unit as the slice
+        // coordinates. Its reference metric scale therefore follows the local
+        // intrinsic slice metric instead of assuming an unrelated unit scale.
+        // This is essential when a compactified Poincare slice has metric
+        // coefficients many orders of magnitude smaller than Euclidean space.
+        const opticalNormalMetricScale = baseNormalMetricScale * refractiveIndex * refractiveIndex;
+        if (!Number.isFinite(opticalNormalMetricScale) || opticalNormalMetricScale <= 0) {
+            throw new RangeError('Normal optical metric scale must remain positive and finite.');
+        }
+
+        const opticalMetric3 = baseMetric.map((value) => value * refractiveIndex * refractiveIndex);
+        const inverseBaseMetric = invertSpd3(baseMetric);
+        const inverseOpticalMetric3 = inverseBaseMetric.map((value) => value / (refractiveIndex * refractiveIndex));
+        const tangentCometric = lift3To4(frame.axes, inverseOpticalMetric3);
+        const normal = frame.normal;
+        const cometric = tangentCometric.map((value, index) => {
+            const row = Math.floor(index / 4);
+            const column = index % 4;
+            return value + (wCoupling * wCoupling / opticalNormalMetricScale) *
+                normal[AXES[row]] * normal[AXES[column]];
+        });
+        validateFiniteMatrix(cometric, MATRIX4_SIZE, 'Optical cometric');
+        validateSymmetricMatrix(cometric, 4, 'Optical cometric');
+
+        const isConstrained = wCoupling === 0;
+        let metric = null;
+        if (!isConstrained) {
+            const tangentMetric = lift3To4(frame.axes, opticalMetric3);
+            const inverseNormalScale = opticalNormalMetricScale / (wCoupling * wCoupling);
+            if (!Number.isFinite(inverseNormalScale)) {
+                throw new RangeError('W optical coupling is too small to construct a finite metric tensor.');
+            }
+            metric = tangentMetric.map((value, index) => {
+                const row = Math.floor(index / 4);
+                const column = index % 4;
+                return value + inverseNormalScale * normal[AXES[row]] * normal[AXES[column]];
+            });
+            validateSpdMatrix(metric, 4, 'Optical metric');
+        }
+
+        return {
+            position: copy4(position),
+            localPosition: { ...local.position },
+            normalOffset: local.normalOffset,
+            refractiveIndex,
+            wCoupling,
+            normalMetricScale: opticalNormalMetricScale,
+            isConstrained,
+            metric,
+            cometric,
+            tangentMetric: opticalMetric3,
+            tangentCometric: inverseOpticalMetric3,
+            frame
+        };
+    }
+
+    function cometricAt(position) {
+        return sample(position).cometric;
+    }
+
+    function cometricGradientAt(position, gradientOptions = {}) {
+        assertVector4(position);
+        const step = gradientOptions.step ?? gradientStep;
+        validatePositive(step, 'Cometric gradient step');
+        const gradient = [];
+        for (const axis of AXES) {
+            const forward = copy4(position);
+            const backward = copy4(position);
+            forward[axis] += step;
+            backward[axis] -= step;
+            const positive = sample(forward).cometric;
+            const negative = sample(backward).cometric;
+            gradient.push(positive.map((value, index) => (value - negative[index]) / (2 * step)));
+        }
+        return gradient;
+    }
+
+    return Object.freeze({
+        frame,
+        sample,
+        metricAt: (position) => sample(position).metric,
+        cometricAt,
+        cometricGradientAt,
+        containsPosition(position) {
+            assertVector4(position);
+            return containsPosition(copy4(position)) === true;
+        }
+    });
+}
+
+/** Convex blend of 3x3 SPD slice metric tensors in the same local basis. */
+function blendPositiveDefiniteMetrics3(metrics, weights) {
+    if (!Array.isArray(metrics) || metrics.length === 0 || !Array.isArray(weights) || weights.length !== metrics.length) {
+        throw new TypeError('Metric blending requires matching non-empty metric and weight arrays.');
+    }
+    const normalizedWeights = normalizeWeights(weights);
+    const result = new Array(MATRIX3_SIZE).fill(0);
+    metrics.forEach((metric, metricIndex) => {
+        const values = readMetric3(metric);
+        for (let index = 0; index < MATRIX3_SIZE; index++) {
+            result[index] += values[index] * normalizedWeights[metricIndex];
+        }
+    });
+    validateSpdMatrix(result, 3, 'Blended optical slice metric');
+    return result;
+}
+
+
+/**
+ * Scale-balanced SPD interpolation for slice metrics expressed in different
+ * world-coordinate units. Each tensor is factored into its determinant scale
+ * and unit-determinant shape; scales interpolate geometrically while shapes
+ * interpolate convexly. This avoids a numerically singular linear blend when
+ * two valid charts differ by many orders of magnitude in optical units.
+ */
+function blendScaledPositiveDefiniteMetrics3(metrics, weights) {
+    if (!Array.isArray(metrics) || metrics.length === 0 ||
+        !Array.isArray(weights) || weights.length !== metrics.length) {
+        throw new TypeError('Scaled metric blending requires matching non-empty metric and weight arrays.');
+    }
+    const normalizedWeights = normalizeWeights(weights);
+    const shape = new Array(MATRIX3_SIZE).fill(0);
+    let logScale = 0;
+    metrics.forEach((metric, index) => {
+        const values = readMetric3(metric);
+        const scale = geometricMeanMetricScale3(values);
+        const weight = normalizedWeights[index];
+        logScale += weight * Math.log(scale);
+        for (let component = 0; component < MATRIX3_SIZE; component++) {
+            shape[component] += weight * values[component] / scale;
+        }
+    });
+    validateSpdMatrix(shape, 3, 'Scale-balanced blended optical slice metric shape');
+    const blendedScale = Math.exp(logScale);
+    validatePositive(blendedScale, 'Scale-balanced blended optical slice metric scale');
+    return shape.map((value) => value * blendedScale);
+}
+
+/** Maps a slice-coordinate SpatialTransform metric callback into this API. */
+function spatialTransformMetricProvider(spatialTransform) {
+    if (!spatialTransform || typeof spatialTransform.metricAtWorld !== 'function') {
+        throw new TypeError('A SpatialTransform with metricAtWorld(position) is required.');
+    }
+    return (localPosition) => spatialTransform.metricAtWorld(localPosition);
+}
+
+function lift3To4(axes, matrix3) {
+    const result = new Array(MATRIX4_SIZE).fill(0);
+    for (let row = 0; row < 4; row++) {
+        for (let column = 0; column < 4; column++) {
+            for (let a = 0; a < 3; a++) {
+                for (let b = 0; b < 3; b++) {
+                    result[row * 4 + column] +=
+                        axes[a][AXES[row]] * matrix3[a * 3 + b] * axes[b][AXES[column]];
+                }
+            }
+        }
+    }
+    return result;
+}
+
+function readMetric3(metric) {
+    const values = Array.isArray(metric) || ArrayBuffer.isView(metric) ? metric : metric?.values;
+    if (!values || values.length !== MATRIX3_SIZE) {
+        throw new TypeError('A slice metric must contain nine row-major values.');
+    }
+    const result = Array.from(values);
+    validateFiniteMatrix(result, MATRIX3_SIZE, 'Slice metric');
+    validateSymmetricMatrix(result, 3, 'Slice metric');
+    validateSpdMatrix(result, 3, 'Slice metric');
+    return result;
+}
+
+/**
+ * Coordinate-invariant characteristic scale (det(g)^(1/3)) of a 3D SPD metric.
+ * Computation is normalized first so very small or very large metric units are
+ * handled without determinant underflow/overflow.
+ */
+function geometricMeanMetricScale3(matrix) {
+    const values = readMetric3(matrix);
+    const scale = matrixScale(values);
+    if (!(scale > 0) || !Number.isFinite(scale)) {
+        throw new RangeError('Cannot derive a normal metric scale from a degenerate slice metric.');
+    }
+    const normalized = values.map((value) => value / scale);
+    const a = normalized[0], b = normalized[1], c = normalized[2];
+    const d = normalized[4], e = normalized[5], f = normalized[8];
+    const determinant = a * (d * f - e * e) +
+        b * (c * e - b * f) + c * (b * e - c * d);
+    if (!Number.isFinite(determinant) || determinant <= 0) {
+        throw new RangeError('Cannot derive a normal metric scale from a non-positive or non-finite slice determinant.');
+    }
+    const result = scale * Math.cbrt(determinant);
+    validatePositive(result, 'Geometric-mean slice metric scale');
+    return result;
+}
+
+function invertSpd3(matrix) {
+    validateSpdMatrix(matrix, 3, 'Slice metric');
+    // Determinants scale cubically. Testing an absolute determinant threshold
+    // incorrectly rejects perfectly valid metrics expressed in small world
+    // units (the live Main World Poincare metric is around 1e-7 per entry).
+    // Normalize first so the conditioning test is scale invariant.
+    const scale = matrixScale(matrix);
+    const normalized = matrix.map((value) => value / scale);
+    const a = normalized[0], b = normalized[1], c = normalized[2];
+    const d = normalized[4], e = normalized[5], f = normalized[8];
+    const cofactor00 = d * f - e * e;
+    const cofactor01 = c * e - b * f;
+    const cofactor02 = b * e - c * d;
+    const cofactor11 = a * f - c * c;
+    const cofactor12 = b * c - a * e;
+    const cofactor22 = a * d - b * b;
+    const determinant = a * cofactor00 + b * cofactor01 + c * cofactor02;
+    if (!Number.isFinite(determinant) || determinant <= SPD_EPSILON) {
+        throw new RangeError('Slice metric is singular or ill-conditioned.');
+    }
+    const inverse = [
+        cofactor00 / determinant / scale,
+        cofactor01 / determinant / scale,
+        cofactor02 / determinant / scale,
+        cofactor01 / determinant / scale,
+        cofactor11 / determinant / scale,
+        cofactor12 / determinant / scale,
+        cofactor02 / determinant / scale,
+        cofactor12 / determinant / scale,
+        cofactor22 / determinant / scale
+    ];
+    validateFiniteMatrix(inverse, MATRIX3_SIZE, 'Inverse slice metric');
+    return inverse;
+}
+
+function validateSpdMatrix(matrix, size, label) {
+    validateFiniteMatrix(matrix, size * size, label);

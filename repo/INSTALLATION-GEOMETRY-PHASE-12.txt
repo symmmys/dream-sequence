@@ -1,0 +1,46 @@
+SOMNIUM — GEOMETRY PHASE 12
+Continuous anomaly influence and W-dependent chunk reachability
+
+INSTALLATION
+
+1. Extract the complete Phase 12 ZIP into a clean project directory.
+2. Serve the directory containing index.html (not the outer ZIP wrapper directory).
+3. For example:
+
+   cd /path/to/somnium-project-root
+   python3 -m http.server 8081
+
+4. Open http://127.0.0.1:8081/ in a modern browser.
+5. If an earlier Phase 11 tab is open, perform a hard refresh. Phase 12 uses the
+   cache-busting identifier somnium-20261108-anomaly-influence-1.
+
+CONTROLS
+
+The existing movement controls are unchanged. E/Q control W movement.
+Near an anomaly, W motion now scales smoothly with distance from its ambient
+4D center. Full W freedom exists within the anomaly's inner sphere. This field
+begins before the player enters the anomaly's bounded interior.
+
+The Poincare-to-Hypercube portal has a wider interaction radius and a larger
+visible aperture. Move close to the portal and approach it while moving forward.
+The 4D chamber's direct +5-W Main World exit from Phase 11 remains present.
+
+NOTES
+
+- World chunk identity remains (sliceId, chunkX, chunkZ).
+- Cross-slice chunk reachability requires an explicit traversable topology edge
+  and sufficient spatial and W reach.
+- The Poincare-side entry aperture was enlarged to make the connection easier
+  to acquire.
+- Legacy Bezier anomalies remain supported.
+- This phase does not implement authentic ray tracing; it documents the optical
+  metric seam for a later phase.
+
+TESTS
+
+Run from the project root:
+
+   node --test tests/*.test.mjs
+
+The full Phase 12 automated suite is recorded in
+GEOMETRY-PHASE-12-TEST-RESULTS.txt.

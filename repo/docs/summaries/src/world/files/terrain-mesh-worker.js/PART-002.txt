@@ -1,0 +1,69 @@
+        !Number.isFinite(settings.minX) ||
+        !Number.isFinite(settings.minZ) ||
+        !Number.isFinite(settings.minHeight) ||
+        !Number.isFinite(settings.maxHeight) ||
+        settings.maxHeight <= settings.minHeight ||
+        pixels.length < expectedLength
+    ) {
+        throw new Error("Terrain worker received invalid heightmap data.");
+    }
+
+    terrain = {
+        ...settings,
+        pixels
+    };
+}
+
+function validateGeneratedColors(colors) {
+    for (let index = 0; index < colors.length; index++) {
+        if (!Number.isFinite(colors[index])) {
+            throw new Error(
+                `Terrain color generation produced a non-finite value at ${index}.`
+            );
+        }
+    }
+}
+
+function transferMeshData(message, buffers) {
+    self.postMessage({
+        type: "complete",
+        id: message.id,
+        revision: message.revision,
+        data: buffers
+    }, [
+        buffers.positions.buffer,
+        buffers.normals.buffer,
+        buffers.colors.buffer,
+        buffers.indices.buffer
+    ]);
+}
+
+function postWorkerError(message, error) {
+    self.postMessage({
+        type: "error",
+        id: message.id,
+        revision: message.revision,
+        message: error.message
+    });
+}
+
+function handleWorkerMessage(event) {
+    const message = event.data;
+
+    if (message.type === "init") {
+        validateWorkerTerrain(message);
+        self.postMessage({ type: "ready" });
+        return;
+    }
+
+    if (message.type !== "generate" || !terrain) return;
+
+    try {
+        const buffers = generateMesh(message.job);
+        transferMeshData(message, buffers);
+    } catch (error) {
+        postWorkerError(message, error);
+    }
+}
+
+self.onmessage = handleWorkerMessage;

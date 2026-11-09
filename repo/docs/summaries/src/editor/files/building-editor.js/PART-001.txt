@@ -1,0 +1,300 @@
+
+import { EditorCamera } from "./editor-camera.js";
+import { BuildingPlacement } from "./building-placement.js";
+import { FloorPlanReference } from "./floor-plan-reference.js";
+import { FloorPlanBuilder } from "./floor-plan-builder.js";
+import {
+    FloorPlanHeightControl
+} from "./floor-plan-height-control.js";
+import {
+    BuildingPreviewRenderer
+} from "./building-preview-renderer.js";
+
+class BuildingEditor {
+    constructor(scene, buildingSystem, spatialTransform) {
+        this.scene = scene;
+        this.system = buildingSystem;
+        this.transform = spatialTransform;
+
+        // Building geometry must use the authoritative
+        // world-to-render coordinate transformation.
+        this.system.renderer.transform = spatialTransform;
+
+        this.editorCamera = new EditorCamera(
+            scene,
+            spatialTransform
+        );
+
+        this.placement = new BuildingPlacement(
+            buildingSystem,
+            this.editorCamera
+        );
+
+        this.floorPlan = new FloorPlanReference(
+            scene,
+            spatialTransform
+        );
+this.floorPlanBuilder = new FloorPlanBuilder({
+    wallHeight: 3.2,
+    doorHeight: 2.1,
+    windowHeight: 1.2,
+    windowSill: 0.9
+});
+
+        this.mode = "room";
+        this.gridSize = 1;
+        this.activeBuilding = null;
+        this.selectedRoom = null;
+        this.startPoint = null;
+        this.enabled = false;
+
+        this.createInterface();
+this.previewRenderer = new BuildingPreviewRenderer(
+    scene,
+    buildingSystem.geometryRenderer
+);
+
+this.floorPlanHeightControl =
+    new FloorPlanHeightControl(
+        this.container,
+        this.floorPlanBuilder,
+        () => {
+            if (
+                this.activeBuilding &&
+                this.floorPlan.mesh
+            ) {
+                this.buildFloorFromPlan();
+            }
+        }
+    );
+
+this.installFloorPlanWorkflowControls();
+
+        this.pointerObserver =
+            scene.onPointerObservable.add(info => {
+                if (!this.enabled) return;
+
+                if (
+                    info.type === BABYLON.PointerEventTypes.POINTERDOWN
+                ) {
+                    this.pointerDown();
+                }
+
+                if (
+                    info.type === BABYLON.PointerEventTypes.POINTERUP
+                ) {
+                    this.pointerUp();
+                }
+            });
+    }
+
+	setGameManager(manager) {
+    this.gameManager = manager;
+
+    manager.registerEditor(this.editorCamera.camera);
+
+    this.unsubscribeMode = manager.onModeChanged(mode => {
+        const active = mode === "editor";
+
+        this.enabled = active;
+        this.container.style.display =
+            active ? "block" : "none";
+
+        if (active && this.activeBuilding) {
+            this.editorCamera.focus(
+                this.activeBuilding.position
+            );
+        }
+    });
+}
+
+    createInterface() {
+        this.container = document.createElement("div");
+
+        Object.assign(this.container.style, {
+            position: "fixed",
+            top: "70px",
+            left: "18px",
+            width: "280px",
+            maxHeight: "85vh",
+            overflowY: "auto",
+            padding: "16px",
+            background: "rgba(19,29,40,0.97)",
+            border: "1px solid #536779",
+            borderRadius: "8px",
+            color: "#fff",
+            fontFamily: "Arial,sans-serif",
+            zIndex: "1600",
+            display: "none"
+        });
+
+        this.container.innerHTML = `
+            <h3>BUILDING EDITOR</h3>
+
+<div style="display:grid;gap:7px">
+    <button data-mode="room">DRAW ROOM</button>
+    <button data-mode="door">ADD DOOR</button>
+    <button data-mode="window">ADD WINDOW</button>
+    <button data-mode="furniture">PLACE FURNITURE</button>
+    <button data-mode="floor-plan">POSITION FLOOR PLAN</button>
+</div>
+            <hr>
+
+            <h4>FLOOR PLAN</h4>
+            <input type="file" id="floor-image" accept="image/*">
+
+            <label>Width
+                <input id="floor-width" type="number" min="0.1" value="20">
+            </label>
+	<label>
+    Floor Plan Altitude Offset
+
+    <input
+        id="floor-altitude"
+        type="number"
+        step="0.1"
+        value="0"
+    >
+</label>
+
+	<button id="build-floor" style="width:100%">
+		BUILD FLOOR FROM PLAN
+	</button>
+
+            <label>Depth
+                <input id="floor-depth" type="number" min="0.1" value="20">
+            </label>
+
+            <label>Opacity
+                <input id="floor-opacity" type="range"
+                    min="0" max="1" step="0.05" value="0.8">
+            </label>
+
+            <label>
+                <input id="floor-visible" type="checkbox" checked>
+                Show floor plan
+            </label>
+
+            <hr>
+
+            <h4>BUILDING POSITION</h4>
+
+            <label>X
+                <input id="position-x" type="number" step="0.1" value="0">
+            </label>
+
+            <label>Z
+                <input id="position-z" type="number" step="0.1" value="0">
+            </label>
+
+            <label>Elevation
+                <input id="position-y" type="number" step="0.1" value="0">
+            </label>
+
+            <label>Rotation (degrees)
+                <input id="position-rotation" type="number"
+                    step="1" value="0">
+            </label>
+
+            <hr>
+
+            <label>Grid size
+                <input id="building-grid" type="number"
+                    min="0.1" step="0.1" value="1">
+            </label>
+
+            <p id="building-status" style="font-size:12px;color:#b8c8d7">
+                Select a construction tool.
+            </p>
+
+            <button id="building-close" style="width:100%">
+                CLOSE EDITOR
+            </button>
+        `;
+
+        document.body.appendChild(this.container);
+
+        this.status = this.container.querySelector(
+            "#building-status"
+        );
+
+        this.container.querySelectorAll("[data-mode]")
+            .forEach(button => {
+                button.onclick = () => this.setMode(
+                    button.dataset.mode
+                );
+            });
+
+        const element = id =>
+            this.container.querySelector(`#${id}`);
+
+        element("building-grid").onchange = event => {
+            this.gridSize = Math.max(
+                0.1,
+                Number(event.target.value) || 1
+            );
+        };
+
+	element("floor-image").onchange = async event => {
+    try {
+	if (
+    this.activeBuilding?.metadata?.editorPreview
+) {
+    this.setStatus(
+        "Please place the current building before importing another plan."
+    );
+
+    event.target.value = "";
+    return;
+}
+        await this.floorPlan.load(
+            event.target.files[0]
+        );
+	const width = Number(
+    this.container.querySelector("#floor-width").value
+);
+
+const depth = width *
+    this.floorPlan.image.naturalHeight /
+    this.floorPlan.image.naturalWidth;
+
+this.container.querySelector(
+    "#floor-depth"
+).value = depth.toFixed(2);
+
+this.aspectLock.checked = true;
+
+this.floorPlan.setDimensions(width, depth);
+
+        this.ensureBuildingForFloorPlan();
+        this.updateFloorPlanPosition();
+	if (
+    this.activeBuilding?.metadata?.editorPreview
+) {
+    this.previewRenderer.show(this.activeBuilding);
+}
+
+        this.setStatus(
+            "Floor plan imported. Position it, then build the floor."
+        );
+    } catch (error) {
+        this.setStatus(error.message);
+    }
+};
+element("floor-altitude").addEventListener(
+    "input",
+    event => {
+        this.floorPlan.setAltitudeOffset(
+            Number(event.target.value) || 0
+        );
+    }
+);
+
+element("build-floor").onclick = () =>
+    this.buildFloorFromPlan();
+
+        element("floor-opacity").oninput = event =>
+            this.floorPlan.setOpacity(Number(event.target.value));
+
+        element("floor-visible").onchange = event =>
+            this.floorPlan.setVisible(event.target.checked);

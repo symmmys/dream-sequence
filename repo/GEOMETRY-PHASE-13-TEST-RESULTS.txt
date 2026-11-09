@@ -1,0 +1,29 @@
+SOMNIUM — GEOMETRY PHASE 13 TEST RESULTS
+
+Command:
+  node --test tests/*.test.mjs
+
+Result:
+  Tests: 160
+  Passed: 160
+  Failed: 0
+
+Static checks:
+  JavaScript / MJS syntax checks: run over source and test modules.
+  Relative source-module references: 181 checked.
+  Missing relative source-module references: 0.
+
+Phase 13-specific regression coverage:
+  - Camera boom distance is measured after projection in render space.
+  - Poincare camera positions remain strictly inside the open render chart.
+  - The follow camera targets the character model, not the hypercube.
+  - Camera orbit pitch can pass beyond the former +/-1.48 radian clamp.
+  - Render-anchor orientation and explicit look target are preserved.
+  - Main player Ctrl+R / Cmd+R events are not prevented or captured.
+  - Geometry-demo free-camera Ctrl+R / Cmd+R events are not prevented or captured.
+  - Unmodified R remains available as vertical movement input.
+
+Limitations:
+  A desktop browser/WebGL visual session was not available in this execution
+  environment. The updated camera controls should be manually checked on the
+  target browser/GPU.

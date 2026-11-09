@@ -1,0 +1,90 @@
+    validateSymmetricMatrix(matrix, size, label);
+    // Cholesky pivots are also scale dependent. Normalize the tensor before
+    // testing positive-definiteness, retaining a relative conditioning bound.
+    const scale = matrixScale(matrix);
+    if (!(scale > 0) || !Number.isFinite(scale)) {
+        throw new RangeError(`${label} must be positive definite.`);
+    }
+    const normalized = matrix.map((value) => value / scale);
+    const lower = new Array(size * size).fill(0);
+    for (let row = 0; row < size; row++) {
+        for (let column = 0; column <= row; column++) {
+            let value = normalized[row * size + column];
+            for (let k = 0; k < column; k++) {
+                value -= lower[row * size + k] * lower[column * size + k];
+            }
+            if (row === column) {
+                if (value <= SPD_EPSILON || !Number.isFinite(value)) {
+                    throw new RangeError(`${label} must be positive definite.`);
+                }
+                lower[row * size + column] = Math.sqrt(value);
+            } else {
+                lower[row * size + column] = value / lower[column * size + column];
+            }
+        }
+    }
+    return lower;
+}
+
+function matrixScale(matrix) {
+    return matrix.reduce((maximum, value) => Math.max(maximum, Math.abs(value)), 0);
+}
+
+function validateSymmetricMatrix(matrix, size, label) {
+    const scale = matrixScale(matrix);
+    const tolerance = Math.max(Number.MIN_VALUE, scale * 1e-9);
+    for (let row = 0; row < size; row++) {
+        for (let column = row + 1; column < size; column++) {
+            if (Math.abs(matrix[row * size + column] - matrix[column * size + row]) > tolerance) {
+                throw new TypeError(`${label} must be symmetric.`);
+            }
+        }
+    }
+}
+
+function validateFiniteMatrix(matrix, expectedLength, label) {
+    if (!Array.isArray(matrix) || matrix.length !== expectedLength || !matrix.every(Number.isFinite)) {
+        throw new TypeError(`${label} must contain ${expectedLength} finite values.`);
+    }
+}
+
+function normalizeWeights(weights) {
+    let sum = 0;
+    const result = weights.map((weight) => {
+        if (!Number.isFinite(weight) || weight < 0) throw new RangeError('Metric blend weights must be non-negative and finite.');
+        sum += weight;
+        return weight;
+    });
+    if (!Number.isFinite(sum) || sum <= 0) throw new RangeError('Metric blend weights must have a positive sum.');
+    return result.map((weight) => weight / sum);
+}
+
+function evaluateScalar(source, position, context, label) {
+    const value = typeof source === 'function' ? source(copy4(position), context) : source;
+    if (!Number.isFinite(value)) throw new TypeError(`${label} must evaluate to a finite number.`);
+    return value;
+}
+
+function validatePositive(value, label) {
+    if (!Number.isFinite(value) || value <= 0) throw new RangeError(`${label} must be positive and finite.`);
+}
+
+function validateUnitInterval(value, label) {
+    if (!Number.isFinite(value) || value < 0 || value > 1) throw new RangeError(`${label} must be between zero and one.`);
+}
+
+function identityMetric3() {
+    return [1, 0, 0, 0, 1, 0, 0, 0, 1];
+}
+
+function copy4(position) {
+    return { x: position.x, y: position.y, z: position.z, w: position.w };
+}
+
+export {
+    blendPositiveDefiniteMetrics3,
+    blendScaledPositiveDefiniteMetrics3,
+    createOpticalMetricField,
+    geometricMeanMetricScale3,
+    spatialTransformMetricProvider
+};

@@ -1,0 +1,90 @@
+SOMNIUM — DIRECTORY SUMMARY
+================================================================
+
+Directory: src/atmosphere/
+Generated: 2026-11-09T03:15:29
+
+PURPOSE
+----------------------------------------------------------------
+Automatically generated source inventory.
+See individual modules for detailed responsibilities.
+
+SOURCE FILES (DIRECT CHILDREN)
+----------------------------------------------------------------
+- air-pressure-field.js
+  Exports: AirPressureField
+- cloud-generator.js
+  Exports: CloudGenerator
+- cloud-species.js
+  Exports: CloudSpecies
+- cloud-system.js
+  Exports: CloudSystem
+- cloud.js
+  Exports: Cloud
+
+DIRECT DEPENDENCIES
+----------------------------------------------------------------
+- src/rendering/cloud-renderer.js
+
+DEPENDENTS
+----------------------------------------------------------------
+- src/ecology/forest.js
+- src/world/chunk-cloud-system.js
+
+INDIVIDUAL SOURCE FILE MANIFEST
+----------------------------------------------------------------
+
+Documentation root: docs/summaries/src/atmosphere/files/
+Maximum chunk size: 300 lines
+Text files documented: 5
+Binary/unreadable files skipped: 0
+
+Each source file has its own documentation directory.
+INDEX.txt identifies the original file and maps every
+numbered part to its exact original source line range.
+
+SOURCE: src/atmosphere/air-pressure-field.js
+  Lines: 131
+  Parts: 1
+  Index: docs/summaries/src/atmosphere/files/air-pressure-field.js/INDEX.txt
+    docs/summaries/src/atmosphere/files/air-pressure-field.js/PART-001.txt
+
+SOURCE: src/atmosphere/cloud-generator.js
+  Lines: 131
+  Parts: 1
+  Index: docs/summaries/src/atmosphere/files/cloud-generator.js/INDEX.txt
+    docs/summaries/src/atmosphere/files/cloud-generator.js/PART-001.txt
+
+SOURCE: src/atmosphere/cloud-species.js
+  Lines: 62
+  Parts: 1
+  Index: docs/summaries/src/atmosphere/files/cloud-species.js/INDEX.txt
+    docs/summaries/src/atmosphere/files/cloud-species.js/PART-001.txt
+
+SOURCE: src/atmosphere/cloud-system.js
+  Lines: 543
+  Parts: 2
+  Index: docs/summaries/src/atmosphere/files/cloud-system.js/INDEX.txt
+    docs/summaries/src/atmosphere/files/cloud-system.js/PART-001.txt
+    docs/summaries/src/atmosphere/files/cloud-system.js/PART-002.txt
+
+SOURCE: src/atmosphere/cloud.js
+  Lines: 67
+  Parts: 1
+  Index: docs/summaries/src/atmosphere/files/cloud.js/INDEX.txt
+    docs/summaries/src/atmosphere/files/cloud.js/PART-001.txt
+
+RECURSIVE SOURCE DUMP
+----------------------------------------------------------------
+- SOURCE.txt contains recursively collected text files.
+- Individual files are available under files/.
+- Individual PART files contain at most 300 lines.
+- Binary files are excluded from both representations.
+
+NOTES
+----------------------------------------------------------------
+- Dependencies are extracted from relative JavaScript imports.
+- External packages and browser globals are not represented.
+- Dynamic imports using computed paths may not be detected.
+- This inventory does not establish runtime initialization order.
+- Generated documentation is not authoritative application state.

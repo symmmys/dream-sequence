@@ -1,0 +1,46 @@
+SOMNIUM — GEOMETRY PHASE 13
+Third-person camera refinement
+
+INSTALLATION
+
+1. Extract this complete ZIP into a clean project directory.
+2. Serve the directory containing index.html:
+
+   cd /path/to/somnium-project-root
+   python3 -m http.server 8081
+
+3. Open http://127.0.0.1:8081/.
+4. Phase 13 uses the cache-busting identifier:
+   somnium-20261108-phase13-camera-controls-1
+   A normal refresh should load the updated modules; hard refresh is also safe.
+
+CAMERA CONTROLS
+
+- Scroll wheel: zoom the follow camera in and out.
+- Right mouse drag: orbit the follow camera around the character. The view can
+  pass over the top and bottom of the character without an arbitrary pitch cap.
+- Left mouse drag: turn the character, as before.
+- The hypercube chamber follow camera now targets the character model instead
+  of the tesseract.
+
+KEYBOARD
+
+- R remains a vertical movement key when pressed by itself in the relevant mode.
+- Ctrl+R and Cmd+R are passed to the browser for page reload.
+
+NOTES
+
+- Camera boom distance is now measured in render units and applied after the
+  character position is projected into the active slice.
+- This keeps camera framing consistent when an anomaly hands the player from
+  the Euclidean 4D chamber into the Poincare Main World slice.
+- Existing anomaly geometry, influence fields, chunk reachability, and terrain
+  generation are unchanged.
+
+TESTS
+
+Run:
+
+   node --test tests/*.test.mjs
+
+All Phase 13 automated tests are included in tests/.

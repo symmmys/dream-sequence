@@ -1,0 +1,163 @@
+/** Owns an isolated render-target view of one remote slice. */
+
+class PortalPreviewRenderer {
+    constructor(scene, options = {}) {
+        this.scene = scene;
+        this.visible = false;
+        this.ownedMeshes = [];
+        this.camera = this.createCamera(options.camera ?? {});
+        this.texture = this.createRenderTarget(options.resolution ?? 512);
+        this.surface = this.createSurface(options.position ?? { x: 0, y: 2.5, z: 14.2 }, options.width ?? 4.6, options.height ?? 5.4);
+        this.material = this.createMaterial();
+        this.surface.material = this.material;
+        this.surface.isPickable = false;
+        this.surface.metadata = { geometryPortal: true, renderOnly: true };
+        this.setVisible(false);
+    }
+
+    createCamera(options) {
+        const camera = new BABYLON.FreeCamera(
+            'geometryPortalPreviewCamera',
+            new BABYLON.Vector3(options.x ?? 0, options.y ?? 34, options.z ?? -58),
+            this.scene
+        );
+        camera.setTarget(new BABYLON.Vector3(options.targetX ?? 0, options.targetY ?? 0, options.targetZ ?? 0));
+        camera.minZ = 0.1;
+        camera.maxZ = options.maxZ ?? 100000;
+        camera.fov = options.fov ?? 0.95;
+        camera.inputs.clear();
+        camera.layerMask = options.layerMask ?? 0x20000000;
+        return camera;
+    }
+
+    createRenderTarget(resolution) {
+        const target = new BABYLON.RenderTargetTexture(
+            'geometryPortalRenderTarget',
+            { width: resolution, height: resolution },
+            this.scene,
+            false,
+            true
+        );
+        target.activeCamera = this.camera;
+        target.renderList = [];
+        target.refreshRate = 2;
+        target.gammaSpace = true;
+        target.clearColor = new BABYLON.Color4(0.025, 0.04, 0.09, 1);
+        return target;
+    }
+
+    createSurface(position, width, height) {
+        const surface = BABYLON.MeshBuilder.CreatePlane(
+            'geometryPortalSurface',
+            { width, height, sideOrientation: BABYLON.Mesh.DOUBLESIDE },
+            this.scene
+        );
+        surface.position.set(position.x, position.y, position.z);
+        return surface;
+    }
+
+    createMaterial() {
+        const material = new BABYLON.StandardMaterial('geometryPortalMaterial', this.scene);
+        material.diffuseTexture = this.texture;
+        material.emissiveTexture = this.texture;
+        material.emissiveColor = BABYLON.Color3.White();
+        material.disableLighting = true;
+        material.backFaceCulling = false;
+        material.specularColor = BABYLON.Color3.Black();
+        return material;
+    }
+
+    setHomePose() {
+        this.homePose = capturePose(this.surface, this.rim);
+    }
+
+    setPose(position, direction = { x: 0, y: 0, z: 1 }) {
+        const length = Math.hypot(direction.x, direction.y, direction.z) || 1;
+        const normal = { x: direction.x / length, y: direction.y / length, z: direction.z / length };
+        const pitch = -Math.asin(Math.max(-1, Math.min(1, normal.y)));
+        const yaw = Math.atan2(normal.x, normal.z);
+        this.surface.position.set(position.x, position.y, position.z);
+        this.surface.rotation.set(pitch, yaw, 0);
+        if (this.rim) {
+            this.rim.position.set(
+                position.x - normal.x * 0.035,
+                position.y - normal.y * 0.035,
+                position.z - normal.z * 0.035
+            );
+            this.rim.rotation.set(pitch, yaw, 0);
+        }
+    }
+
+    resetPose() {
+        if (this.homePose) restorePose(this, this.homePose);
+    }
+
+    setRenderList(meshes) {
+        const renderList = meshes.filter(isRenderableMesh);
+        if (sameMeshes(renderList, this.ownedMeshes)) return;
+        this.ownedMeshes = renderList;
+        this.texture.renderList = renderList;
+    }
+
+    setVisible(visible) {
+        this.visible = Boolean(visible);
+        this.surface.isVisible = this.visible;
+        const targets = this.scene.customRenderTargets;
+        const index = targets.indexOf(this.texture);
+        if (this.visible && index < 0) targets.push(this.texture);
+        if (!this.visible && index >= 0) targets.splice(index, 1);
+    }
+
+    getInfo() {
+        return {
+            visible: this.visible,
+            renderOnly: true,
+            renderListSize: this.ownedMeshes.length,
+            resolution: this.texture.getSize()
+        };
+    }
+
+    dispose() {
+        this.setVisible(false);
+        this.rim?.dispose(false, false);
+        this.surface.dispose(false, false);
+        this.material.dispose(false, true);
+        this.texture.dispose();
+        this.camera.dispose();
+        this.ownedMeshes = [];
+    }
+}
+
+function isRenderableMesh(mesh) {
+    return Boolean(mesh && !mesh.isDisposed());
+}
+
+function capturePose(surface, rim) {
+    return {
+        surfacePosition: cloneVector(surface.position),
+        surfaceRotation: cloneVector(surface.rotation),
+        rimPosition: rim ? cloneVector(rim.position) : null,
+        rimRotation: rim ? cloneVector(rim.rotation) : null
+    };
+}
+
+function restorePose(renderer, pose) {
+    renderer.surface.position.set(pose.surfacePosition.x, pose.surfacePosition.y, pose.surfacePosition.z);
+    renderer.surface.rotation.set(pose.surfaceRotation.x, pose.surfaceRotation.y, pose.surfaceRotation.z);
+    if (renderer.rim && pose.rimPosition) {
+        renderer.rim.position.set(pose.rimPosition.x, pose.rimPosition.y, pose.rimPosition.z);
+        renderer.rim.rotation.set(pose.rimRotation.x, pose.rimRotation.y, pose.rimRotation.z);
+    }
+}
+
+function cloneVector(value) {
+    return { x: value.x, y: value.y, z: value.z };
+}
+
+function sameMeshes(left, right) {
+    return left.length === right.length && left.every(function sameMesh(mesh, index) {
+        return mesh === right[index];
+    });
+}
+
+export { PortalPreviewRenderer };

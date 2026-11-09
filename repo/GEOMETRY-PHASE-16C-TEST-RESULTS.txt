@@ -1,0 +1,50 @@
+SOMNIUM — GEOMETRY PHASE 16C TEST RESULTS
+Date: November 8, 2026
+Build: somnium-20261108-phase16c-anomaly-optics-2
+
+FULL AUTOMATED SUITE
+Command: node --test tests/*.test.mjs
+Result: 255 passed, 0 failed.
+Fresh verification was run from the Phase 16C project tree and repeated
+from the extracted delivery archive.
+
+FOCUSED OPTICAL TESTS
+- tests/optical-foundation.test.mjs
+- tests/optical-intersections.test.mjs
+- tests/optical-debug-renderer.test.mjs
+- tests/optical-anomaly-tracing.test.mjs
+- tests/optical-demo-transport.test.mjs
+
+PHASE 16C COVERAGE
+- Optical topology independent from player traversal permissions.
+- Optical one-way and bidirectional behavior.
+- Optical-only chunk reachability.
+- Stable 4D anomaly metric and radial W coupling.
+- Actual demo endpoint metric construction using live-scale Poincare and Euclidean transforms.
+- All three demo anomaly links traced in both directions in controlled fixtures.
+- Live-metric Main World/Poincare transport.
+- Live-metric Euclidean/Poincare transport through the 75-W anomaly in both directions.
+- Live-metric Euclidean/Poincare transport through the direct +5-W anomaly in both directions.
+- Chained Hypercube -> Poincare -> Main World optical propagation.
+- Aperture-tangential canonical momentum and Hamiltonian preservation.
+- W-range refusal and optical chunk permission checks.
+- Scale-relative SPD validation for small Main World Poincare metrics.
+- Controlled termination at declared finite metric/chart boundaries.
+
+STATIC VERIFICATION
+- Source JavaScript syntax: 123/123 passed.
+- Test module syntax: 27/27 passed.
+- Static relative import references (source and tests): 304 checked, 0 missing.
+- Full suite: 255 passed, 0 failed.
+
+VISUAL VERIFICATION
+No live browser/WebGL session was available in this environment. No claim is made
+that visible sunlight, cross-slice shadows, or a dedicated ambient-R4 debug ray
+visualization have been tested. Those are later rendering milestones.
+
+KNOWN PHASE 16C LIMITATIONS
+- Arbitrary 4D mesh/volume intersections inside anomaly interiors are not yet implemented.
+- The debug renderer visualizes slice-native portions; ambient R4 anomaly samples remain in CPU trace results.
+- Dielectric reflection/refraction, Fresnel splitting, and total internal reflection are not implemented.
+- Sunlight generation, visible lighting integration, cross-slice shadows, and GPU acceleration remain future work.
+- Endpoint metric blending is a stable bridge approximation, not a unique physical law for all possible anomaly geometries.

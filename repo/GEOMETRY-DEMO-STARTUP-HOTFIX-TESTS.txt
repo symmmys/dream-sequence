@@ -1,0 +1,8 @@
+GEOMETRY DEMO STARTUP HOTFIX - VERIFICATION
+===========================================
+
+Node test suite: 65/65 passed.
+New compatibility tests: 4/4 passed.
+JavaScript source/test syntax checks: 117/117 passed.
+Relative import target checks: 191/191 resolved.
+Browser/WebGL smoke test: not performed; requires an actual browser runtime.

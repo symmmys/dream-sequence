@@ -1,0 +1,81 @@
+SOMNIUM — DIRECTORY SUMMARY
+================================================================
+
+Directory: src/world/persistence/
+Generated: 2026-11-09T03:15:29
+
+PURPOSE
+----------------------------------------------------------------
+Automatically generated source inventory.
+See individual modules for detailed responsibilities.
+
+SOURCE FILES (DIRECT CHILDREN)
+----------------------------------------------------------------
+- world-library-ui.js
+  Exports: WorldLibraryUI
+- world-persistence.js
+  Exports: WorldPersistence
+- world-session.js
+  Exports: WorldSession
+- world-state.js
+  Exports: WORLD_SCHEMA_VERSION, WorldState
+
+DIRECT DEPENDENCIES
+----------------------------------------------------------------
+(No external local-directory imports detected.)
+
+DEPENDENTS
+----------------------------------------------------------------
+- src/scene/create-scene.js
+
+INDIVIDUAL SOURCE FILE MANIFEST
+----------------------------------------------------------------
+
+Documentation root: docs/summaries/src/world/persistence/files/
+Maximum chunk size: 300 lines
+Text files documented: 4
+Binary/unreadable files skipped: 0
+
+Each source file has its own documentation directory.
+INDEX.txt identifies the original file and maps every
+numbered part to its exact original source line range.
+
+SOURCE: src/world/persistence/world-library-ui.js
+  Lines: 305
+  Parts: 2
+  Index: docs/summaries/src/world/persistence/files/world-library-ui.js/INDEX.txt
+    docs/summaries/src/world/persistence/files/world-library-ui.js/PART-001.txt
+    docs/summaries/src/world/persistence/files/world-library-ui.js/PART-002.txt
+
+SOURCE: src/world/persistence/world-persistence.js
+  Lines: 245
+  Parts: 1
+  Index: docs/summaries/src/world/persistence/files/world-persistence.js/INDEX.txt
+    docs/summaries/src/world/persistence/files/world-persistence.js/PART-001.txt
+
+SOURCE: src/world/persistence/world-session.js
+  Lines: 92
+  Parts: 1
+  Index: docs/summaries/src/world/persistence/files/world-session.js/INDEX.txt
+    docs/summaries/src/world/persistence/files/world-session.js/PART-001.txt
+
+SOURCE: src/world/persistence/world-state.js
+  Lines: 143
+  Parts: 1
+  Index: docs/summaries/src/world/persistence/files/world-state.js/INDEX.txt
+    docs/summaries/src/world/persistence/files/world-state.js/PART-001.txt
+
+RECURSIVE SOURCE DUMP
+----------------------------------------------------------------
+- SOURCE.txt contains recursively collected text files.
+- Individual files are available under files/.
+- Individual PART files contain at most 300 lines.
+- Binary files are excluded from both representations.
+
+NOTES
+----------------------------------------------------------------
+- Dependencies are extracted from relative JavaScript imports.
+- External packages and browser globals are not represented.
+- Dynamic imports using computed paths may not be detected.
+- This inventory does not establish runtime initialization order.
+- Generated documentation is not authoritative application state.

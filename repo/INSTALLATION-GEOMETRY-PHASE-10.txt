@@ -1,0 +1,53 @@
+SOMNIUM — GEOMETRY PHASE 10 INSTALLATION
+Build: 2026-11-08-slice-transition-anomaly-hotfix-1
+
+1. Extract the project archive.
+2. Open a terminal in the directory containing index.html.
+3. Start the local server:
+
+     python3 -m http.server 8000
+
+4. Open this address in a desktop browser:
+
+     http://localhost:8000
+
+5. Open the 4D Geometry Demo from the main menu.
+
+MOVEMENT
+
+Ordinary world:
+  WASD              Walk
+  Mouse drag        Look around
+  Space             Jump
+  E/Q               No effect on W (fourth-axis movement is locked)
+
+Inside a slice-transition anomaly:
+  WASD              Move in the 3D slice plane
+  R/F               Move along local Y
+  E/Q               Move along the fourth axis / slice normal
+  Arrow Left/Right  Turn
+  Shift             Sprint
+
+Free inspection camera:
+  C                 Toggle follow/free camera
+  WASD              Move
+  R/F               Vertical movement
+  E/Q               W movement only after entering a slice-transition anomaly
+  Mouse drag        Look
+  Mouse wheel       Adjust movement speed
+  Shift             Move faster
+  G                 Toggle metric grid
+
+DEMO ROUTE
+
+- The first connection links the 4D Hypercube Chamber at W=140 to the
+  Poincare Chamber at W=0. Press Q to move toward decreasing W.
+- The second connection links the Poincare Chamber at W=0 to the Somnium Main
+  World at W=80. Press E to move toward increasing W.
+- XYZ movement remains available inside either anomaly, within its bounds.
+- Once the player crosses a connected destination slice plane, the player is
+  transferred to that slice and ordinary 3D movement resumes.
+
+The demo retains explicit topology and chunk-graph connections. W is not part
+of a world chunk address; the anomaly's CorridorChunk tracks occupancy during
+4D traversal.

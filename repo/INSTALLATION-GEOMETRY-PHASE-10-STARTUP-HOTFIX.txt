@@ -1,0 +1,18 @@
+SOMNIUM — GEOMETRY PHASE 10 STARTUP HOTFIX 1
+
+1. Extract this hotfix project archive into a clean project directory. Do not
+   merge only selected files into a mixture of Phase 9 and Phase 10 folders.
+2. Open a terminal in the directory containing index.html.
+3. Start the local server:
+
+     python3 -m http.server 8000
+
+4. Open or reload:
+
+     http://localhost:8000
+
+5. If the old page is still open, perform a hard reload once. The hotfix uses a
+   new application/module build identifier so the browser requests the updated
+   WorldTopology module instead of reusing the Phase 9 cached version.
+
+No gameplay controls or anomaly behavior changed in this hotfix.

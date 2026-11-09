@@ -1,0 +1,195 @@
+/** Provides tesseract topology and true 3D hyperplane sections. */
+
+import { rotate4 } from './spatial-4d.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+
+const AXES = ['x', 'y', 'z', 'w'];
+const FACET_BITS = [1, 2, 4, 8];
+const ROTATION_PLANES = ['xw', 'yw', 'zw'];
+
+function createHypercubeVertices(halfExtent = 2) {
+    assertPositive(halfExtent, 'Hypercube half-extent');
+    return Array.from({ length: 16 }, function vertexAt(unused, mask) {
+        return {
+            x: (mask & 1) ? halfExtent : -halfExtent,
+            y: (mask & 2) ? halfExtent : -halfExtent,
+            z: (mask & 4) ? halfExtent : -halfExtent,
+            w: (mask & 8) ? halfExtent : -halfExtent
+        };
+    });
+}
+
+function createHypercubeEdges(vertices) {
+    if (!Array.isArray(vertices) || vertices.length !== 16) {
+        throw new TypeError('A tesseract requires exactly 16 vertices.');
+    }
+    const edges = [];
+    for (let index = 0; index < vertices.length; index++) {
+        for (const bit of FACET_BITS) {
+            const next = index ^ bit;
+            if (next > index) edges.push([vertices[index], vertices[next]]);
+        }
+    }
+    return edges;
+}
+
+function rotateHypercubePoint(point, angles = {}) {
+    assertVector4(point);
+    let rotated = { ...point };
+    for (const plane of ROTATION_PLANES) {
+        const angle = angles[plane] ?? 0;
+        if (!Number.isFinite(angle)) throw new TypeError(`The ${plane} rotation must be finite.`);
+        rotated = rotate4(rotated, plane, angle);
+    }
+    return rotated;
+}
+
+/** Intersects the rotated tesseract with the 3D hyperplane W = viewerW. */
+function createHypercubeSlice(vertices, angles, viewerW, options = {}) {
+    if (!Array.isArray(vertices) || vertices.length !== 16) {
+        throw new TypeError('A tesseract slice requires exactly 16 vertices.');
+    }
+    if (!Number.isFinite(viewerW)) throw new TypeError('The slice W coordinate must be finite.');
+    const tolerance = options.tolerance ?? 1e-7;
+    assertPositive(tolerance, 'Slice tolerance');
+    const rotated = vertices.map(function rotateVertex(vertex) {
+        return rotateHypercubePoint(vertex, angles);
+    });
+    const polygons = [];
+
+    for (const bit of FACET_BITS) {
+        for (const positive of [false, true]) {
+            const facet = rotated.filter(function belongsToFacet(vertex, index) {
+                return Boolean(index & bit) === positive;
+            });
+            if (facet.every(function liesInSlice(vertex) { return Math.abs(vertex.w - viewerW) <= tolerance; })) {
+                continue;
+            }
+            const points = collectFacetIntersections(rotated, bit, positive, viewerW, tolerance);
+            const ordered = orderPolygon(points, tolerance);
+            if (ordered.length >= 3) polygons.push(ordered);
+        }
+    }
+
+    return buildSliceGeometry(polygons, tolerance, viewerW);
+}
+
+function collectFacetIntersections(vertices, bit, positive, viewerW, tolerance) {
+    const points = new Map();
+    for (let left = 0; left < vertices.length; left++) {
+        if (Boolean(left & bit) !== positive) continue;
+        for (const edgeBit of FACET_BITS) {
+            const right = left ^ edgeBit;
+            if (edgeBit === bit || right <= left || Boolean(right & bit) !== positive) continue;
+            for (const point of intersectSegment(vertices[left], vertices[right], viewerW, tolerance)) {
+                points.set(pointKey(point, tolerance), point);
+            }
+        }
+    }
+    return [...points.values()];
+}
+
+function intersectSegment(start, end, viewerW, tolerance) {
+    const left = start.w - viewerW;
+    const right = end.w - viewerW;
+    if (Math.abs(left) <= tolerance && Math.abs(right) <= tolerance) return [toVector3(start), toVector3(end)];
+    if (Math.abs(left) <= tolerance) return [toVector3(start)];
+    if (Math.abs(right) <= tolerance) return [toVector3(end)];
+    if ((left < 0) === (right < 0)) return [];
+    const t = left / (left - right);
+    return [{
+        x: start.x + (end.x - start.x) * t,
+        y: start.y + (end.y - start.y) * t,
+        z: start.z + (end.z - start.z) * t
+    }];
+}
+
+function orderPolygon(points, tolerance) {
+    if (points.length < 3) return [];
+    const center = average3(points);
+    const first = normalize3(subtract3(points[0], center));
+    let normal = null;
+    for (let index = 1; index < points.length; index++) {
+        const candidate = cross3(first, subtract3(points[index], center));
+        if (length3(candidate) > tolerance) {
+            normal = normalize3(candidate);
+            break;
+        }
+    }
+    if (!normal) return [];
+    const second = normalize3(cross3(normal, first));
+    return points.slice().sort(function sortAroundCenter(left, right) {
+        const a = subtract3(left, center);
+        const b = subtract3(right, center);
+        return Math.atan2(dot3(a, second), dot3(a, first)) -
+            Math.atan2(dot3(b, second), dot3(b, first));
+    });
+}
+
+function buildSliceGeometry(polygons, tolerance, viewerW) {
+    const vertices = [];
+    const vertexMap = new Map();
+    const faces = [];
+    const edgeMap = new Map();
+    for (const polygon of polygons) {
+        const face = polygon.map(function indexVertex(point) {
+            const key = pointKey(point, tolerance);
+            if (!vertexMap.has(key)) {
+                vertexMap.set(key, vertices.length);
+                vertices.push(point);
+            }
+            return vertexMap.get(key);
+        });
+        if (new Set(face).size < 3) continue;
+        faces.push(face);
+        for (let index = 0; index < face.length; index++) {
+            const a = face[index];
+            const b = face[(index + 1) % face.length];
+            edgeMap.set(a < b ? `${a}:${b}` : `${b}:${a}`, a < b ? [a, b] : [b, a]);
+        }
+    }
+    return {
+        vertices,
+        faces,
+        edges: [...edgeMap.values()],
+        viewerW,
+        empty: vertices.length === 0
+    };
+}
+
+
+function assertVector4(point) {
+    if (!point || !AXES.every(function finiteAxis(axis) { return Number.isFinite(point[axis]); })) {
+        throw new TypeError('A tesseract vertex must have four finite coordinates.');
+    }
+}
+
+function assertPositive(value, label) {
+    if (!Number.isFinite(value) || value <= 0) throw new RangeError(`${label} must be positive.`);
+}
+
+function toVector3(point) { return { x: point.x, y: point.y, z: point.z }; }
+function pointKey(point, tolerance) {
+    return [point.x, point.y, point.z].map(function quantize(value) {
+        return Math.round(value / tolerance);
+    }).join(':');
+}
+function average3(points) {
+    const sum = points.reduce(function addPoint(total, point) { return add3(total, point); }, { x: 0, y: 0, z: 0 });
+    return { x: sum.x / points.length, y: sum.y / points.length, z: sum.z / points.length };
+}
+function subtract3(a, b) { return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }; }
+function add3(a, b) { return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }; }
+function cross3(a, b) {
+    return { x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x };
+}
+function dot3(a, b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+function length3(value) { return Math.hypot(value.x, value.y, value.z); }
+function normalize3(value) {
+    const length = length3(value);
+    return length > 1e-12 ? { x: value.x / length, y: value.y / length, z: value.z / length } : { x: 1, y: 0, z: 0 };
+}
+
+export {
+    createHypercubeEdges, createHypercubeSlice, createHypercubeVertices,
+    rotateHypercubePoint
+};

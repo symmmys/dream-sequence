@@ -1,0 +1,13 @@
+function cross3(a, b) { return { x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x }; }
+function dot3(a, b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+function length3(value) { return Math.hypot(value.x, value.y, value.z); }
+function normalize3(value) {
+    const length = length3(value);
+    if (!Number.isFinite(length) || length <= EPSILON) throw new RangeError('Cannot normalize a zero-length surface normal.');
+    return scale3(value, 1 / length);
+}
+function interpolate3(a, b, t) {
+    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t };
+}
+
+export { OpticalSceneRegistry };

@@ -1,0 +1,28 @@
+SOMNIUM — GEOMETRY PHASE 9 TEST RESULTS
+Build: 2026-11-08-hypercube-slice-cross-section-1
+
+FULL TEST SUITE
+125 tests passed
+0 tests failed
+
+SYNTAX
+113/113 JavaScript source files passed node --check.
+16/16 JavaScript test files passed node --check.
+
+MODULE REFERENCES
+165 relative JavaScript import references checked.
+0 missing relative import targets.
+
+GEOMETRY REGRESSIONS
+- 16 distinct tesseract corners are generated.
+- The tesseract has 32 edges, each joining corners that differ on one axis.
+- The axis-aligned central slice is an 8-vertex, 6-face cube.
+- The default oblique W=0 slice is a closed 12-vertex, 8-face, 18-edge polyhedron.
+- Every section boundary edge is shared by exactly two faces.
+- Moving W to 5 changes the oblique section to 6 vertices, 5 faces, and 9 edges.
+- Moving W to 9 yields an empty slice.
+- Rotating in XW, YW, and ZW changes the central section topology.
+- Babylon buffers update without replacing meshes; marker visibility and disposal are tested.
+
+LIMITATION
+The tests exercise pure geometry and a Babylon API stub. Live browser/WebGL rendering has not been visually verified in this environment.

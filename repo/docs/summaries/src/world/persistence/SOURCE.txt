@@ -1,0 +1,821 @@
+SOMNIUM — DIRECTORY SOURCE DUMP
+========================================================================
+
+Directory: src/world/persistence/
+Generated: 2026-11-09T03:15:29
+
+This file contains recursively collected UTF-8 text files.
+Binary files and excluded directories are omitted.
+File paths are relative to the project root.
+
+
+========================================================================
+FILE: src/world/persistence/world-library-ui.js
+========================================================================
+
+
+class WorldLibraryUI {
+    constructor(persistence, callbacks = {}) {
+        this.persistence = persistence;
+        this.callbacks = callbacks;
+        this.currentWorldId = null;
+        this.container = null;
+        this.create();
+    }
+
+    create() {
+        this.container = document.createElement("div");
+
+        Object.assign(this.container.style, {
+            position: "fixed",
+            inset: "0",
+            zIndex: "2000",
+            display: "none",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(0,0,0,0.82)",
+            color: "white",
+            fontFamily: "Arial, sans-serif"
+        });
+
+        this.container.innerHTML = `
+            <section style="
+                width:min(620px,90vw);
+                max-height:85vh;
+                overflow:auto;
+                padding:28px;
+                border-radius:14px;
+                background:#18202b;
+                box-shadow:0 20px 80px #000;
+            ">
+                <h2>SOMNIUM WORLDS</h2>
+
+                <p style="color:#aab5c4">
+                    Create and manage persistent worlds.
+                </p>
+
+                <div style="display:flex;gap:8px">
+                    <input
+                        id="world-name"
+                        placeholder="New world name"
+                        style="flex:1;padding:12px"
+                    />
+
+                    <button id="world-create">
+                        CREATE
+                    </button>
+                </div>
+
+                <hr style="margin:22px 0">
+
+                <div id="world-list"></div>
+
+                <hr style="margin:22px 0">
+
+                <div style="display:flex;gap:8px">
+                    <button id="world-save">
+                        SAVE CURRENT WORLD
+                    </button>
+
+                    <button id="world-close">
+                        CLOSE
+                    </button>
+                </div>
+
+                <p
+                    id="world-status"
+                    style="color:#aab5c4;font-size:12px"
+                ></p>
+            </section>
+        `;
+
+        document.body.appendChild(this.container);
+
+
+	this.launcher = document.createElement("button");
+
+this.launcher.textContent = "WORLD LIBRARY";
+
+Object.assign(this.launcher.style, {
+    position: "fixed",
+    top: "76px",
+    right: "18px",
+    zIndex: "1500",
+    padding: "12px 18px",
+    background: "#263b50",
+    color: "white",
+    border: "1px solid #71869b",
+    borderRadius: "6px",
+    cursor: "pointer"
+});
+
+this.launcher.onclick = () => this.open();
+
+document.body.appendChild(this.launcher);
+
+        this.list = this.container.querySelector("#world-list");
+        this.nameInput = this.container.querySelector("#world-name");
+        this.status = this.container.querySelector("#world-status");
+
+        this.container.querySelector("#world-create").onclick =
+            () => this.createWorld();
+
+        this.container.querySelector("#world-save").onclick =
+            () => this.saveCurrent();
+
+        this.container.querySelector("#world-close").onclick =
+            () => this.close();
+    }
+
+    setStatus(message) {
+        this.status.textContent = message;
+    }
+
+    open() {
+        this.container.style.display = "flex";
+        this.refresh();
+    }
+
+    close() {
+        this.container.style.display = "none";
+    }
+
+    async refresh() {
+        try {
+            const worlds = await this.persistence.listWorlds();
+
+            this.list.replaceChildren();
+
+            if (worlds.length === 0) {
+                const empty = document.createElement("p");
+                empty.textContent = "No saved worlds yet.";
+                this.list.appendChild(empty);
+                return;
+            }
+
+            for (const world of worlds) {
+                const row = document.createElement("div");
+
+                Object.assign(row.style, {
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "12px 0",
+                    borderBottom: "1px solid #354252"
+                });
+
+                const information = document.createElement("div");
+                information.style.flex = "1";
+
+                const title = document.createElement("strong");
+                title.textContent = world.name;
+
+                const details = document.createElement("small");
+                details.style.display = "block";
+                details.style.color = "#aab5c4";
+                details.textContent =
+                    `Seed: ${world.worldSeed} · Revision: ${world.revision}`;
+
+                information.append(title, details);
+
+                const load = document.createElement("button");
+                load.textContent = "LOAD";
+                load.onclick = () => this.loadWorld(world.id);
+
+                const rename = document.createElement("button");
+                rename.textContent = "RENAME";
+                rename.onclick = () => this.renameWorld(world);
+
+                const remove = document.createElement("button");
+                remove.textContent = "DELETE";
+                remove.onclick = () => this.deleteWorld(world);
+
+                row.append(information, load, rename, remove);
+                this.list.appendChild(row);
+            }
+        } catch (error) {
+            this.setStatus(error.message);
+        }
+    }
+
+    async createWorld() {
+        try {
+            const name = this.nameInput.value.trim();
+
+            const world = await this.persistence.createWorld(
+                name,
+                {
+                    worldSeed: Math.floor(
+                        Math.random() * 2147483647
+                    )
+                }
+            );
+
+            this.currentWorldId = world.metadata.id;
+
+            if (this.callbacks.onLoad) {
+                await this.callbacks.onLoad(world);
+            }
+
+            this.nameInput.value = "";
+            this.setStatus(`Created ${name}.`);
+            await this.refresh();
+        } catch (error) {
+            this.setStatus(error.message);
+        }
+    }
+
+    async loadWorld(id) {
+        try {
+            const world = await this.persistence.loadWorld(id);
+
+            if (this.callbacks.onLoad) {
+                await this.callbacks.onLoad(world);
+            }
+
+            this.currentWorldId = id;
+            this.setStatus(`Loaded ${world.metadata.name}.`);
+            await this.refresh();
+        } catch (error) {
+            this.setStatus(error.message);
+        }
+    }
+
+    async saveCurrent() {
+        try {
+            if (!this.currentWorldId) {
+                throw new Error("Select or create a world first.");
+            }
+
+            const world = await this.persistence.loadWorld(
+                this.currentWorldId
+            );
+
+            if (this.callbacks.onCapture) {
+                await this.callbacks.onCapture(world);
+            }
+
+            await this.persistence.saveWorld(world);
+
+            this.setStatus(
+                `Saved ${world.metadata.name} successfully.`
+            );
+
+            await this.refresh();
+        } catch (error) {
+            this.setStatus(error.message);
+        }
+    }
+
+    async renameWorld(world) {
+        const name = prompt(
+            "Enter a new world name:",
+            world.name
+        );
+
+        if (name === null) return;
+
+        try {
+            await this.persistence.renameWorld(
+                world.id,
+                name
+            );
+
+            await this.refresh();
+        } catch (error) {
+            this.setStatus(error.message);
+        }
+    }
+
+    async deleteWorld(world) {
+        if (!confirm(`Delete "${world.name}" permanently?`)) {
+            return;
+        }
+
+        try {
+            await this.persistence.deleteWorld(world.id);
+
+            if (this.currentWorldId === world.id) {
+                this.currentWorldId = null;
+            }
+
+            this.setStatus(`Deleted ${world.name}.`);
+            await this.refresh();
+        } catch (error) {
+            this.setStatus(error.message);
+        }
+    }
+
+dispose() {
+    this.launcher?.remove();
+    this.container?.remove();
+
+    this.launcher = null;
+    this.container = null;
+}
+
+}
+
+export { WorldLibraryUI };
+
+
+========================================================================
+FILE: src/world/persistence/world-persistence.js
+========================================================================
+
+
+import { WorldState } from "./world-state.js";
+
+const DATABASE_NAME = "somnium-worlds";
+const DATABASE_VERSION = 1;
+const STORE_NAME = "worlds";
+
+class WorldPersistence {
+    constructor() {
+        this.database = null;
+        this.opening = null;
+    }
+
+    async open() {
+        if (this.database) {
+            return this.database;
+        }
+
+        if (this.opening) {
+            return this.opening;
+        }
+
+        if (!globalThis.indexedDB) {
+            throw new Error(
+                "IndexedDB is unavailable in this browser."
+            );
+        }
+
+        this.opening = new Promise((resolve, reject) => {
+            const request = indexedDB.open(
+                DATABASE_NAME,
+                DATABASE_VERSION
+            );
+
+            request.onupgradeneeded = () => {
+                const database = request.result;
+
+                if (!database.objectStoreNames.contains(STORE_NAME)) {
+                    database.createObjectStore(STORE_NAME, {
+                        keyPath: "metadata.id"
+                    });
+                }
+            };
+
+            request.onsuccess = () => {
+                this.database = request.result;
+
+                this.database.onversionchange = () => {
+                    this.database.close();
+                    this.database = null;
+                };
+
+                resolve(this.database);
+            };
+
+            request.onerror = () => {
+                reject(request.error);
+            };
+
+            request.onblocked = () => {
+                console.warn(
+                    "[WorldPersistence] Database upgrade blocked."
+                );
+            };
+        });
+
+        try {
+            return await this.opening;
+        } finally {
+            this.opening = null;
+        }
+    }
+
+    async transaction(mode, operation) {
+        const database = await this.open();
+
+        return new Promise((resolve, reject) => {
+            const tx = database.transaction(STORE_NAME, mode);
+            const store = tx.objectStore(STORE_NAME);
+
+            let result;
+
+            try {
+                result = operation(store, tx);
+            } catch (error) {
+                tx.abort();
+                reject(error);
+                return;
+            }
+
+            tx.oncomplete = () => resolve(result);
+            tx.onerror = () => reject(tx.error);
+            tx.onabort = () => reject(
+                tx.error ?? new Error("Transaction aborted.")
+            );
+        });
+    }
+
+    async createWorld(name, options = {}) {
+        const cleanName = String(name ?? "").trim();
+
+        if (!cleanName) {
+            throw new Error("Please provide a world name.");
+        }
+
+        const world = new WorldState({
+            ...options,
+            name: cleanName
+        });
+
+        world.validate();
+
+        await this.transaction("readwrite", store => {
+            store.add(world.serialize());
+        });
+
+        console.log(
+            "[WorldPersistence] Created world:",
+            world.metadata.name
+        );
+
+        return world;
+    }
+
+    async listWorlds() {
+        const records = await new Promise(async (resolve, reject) => {
+            try {
+                const database = await this.open();
+                const tx = database.transaction(STORE_NAME, "readonly");
+                const request = tx.objectStore(STORE_NAME).getAll();
+
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            } catch (error) {
+                reject(error);
+            }
+        });
+
+        return records
+            .map(record => ({
+                id: record.metadata.id,
+                name: record.metadata.name,
+                createdAt: record.metadata.createdAt,
+                updatedAt: record.metadata.updatedAt,
+                revision: record.metadata.revision,
+                worldSeed: record.generation.worldSeed
+            }))
+            .sort((a, b) =>
+                b.updatedAt.localeCompare(a.updatedAt)
+            );
+    }
+
+    async loadWorld(id) {
+        const record = await new Promise(async (resolve, reject) => {
+            try {
+                const database = await this.open();
+                const tx = database.transaction(STORE_NAME, "readonly");
+                const request = tx.objectStore(STORE_NAME).get(id);
+
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            } catch (error) {
+                reject(error);
+            }
+        });
+
+        if (!record) {
+            throw new Error(`World not found: ${id}`);
+        }
+
+        return WorldState.deserialize(record);
+    }
+
+    async saveWorld(world, options = {}) {
+        if (!(world instanceof WorldState)) {
+            throw new TypeError("Expected a WorldState instance.");
+        }
+
+        world.validate();
+
+        const serialized = world.serialize();
+
+        await this.transaction("readwrite", (store, tx) => {
+            const request = store.get(world.metadata.id);
+
+            request.onsuccess = () => {
+                const existing = request.result;
+
+                if (!existing) {
+                    if (!options.allowCreate) {
+                        tx.abort();
+                        return;
+                    }
+
+                    world.touch();
+                    store.add(world.serialize());
+                    return;
+                }
+
+                // Prevent overwriting changes from another tab.
+                if (
+                    existing.metadata.revision !==
+                    world.metadata.revision
+                ) {
+                    tx.abort();
+                    return;
+                }
+
+                world.touch();
+                store.put(world.serialize());
+            };
+        });
+
+        return world;
+    }
+
+    async renameWorld(id, newName) {
+        const world = await this.loadWorld(id);
+        const cleanName = String(newName ?? "").trim();
+
+        if (!cleanName) {
+            throw new Error("World name cannot be empty.");
+        }
+
+        world.metadata.name = cleanName;
+
+        return this.saveWorld(world);
+    }
+
+    async deleteWorld(id) {
+        await this.transaction("readwrite", store => {
+            store.delete(id);
+        });
+
+        console.log("[WorldPersistence] Deleted world:", id);
+    }
+
+    close() {
+        this.database?.close();
+        this.database = null;
+    }
+}
+
+export { WorldPersistence };
+
+
+========================================================================
+FILE: src/world/persistence/world-session.js
+========================================================================
+
+
+import { WorldState } from "./world-state.js";
+
+class WorldSession {
+    constructor(ecology) {
+        if (!ecology?.populationManager) {
+            throw new Error(
+                "WorldSession requires ChunkEcologySystem."
+            );
+        }
+
+        this.ecology = ecology;
+    }
+
+    capture(world, elapsedTime = 0) {
+        if (!(world instanceof WorldState)) {
+            throw new TypeError("Expected WorldState.");
+        }
+
+        const manager = this.ecology.populationManager;
+
+        const chunkRecords = [];
+
+        for (const record of manager.records.values()) {
+            const exported = manager.exportRecord(
+                record.x,
+                record.z
+            );
+
+            if (exported) {
+                chunkRecords.push(exported);
+            }
+        }
+
+        world.generation.worldSeed = manager.worldSeed;
+
+        world.simulation.elapsedTime = elapsedTime;
+
+        world.ecology.chunkRecords = chunkRecords;
+
+
+        return world;
+    }
+
+    restore(world) {
+        if (!(world instanceof WorldState)) {
+            throw new TypeError("Expected WorldState.");
+        }
+
+        const ecology = this.ecology;
+        const manager = ecology.populationManager;
+
+        // Deactivate currently rendered populations.
+        for (const record of manager.records.values()) {
+            if (record.active) {
+                manager.deactivateRecord(record);
+            }
+        }
+
+        manager.records.clear();
+        manager.pending.length = 0;
+        manager.activeKeys.clear();
+        manager.simulationCursor = 0;
+
+        ecology.worldSeed = world.generation.worldSeed;
+        manager.worldSeed = world.generation.worldSeed;
+
+        // Restore all previously generated populations.
+        for (const record of world.ecology.chunkRecords) {
+            manager.importRecord(record);
+        }
+
+        ecology.renderDirty = true;
+
+        return {
+            elapsedTime: world.simulation.elapsedTime,
+            worldSeed: world.generation.worldSeed,
+            restoredChunks: world.ecology.chunkRecords.length
+        };
+    }
+
+    getStats() {
+        return {
+            worldSeed: this.ecology.populationManager.worldSeed,
+            generatedChunks:
+                this.ecology.populationManager.records.size
+        };
+    }
+}
+
+export { WorldSession };
+
+
+========================================================================
+FILE: src/world/persistence/world-state.js
+========================================================================
+
+
+const WORLD_SCHEMA_VERSION = 1;
+
+function createId() {
+    if (globalThis.crypto?.randomUUID) {
+        return globalThis.crypto.randomUUID();
+    }
+
+    return `world-${Date.now()}-${Math.random()
+        .toString(36).slice(2)}`;
+}
+
+function cloneData(value) {
+    return JSON.parse(JSON.stringify(value));
+}
+
+class WorldState {
+    constructor(options = {}) {
+        const now = new Date().toISOString();
+
+        this.schemaVersion = WORLD_SCHEMA_VERSION;
+
+        this.metadata = {
+            id: options.id ?? createId(),
+            name: options.name ?? "Untitled World",
+            createdAt: options.createdAt ?? now,
+            updatedAt: now,
+            revision: options.revision ?? 0
+        };
+
+        this.generation = {
+            worldSeed: options.worldSeed ?? 91827,
+            generatorVersion: options.generatorVersion ?? 1,
+            configuration: options.configuration ?? {}
+        };
+
+        this.simulation = {
+            elapsedTime: options.elapsedTime ?? 0,
+            simulationRate: options.simulationRate ?? 1,
+            paused: options.paused ?? false
+        };
+
+        this.ecology = {
+            chunkRecords: options.chunkRecords ?? []
+        };
+
+        this.entities = {
+            manual: options.manualEntities ?? [],
+            overrides: options.entityOverrides ?? [],
+            removedProceduralIds: options.removedProceduralIds ?? []
+        };
+
+        this.environment = {
+            state: options.environmentState ?? {}
+        };
+    }
+
+    validate() {
+        if (!this.metadata.id || !this.metadata.name.trim()) {
+            throw new Error("World requires an ID and name.");
+        }
+
+        if (!Number.isInteger(this.generation.worldSeed)) {
+            throw new Error("Invalid world seed.");
+        }
+
+        if (
+            !Number.isFinite(this.simulation.elapsedTime) ||
+            this.simulation.elapsedTime < 0
+        ) {
+            throw new Error("Invalid simulation time.");
+        }
+
+        if (!Array.isArray(this.ecology.chunkRecords)) {
+            throw new Error("Invalid ecology records.");
+        }
+
+        if (
+            !Array.isArray(this.entities.manual) ||
+            !Array.isArray(this.entities.overrides) ||
+            !Array.isArray(this.entities.removedProceduralIds)
+        ) {
+            throw new Error("Invalid entity collections.");
+        }
+
+        return true;
+    }
+
+    touch() {
+        this.metadata.updatedAt = new Date().toISOString();
+        this.metadata.revision++;
+    }
+
+    serialize() {
+        this.validate();
+
+        return cloneData(this);
+    }
+
+    static deserialize(data) {
+        if (!data || typeof data !== "object") {
+            throw new Error("Invalid world data.");
+        }
+
+        if (data.schemaVersion !== WORLD_SCHEMA_VERSION) {
+            throw new Error(
+                `Unsupported world schema: ${data.schemaVersion}`
+            );
+        }
+
+        const state = new WorldState({
+            id: data.metadata?.id,
+            name: data.metadata?.name,
+            createdAt: data.metadata?.createdAt,
+            revision: data.metadata?.revision,
+            worldSeed: data.generation?.worldSeed,
+            generatorVersion: data.generation?.generatorVersion,
+            configuration: data.generation?.configuration,
+            elapsedTime: data.simulation?.elapsedTime,
+            simulationRate: data.simulation?.simulationRate,
+            paused: data.simulation?.paused,
+            chunkRecords: data.ecology?.chunkRecords,
+            manualEntities: data.entities?.manual,
+            entityOverrides: data.entities?.overrides,
+            removedProceduralIds:
+                data.entities?.removedProceduralIds,
+            environmentState: data.environment?.state
+        });
+
+        state.metadata.updatedAt =
+            data.metadata.updatedAt ?? state.metadata.updatedAt;
+
+        state.validate();
+
+        return state;
+    }
+}
+
+export {
+    WorldState,
+    WORLD_SCHEMA_VERSION
+};
+
+
+========================================================================
+END OF DIRECTORY SOURCE DUMP
+Files included: 4
+Binary/unreadable files skipped: 0
+========================================================================

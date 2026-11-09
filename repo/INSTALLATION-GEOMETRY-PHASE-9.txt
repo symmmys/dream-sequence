@@ -1,0 +1,38 @@
+SOMNIUM — GEOMETRY PHASE 9 INSTALLATION
+Build: 2026-11-08-hypercube-slice-cross-section-1
+
+RECOMMENDED INSTALLATION
+1. Back up your current Somnium directory.
+2. Extract somnium_geometry_phase9_hypercube_slices_project.zip into a NEW directory.
+3. Enter the extracted project directory containing index.html.
+4. Start the local server:
+
+   python3 -m http.server 8081 --bind 127.0.0.1
+
+5. Open http://127.0.0.1:8081/.
+6. Select 4D GEOMETRY DEMO from the main menu.
+7. Confirm the console contains:
+
+   [Main] Build: 2026-11-08-hypercube-slice-cross-section-1
+   [GeometryDemo] Build: 2026-11-08-hypercube-slice-cross-section-1
+
+CONTROLS
+- WASD: player movement in the chamber.
+- C: toggle follow/free camera.
+- Free camera W/S, A/D, R/F: move through ordinary 3D space.
+- Free camera E/Q: move the W slicing hyperplane through the tesseract.
+- Mouse drag: look around the cross-section.
+- Mouse wheel: adjust free-camera movement speed.
+- Shift: move faster.
+- G: toggle the geometry debug grid.
+
+WHAT TO VERIFY
+- The tesseract appears as a translucent 3D polyhedron with bright edges, not a ball of coincident markers.
+- At initial W=0 the HUD should show approximately 12 vertices and 8 faces.
+- Press C to enter free camera.
+- Hold E or Q and observe both the polyhedron and the HUD vertex/face counts change.
+- Move with W/A/S/D/R/F to inspect the section from different 3D positions.
+- Far enough along W, the section should shrink and eventually disappear when the slice no longer intersects the tesseract.
+- Existing corridor traversal and the Poincare/main-world connections should remain functional.
+
+The geometry is computed from the 16 distinct R4 corners and the intersections of their cubical facets with the current W hyperplane. This is a genuine cross-section, not a perspective scaling effect.

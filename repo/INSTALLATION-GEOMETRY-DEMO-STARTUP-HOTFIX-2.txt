@@ -1,0 +1,16 @@
+GEOMETRY DEMO STARTUP HOTFIX 2
+
+1. Back up the currently served Somnium project.
+2. Extract the COMPLETE project archive into a new, clean directory.
+3. Open a terminal in the directory containing index.html.
+4. Verify the directory with: pwd && test -f index.html
+5. Start: python3 -m http.server 8081 --bind 127.0.0.1
+6. Open http://127.0.0.1:8081/
+7. In the browser console, verify these exact messages:
+   [Main] Build: 2026-11-07-startup-fix-2
+   [GeometryDemo] Build: 2026-11-07-startup-fix-2
+
+The build markers and versioned module URLs make it possible to tell whether
+the browser is using this project copy. If a marker is absent, do not continue
+debugging the same stack trace: first correct the served directory or clear
+any proxy/browser cache.

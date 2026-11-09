@@ -1,0 +1,53 @@
+SOMNIUM — GEOMETRY PHASE 11 TEST RESULTS
+Build: somnium-20261108-poincare-chart-main-exit-1
+
+AUTOMATED TEST SUITE
+Command: node --test tests/*.test.mjs
+Result: PASS
+Tests: 141
+Passed: 141
+Failed: 0
+Skipped: 0
+
+JAVASCRIPT SYNTAX
+Command:
+  find src -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+  find tests -type f -name '*.mjs' -print0 | xargs -0 -n1 node --check
+
+Result: PASS
+Source modules checked: 115
+Test modules checked: 19
+
+RELATIVE MODULE REFERENCES
+Checked relative imports in src and tests: 232
+Missing references: 0
+Result: PASS
+
+KEY REGRESSION COVERAGE
+- Poincare free-camera coordinates remain strictly inside the open ball.
+- An out-of-chart stale camera position is clamped before renderToWorld().
+- Euclidean free-camera coordinates pass through unchanged.
+- All three demo anomalies register as slice-transition anomalies.
+- The 4D chamber is at W=75 and the existing Main World slice remains W=80.
+- The direct 4D-room exit is bidirectional and spans exactly +5 W.
+- Both endpoint world chunks are adjacent to the dedicated anomaly CorridorChunk.
+- End-to-end traversal reaches the existing Main World slice and samples its
+  live terrain for the arrival position.
+- Player movement resumes and the anomaly CorridorChunk occupant is removed
+  after successful handoff.
+- The 4D room contains a visible label for the new Main World exit.
+
+BROWSER / WEBGL VISUAL CHECK
+A headless Chromium launch was attempted with SwiftShader enabled. The
+container's EGL/graphics backend failed to initialize (EGL_NOT_INITIALIZED),
+so a browser-rendered WebGL visual pass could not be completed here. This is
+an environment limitation; the automated topology, camera-boundary, traversal,
+syntax, and module-reference checks above all passed.
+
+RECOMMENDED LOCAL SMOKE TEST
+1. Extract the archive into a clean directory.
+2. Start `python3 -m http.server 8000` in the directory containing index.html.
+3. Open http://localhost:8000 and launch the 4D Geometry Demo.
+4. Enter the Poincare Chamber and test the free camera near the chart boundary.
+5. Return to the 4D chamber and use the labeled "SOMNIUM MAIN WORLD · W +5"
+   anomaly. Press E to travel toward increasing W.

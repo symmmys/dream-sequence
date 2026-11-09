@@ -1,0 +1,121 @@
+SOMNIUM — DIRECTORY SUMMARY
+================================================================
+
+Directory: src/environment/
+Generated: 2026-11-09T03:15:29
+
+PURPOSE
+----------------------------------------------------------------
+Automatically generated source inventory.
+See individual modules for detailed responsibilities.
+
+SOURCE FILES (DIRECT CHILDREN)
+----------------------------------------------------------------
+- celestial-system.js
+  Exports: CelestialSystem
+- environment.js
+  Exports: Environment
+- height-map-terrain.js
+  Exports: HeightmapTerrain
+- heightmap-terrain.js
+  Exports: HeightmapTerrain
+- moisture-field.js
+  Exports: MoistureField
+- spatial-grid.js
+  Exports: SpatialGrid
+- terrain.js
+  Exports: TerrainSampler
+
+DIRECT DEPENDENCIES
+----------------------------------------------------------------
+- src/environment/topography/browser-heightmap-loader.js
+- src/environment/topography/heightmap-data.js
+
+DEPENDENTS
+----------------------------------------------------------------
+- src/ecology/forest.js
+- src/scene/create-scene.js
+- src/world/chunk-ecology-system.js
+
+INDIVIDUAL SOURCE FILE MANIFEST
+----------------------------------------------------------------
+
+Documentation root: docs/summaries/src/environment/files/
+Maximum chunk size: 300 lines
+Text files documented: 9
+Binary/unreadable files skipped: 0
+
+Each source file has its own documentation directory.
+INDEX.txt identifies the original file and maps every
+numbered part to its exact original source line range.
+
+SOURCE: src/environment/celestial-system.js
+  Lines: 681
+  Parts: 3
+  Index: docs/summaries/src/environment/files/celestial-system.js/INDEX.txt
+    docs/summaries/src/environment/files/celestial-system.js/PART-001.txt
+    docs/summaries/src/environment/files/celestial-system.js/PART-002.txt
+    docs/summaries/src/environment/files/celestial-system.js/PART-003.txt
+
+SOURCE: src/environment/environment.js
+  Lines: 130
+  Parts: 1
+  Index: docs/summaries/src/environment/files/environment.js/INDEX.txt
+    docs/summaries/src/environment/files/environment.js/PART-001.txt
+
+SOURCE: src/environment/height-map-terrain.js
+  Lines: 2
+  Parts: 1
+  Index: docs/summaries/src/environment/files/height-map-terrain.js/INDEX.txt
+    docs/summaries/src/environment/files/height-map-terrain.js/PART-001.txt
+
+SOURCE: src/environment/heightmap-terrain.js
+  Lines: 217
+  Parts: 1
+  Index: docs/summaries/src/environment/files/heightmap-terrain.js/INDEX.txt
+    docs/summaries/src/environment/files/heightmap-terrain.js/PART-001.txt
+
+SOURCE: src/environment/moisture-field.js
+  Lines: 164
+  Parts: 1
+  Index: docs/summaries/src/environment/files/moisture-field.js/INDEX.txt
+    docs/summaries/src/environment/files/moisture-field.js/PART-001.txt
+
+SOURCE: src/environment/spatial-grid.js
+  Lines: 95
+  Parts: 1
+  Index: docs/summaries/src/environment/files/spatial-grid.js/INDEX.txt
+    docs/summaries/src/environment/files/spatial-grid.js/PART-001.txt
+
+SOURCE: src/environment/terrain.js
+  Lines: 212
+  Parts: 1
+  Index: docs/summaries/src/environment/files/terrain.js/INDEX.txt
+    docs/summaries/src/environment/files/terrain.js/PART-001.txt
+
+SOURCE: src/environment/topography/browser-heightmap-loader.js
+  Lines: 90
+  Parts: 1
+  Index: docs/summaries/src/environment/files/topography/browser-heightmap-loader.js/INDEX.txt
+    docs/summaries/src/environment/files/topography/browser-heightmap-loader.js/PART-001.txt
+
+SOURCE: src/environment/topography/heightmap-data.js
+  Lines: 194
+  Parts: 1
+  Index: docs/summaries/src/environment/files/topography/heightmap-data.js/INDEX.txt
+    docs/summaries/src/environment/files/topography/heightmap-data.js/PART-001.txt
+
+RECURSIVE SOURCE DUMP
+----------------------------------------------------------------
+- SOURCE.txt contains recursively collected text files.
+- Individual files are available under files/.
+- Individual PART files contain at most 300 lines.
+- Binary files are excluded from both representations.
+
+NOTES
+----------------------------------------------------------------
+- Dependencies are extracted from relative JavaScript imports.
+- External packages and browser globals are not represented.
+- Dynamic imports using computed paths may not be detected.
+- This inventory does not establish runtime initialization order.
+- Generated documentation is not authoritative application state.

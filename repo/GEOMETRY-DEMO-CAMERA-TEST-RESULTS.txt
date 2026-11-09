@@ -1,0 +1,37 @@
+SOMNIUM — GEOMETRY DEMO CAMERA UPDATE
+Build: 2026-11-08-free-camera-3
+
+Node test command:
+  node --test tests/*.test.mjs
+
+Result:
+  107 tests passed
+  0 tests failed
+
+New regression coverage includes:
+- C toggles follow -> free and free -> follow.
+- Character input is suppressed during free inspection and restored afterward.
+- Free camera can independently enter a corridor.
+- Tangent progress plus all three perpendicular corridor offsets are independently controlled.
+- Free camera exits into the destination slice and adopts its render layer.
+- Free camera can be initialized while the player is already traversing.
+- Mouse-look remains effective while the camera traverses a curved corridor.
+- Third-person follow camera aims directly toward the destination aperture while in transit.
+- Destination preview aperture remains ahead of forward and reverse traversal.
+- Destination preview remains active during free-camera corridor inspection.
+- Camera transit takes precedence over a stationary player transit.
+- Portal visibility follows the inspection camera slice, including after an independent handoff.
+- Look-ahead aperture remains close enough to appear early in transit.
+- Corridor opacity is configurable and validated; the demo corridor shell is translucent.
+
+Syntax checks:
+  124/124 JavaScript source files and test modules passed node --check.
+
+Import checks:
+  201/201 relative static import targets resolved.
+
+Archive checks:
+  Complete project ZIP and replacement patch ZIP passed integrity checks. The complete project was extracted into a clean directory and its 107-test suite passed again.
+
+Not verified:
+  No live WebGL browser session was completed. Portal appearance, transparency ordering, and actual camera input behavior should be visually checked in the target browser.

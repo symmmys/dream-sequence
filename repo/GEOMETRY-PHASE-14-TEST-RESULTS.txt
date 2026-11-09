@@ -1,0 +1,38 @@
+SOMNIUM — GEOMETRY PHASE 14 TEST RESULTS
+Main-world W traversal and Poincare camera safety
+
+Automated tests:
+  Command: node --test tests/*.test.mjs
+  Total:   173
+  Passed:  173
+  Failed:  0
+
+Static checks:
+  Source JavaScript/MJS syntax checks: 116 / 116 passed.
+  Test MJS syntax checks:             20 / 20 passed.
+  Relative import references scanned: 242.
+  Missing relative import references: 0.
+  Documentation generator:
+    JavaScript files analyzed: 116.
+    Source directories analyzed: 19.
+    Cross-directory dependency relationships: 38.
+
+Phase 14 regression coverage:
+  - Main World movement profile is applied after slice handoff.
+  - Faster Main World movement and chamber-scale restoration are supported.
+  - W influence movement is available in both signs from either connected slice.
+  - The player can move below and back above the source slice plane while in an anomaly.
+  - The existing anomaly W region provides symmetric endpoint overhang.
+  - Poincare source-side anomaly traversal remains inside finite world bounds.
+  - Poincare destination handoffs constrain the final player position.
+  - Poincare free anomaly camera positions are constrained before projection.
+  - Free-camera ambient handoffs constrain destination chart positions.
+  - Third-person-to-free-camera switching constrains the inherited camera pose.
+  - Inverted-Poincare world positions use the finite chart constraint.
+  - The Poincare projection itself remains strict.
+
+Limitations:
+  A live desktop browser/WebGL visual session was not available in this
+  execution environment. Manual browser verification remains necessary for
+  movement feel, visual camera behavior, and portal interaction near chart
+  boundaries.

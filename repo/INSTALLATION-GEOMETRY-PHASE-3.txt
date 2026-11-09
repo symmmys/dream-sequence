@@ -1,0 +1,22 @@
+SOMNIUM — GEOMETRY PHASE 3
+
+1. Back up your current project directory.
+2. Extract somnium_geometry_phase3_traversal_project.zip.
+3. Change into the extracted project root (the directory containing index.html).
+4. Start the local server:
+
+   python3 -m http.server 8081 --bind 127.0.0.1
+
+5. Open http://localhost:8081 and select GEOMETRY DEMO.
+
+Demo behavior:
+- The chamber has no floor or ceiling mesh. The metric grid is enabled by default.
+- WASD moves; Shift runs; left-mouse drag turns the player.
+- Approach the corridor mouth near z=20 while facing it to enter.
+- G toggles the metric grid.
+- The topographic destination is chunk-streamed through WorldManager and shown in the portal render target.
+- The controller exposes beginEntityTransit(entity, fromSliceId) for entities detected by collision/AI, and tryBeginEntityTransit(entity, fromSliceId) for a shared proximity/facing entry check.
+
+Diagnostics are available from GeometryDemoWorld.getDiagnostics(); they include corridor occupancy, graph neighbourhoods, and destination chunk statistics.
+
+Verification in this package: 61/61 Node tests passed; 115/115 JavaScript source and test files passed node --check; 189/189 relative imports resolved. A real-browser/WebGL visual pass was not completed, so please verify portal framing and terrain chunk arrival in your browser.

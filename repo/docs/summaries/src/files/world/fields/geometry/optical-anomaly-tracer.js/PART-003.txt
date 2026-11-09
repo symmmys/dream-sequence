@@ -1,0 +1,300 @@
+    let best = null;
+    for (const { neighbor, anomaly } of candidates) {
+        const side = neighbor.entrySide;
+        if (side === 'destination' && !anomaly.optics.bidirectional) continue;
+        const endpoint = anomaly[side];
+        const radius = anomaly.optics.apertureRadius ?? anomaly.entryRadius;
+        // Slice coordinates are records, while the small vector helpers below
+        // intentionally use dense arrays. Convert explicitly at this boundary.
+        const hit = intersectSphereEntry(
+            [start.x, start.y, start.z],
+            [end.x, end.y, end.z],
+            [endpoint.position.x, endpoint.position.y, endpoint.position.z],
+            radius
+        );
+        if (!hit || (best && hit.parameter >= best.parameter)) continue;
+        const localPosition = { x: hit.point[0], y: hit.point[1], z: hit.point[2] };
+        const ambientPosition = sliceToAmbient(binding.slice.frame, localPosition);
+        if (!containsAmbientPoint(anomaly.region, ambientPosition, 1e-6)) continue;
+        best = {
+            kind: 'anomaly-entry',
+            parameter: hit.parameter,
+            anomalyId: anomaly.id,
+            side,
+            apertureNormal: hit.normal,
+            ambientPosition,
+            localPosition
+        };
+    }
+    return best;
+}
+
+function findAnomalyEvent(segment, anomaly, entrySide, field, evaluateExitReachability = null) {
+    const events = [];
+    const sourceBinding = field.sourceBinding;
+    const destinationBinding = field.destinationBinding;
+    const sourceAmbient = field.sourceAmbient;
+    const destinationAmbient = field.destinationAmbient;
+    const normalSign = Math.sign(field.signedSpan);
+    const orientedNormal = scale4(sourceBinding.slice.frame.normal, normalSign);
+    const apertureRadius = anomaly.optics.apertureRadius ?? anomaly.entryRadius;
+
+    for (const side of ['source', 'destination']) {
+        if (!anomaly.optics.bidirectional && side === entrySide) continue;
+        const binding = side === 'source' ? sourceBinding : destinationBinding;
+        const endpoint = side === 'source' ? anomaly.source : anomaly.destination;
+        const endpointAmbient = side === 'source' ? sourceAmbient : destinationAmbient;
+        const inwardNormal = side === 'source' ? orientedNormal : scale4(orientedNormal, -1);
+        const d0 = dot4(subtract4(segment.startPosition, endpointAmbient), inwardNormal);
+        const d1 = dot4(subtract4(segment.endPosition, endpointAmbient), inwardNormal);
+        if (!(d0 > EPSILON && d1 <= EPSILON)) continue;
+        const parameter = d0 / (d0 - d1);
+        const point = interpolate4(segment.startPosition, segment.endPosition, parameter);
+        const local = ambientToSlice(binding.slice.frame, point).position;
+        const normal = normalize3OrFallback([
+            local.x - endpoint.position.x,
+            local.y - endpoint.position.y,
+            local.z - endpoint.position.z
+        ], projectAmbientVectorToFrame(segment.endPosition, segment.startPosition, binding.slice.frame.axes));
+        const apertureDistance = Math.hypot(
+            local.x - endpoint.position.x,
+            local.y - endpoint.position.y,
+            local.z - endpoint.position.z
+        );
+        if (apertureDistance <= apertureRadius + 1e-6) {
+            const exitEvent = {
+                kind: 'anomaly-exit',
+                anomalyId: anomaly.id,
+                side,
+                sliceId: endpoint.sliceId,
+                localPosition: local,
+                apertureNormal: normal,
+                ambientPosition: point
+            };
+            const reachability = typeof evaluateExitReachability === 'function'
+                ? evaluateExitReachability(exitEvent) : null;
+            events.push({
+                parameter,
+                priority: 0,
+                event: reachability && !reachability.reachable
+                    ? {
+                        kind: 'optical-exit-blocked',
+                        anomalyId: anomaly.id,
+                        side,
+                        sliceId: endpoint.sliceId,
+                        ambientPosition: point,
+                        reachability
+                    }
+                    : exitEvent
+            });
+        }
+    }
+
+    const regionParameter = segmentAabbExitParameter(
+        segment.startPosition, segment.endPosition, anomaly.region
+    );
+    if (regionParameter !== null) {
+        events.push({
+            parameter: regionParameter,
+            priority: 1,
+            event: { kind: 'anomaly-boundary', anomalyId: anomaly.id }
+        });
+    }
+
+    const horizonParameter = segmentSphereExitParameter(
+        segment.startPosition,
+        segment.endPosition,
+        anomaly.influence.center,
+        anomaly.influence.horizonRadius
+    );
+    if (horizonParameter !== null) {
+        events.push({
+            parameter: horizonParameter,
+            priority: 2,
+            event: { kind: 'optical-horizon', anomalyId: anomaly.id }
+        });
+    }
+
+    if (!events.length) return null;
+    events.sort((left, right) => left.parameter - right.parameter || left.priority - right.priority);
+    return { ...events[0].event, parameter: events[0].parameter };
+}
+
+function transferSliceMomentumIntoAnomaly({ anomaly, anomalyField, sliceField, slice, state, event, side }) {
+    const point = event.ambientPosition ?? state.position;
+    const sliceMomentum = projectCovectorToFrame(state.momentum, slice.frame.axes);
+    const sliceSample = sliceField.sample(point);
+    const aperture = event.apertureNormal;
+    const decomposition = decomposeCovector3(sliceMomentum, aperture, sliceSample.tangentCometric);
+    const incomingHamiltonian = evaluateOpticalHamiltonian(sliceField, point, state.momentum);
+    const tangentAmbient = liftCovectorFromFrame(slice.frame.axes, decomposition.tangential);
+    const anomalyMomentumTangent = projectCovectorToFrame(tangentAmbient, anomalyField.frame.axes);
+    const anomalySample = anomalyField.sample(point);
+    const tangentQuadratic = quadratic3(anomalySample.tangentCometric, anomalyMomentumTangent);
+    const availableTwiceHamiltonian = 2 * incomingHamiltonian - tangentQuadratic;
+    const coupling = anomalySample.wCoupling;
+    if (coupling <= 1e-8 || availableTwiceHamiltonian < -1e-8) {
+        return {
+            transmitted: false,
+            momentum: null,
+            diagnostics: {
+                rule: 'aperture-normal-to-anomaly-normal',
+                reason: coupling <= 1e-8 ? 'zero-w-optical-coupling' : 'insufficient-interface-energy',
+                incomingHamiltonian,
+                tangentHamiltonian: tangentQuadratic / 2,
+                wCoupling: coupling
+            }
+        };
+    }
+
+    // A 3D aperture boundary has a two-dimensional normal space in ambient R4:
+    // its radial conormal plus the slice normal. Aim the unconstrained launch
+    // component toward the anomaly influence centre. The radial component is
+    // deliberately biasable: the radial W-coupling gradient can refract a ray
+    // away from the core, so a modest inward bias helps it enter the full-field
+    // region before the ray is redirected toward the opposite aperture.
+    const radialCovector = liftCovectorFromFrame(slice.frame.axes, aperture);
+    const wCovector = anomalyField.frame.normal;
+    const targetDirection = subtract4(anomaly.influence.center, point);
+    const cometric = anomalySample.cometric;
+    const radialImage = multiply4(cometric, radialCovector);
+    const wImage = multiply4(cometric, wCovector);
+    const g00 = dot4(radialCovector, radialImage);
+    const g01 = dot4(radialCovector, wImage);
+    const g11 = dot4(wCovector, wImage);
+    const determinant = g00 * g11 - g01 * g01;
+    if (!Number.isFinite(determinant) || determinant <= 1e-14) {
+        return {
+            transmitted: false,
+            momentum: null,
+            diagnostics: {
+                rule: 'aperture-normal-to-anomaly-normal',
+                reason: 'degenerate-anomaly-interface-normal-plane',
+                incomingHamiltonian,
+                wCoupling: coupling
+            }
+        };
+    }
+    const rhs0 = dot4(radialCovector, targetDirection);
+    const rhs1 = dot4(wCovector, targetDirection);
+    let coefficient0 = anomaly.optics.entryRadialBias *
+        (rhs0 * g11 - rhs1 * g01) / determinant;
+    let coefficient1 = (rhs1 * g00 - rhs0 * g01) / determinant;
+    let preferredNormalCovector = add4(
+        scale4(radialCovector, coefficient0),
+        scale4(wCovector, coefficient1)
+    );
+    let normalQuadratic = dot4(
+        preferredNormalCovector,
+        multiply4(cometric, preferredNormalCovector)
+    );
+    if (!Number.isFinite(normalQuadratic) || normalQuadratic <= 1e-14) {
+        // A fixed endpoint-centred field can put its centre exactly on the
+        // aperture. In that degenerate case, preserve the old axial W transfer.
+        const expectedWSign = Math.sign(dot4(
+            subtract4(anomalyField.destinationAmbient, anomalyField.sourceAmbient),
+            anomalyField.frame.normal
+        )) * (side === 'source' ? 1 : -1);
+        coefficient0 = 0;
+        coefficient1 = expectedWSign || 1;
+        preferredNormalCovector = scale4(wCovector, coefficient1);
+        normalQuadratic = dot4(preferredNormalCovector, multiply4(cometric, preferredNormalCovector));
+    }
+
+    const normalScale = Math.sqrt(Math.max(0, availableTwiceHamiltonian) / normalQuadratic);
+    const momentum = add4(tangentAmbient, scale4(preferredNormalCovector, normalScale));
+    const outgoingHamiltonian = evaluateOpticalHamiltonian(anomalyField, point, momentum);
+    const drift = Math.abs(outgoingHamiltonian - incomingHamiltonian);
+    return {
+        transmitted: drift <= 1e-5 * Math.max(1, incomingHamiltonian),
+        momentum,
+        diagnostics: {
+            rule: 'aperture-normal-to-anomaly-normal',
+            entryRadialBias: anomaly.optics.entryRadialBias,
+            reason: drift <= 1e-5 * Math.max(1, incomingHamiltonian) ? null : 'interface-hamiltonian-mismatch',
+            incomingHamiltonian,
+            outgoingHamiltonian,
+            hamiltonianDrift: drift,
+            wCoupling: coupling,
+            normalMomentum: normalScale,
+            preferredAnomalyDirection: {
+                x: radialImage.x * coefficient0 + wImage.x * coefficient1,
+                y: radialImage.y * coefficient0 + wImage.y * coefficient1,
+                z: radialImage.z * coefficient0 + wImage.z * coefficient1,
+                w: radialImage.w * coefficient0 + wImage.w * coefficient1
+            },
+            preservedApertureTangentMomentum: true
+        }
+    };
+}
+
+function transferAnomalyMomentumIntoSlice({ anomaly, anomalyField, sliceField, slice, state, event }) {
+    const point = event.ambientPosition ?? state.position;
+    const sliceSample = sliceField.sample(point);
+    const sliceMomentum = projectCovectorToFrame(state.momentum, slice.frame.axes);
+    const decomposition = decomposeCovector3(
+        sliceMomentum, event.apertureNormal, sliceSample.tangentCometric
+    );
+    const incomingHamiltonian = evaluateOpticalHamiltonian(anomalyField, point, state.momentum);
+    const tangentQuadratic = quadratic3(sliceSample.tangentCometric, decomposition.tangential);
+    const availableTwiceHamiltonian = 2 * incomingHamiltonian - tangentQuadratic;
+    const normalNormSquared = decomposition.normalNormSquared;
+    if (availableTwiceHamiltonian < -1e-8 || normalNormSquared <= 1e-12) {
+        return {
+            transmitted: false,
+            momentum: null,
+            diagnostics: {
+                rule: 'anomaly-normal-to-aperture-normal',
+                reason: 'insufficient-interface-energy',
+                incomingHamiltonian,
+                tangentHamiltonian: tangentQuadratic / 2
+            }
+        };
+    }
+    const radialMomentum = Math.sqrt(Math.max(0, availableTwiceHamiltonian) / normalNormSquared);
+    const outgoingLocal = add3(
+        decomposition.tangential,
+        scale3(event.apertureNormal, radialMomentum)
+    );
+    const momentum = liftCovectorFromFrame(slice.frame.axes, outgoingLocal);
+    const outgoingHamiltonian = evaluateOpticalHamiltonian(sliceField, point, momentum);
+    const drift = Math.abs(outgoingHamiltonian - incomingHamiltonian);
+    return {
+        transmitted: drift <= 1e-5 * Math.max(1, incomingHamiltonian),
+        momentum,
+        diagnostics: {
+            rule: 'anomaly-normal-to-aperture-normal',
+            reason: drift <= 1e-5 * Math.max(1, incomingHamiltonian) ? null : 'interface-hamiltonian-mismatch',
+            incomingHamiltonian,
+            outgoingHamiltonian,
+            hamiltonianDrift: drift,
+            normalMomentum: radialMomentum,
+            preservedApertureTangentMomentum: true
+        }
+    };
+}
+
+function decomposeCovector3(momentum, apertureConormal, cometric) {
+    const transformed = multiply3(cometric, apertureConormal);
+    const normalNormSquared = dot3(apertureConormal, transformed);
+    if (!Number.isFinite(normalNormSquared) || normalNormSquared <= 1e-12) {
+        throw new RangeError('Aperture conormal is degenerate in the slice optical metric.');
+    }
+    const metricMomentum = multiply3(cometric, momentum);
+    const coefficient = dot3(apertureConormal, metricMomentum) / normalNormSquared;
+    const tangential = subtract3(momentum, scale3(apertureConormal, coefficient));
+    return { coefficient, tangential, normalNormSquared };
+}
+
+function resolveEndpoint(anomaly, sliceId) {
+    if (anomaly.source.sliceId === sliceId) return anomaly.source;
+    if (anomaly.destination.sliceId === sliceId) return anomaly.destination;
+    throw new Error(`Slice ${sliceId} is not an endpoint of anomaly ${anomaly.id}.`);
+}
+
+function validateAnomaly(anomaly, { requireEnabled = true } = {}) {
+    if (!anomaly || anomaly.type !== SLICE_TRANSITION_ANOMALY) {
+        throw new TypeError('Phase 16C optical transport currently requires a slice-transition anomaly.');
+    }
+    if (requireEnabled && !anomaly.optics?.enabled) {
+        throw new RangeError(`Anomaly ${anomaly.id} is not optically enabled.`);

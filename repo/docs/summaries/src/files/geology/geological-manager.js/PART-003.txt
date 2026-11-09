@@ -1,0 +1,174 @@
+    }
+
+
+    advance(deltaYears) {
+
+        let changed = false;
+
+        // Only process formations that existed
+        // at the beginning of this simulation step.
+        const initialCount =
+            this.formations.length;
+
+        for (
+            let i = 0;
+            i < initialCount;
+            i++
+        ) {
+
+            const formation =
+                this.formations[i];
+
+            if (!formation.alive) continue;
+
+            if (
+                this.erodeFormation(
+                    formation,
+                    deltaYears
+                )
+            ) {
+
+                changed = true;
+
+            }
+
+        }
+
+
+        if (changed) {
+
+            this.renderDirty = true;
+
+        }
+
+
+        this.simulationSteps++;
+
+        if (
+            this.renderDirty ||
+            this.simulationSteps >=
+                this.renderEverySteps
+        ) {
+
+            this.rebuildRendering();
+
+            this.simulationSteps = 0;
+
+        }
+
+    }
+
+
+    // ---------------------------------
+    // RENDERING
+    // ---------------------------------
+
+    rebuildRendering() {
+
+        for (const speciesName in this.renderers) {
+
+            this.renderers[speciesName].clear();
+
+        }
+
+
+        for (const formation of this.formations) {
+
+            if (!formation.alive) continue;
+
+            const config =
+                RockSpecies[formation.speciesName];
+
+            const generator =
+                new RockGenerator(
+                    config,
+                    formation.seed
+                );
+
+            const matrices = generator.generate(
+
+                formation.position,
+
+                formation.scale,
+
+                formation.fragmentDepth === 0
+                    ? config.recursionDepth
+                    : Math.max(
+                        0,
+                        config.recursionDepth -
+                        formation.fragmentDepth
+                    )
+
+            );
+
+
+            this.renderers[
+                formation.speciesName
+            ].addMatrices(matrices);
+
+        }
+
+
+        for (const speciesName in this.renderers) {
+
+            this.renderers[speciesName].update();
+
+        }
+
+        this.renderDirty = false;
+
+    }
+
+
+    getLivingFormationCount() {
+
+        return this.formations.reduce(
+
+            (count, formation) =>
+
+                count + (formation.alive ? 1 : 0),
+
+            0
+
+        );
+
+    }
+
+	getMaterialAt(position) {
+
+    return this.field.sample(
+        position.x,
+        position.z
+    );
+
+}
+
+
+getSoilQualityAt(position) {
+
+    const sample = this.getMaterialAt(position);
+
+    if (!sample) return 0.5;
+
+    const quality = {
+
+        fertileSoil: 1.0,
+
+        clay: 0.55,
+
+        limestone: 0.45,
+
+        granite: 0.20,
+
+        sand: 0.12,
+
+        anomaly: 0.65
+
+    };
+
+    return quality[sample.speciesName] ?? 0.5;
+
+}
+
+}
+export { GeologicalManager }

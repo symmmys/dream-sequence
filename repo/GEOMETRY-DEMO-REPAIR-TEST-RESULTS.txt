@@ -1,0 +1,391 @@
+TAP version 13
+# D&D tactical logic regression tests loaded.
+# Subtest: altitude survives character save and legacy saves default to ground level
+ok 1 - altitude survives character save and legacy saves default to ground level
+  ---
+  duration_ms: 2.919394
+  type: 'test'
+  ...
+# Subtest: movement remains independent and extended movement spends Dash as an action
+ok 2 - movement remains independent and extended movement spends Dash as an action
+  ---
+  duration_ms: 0.67073
+  type: 'test'
+  ...
+# Subtest: an already-spent non-Dash action prevents extended movement
+ok 3 - an already-spent non-Dash action prevents extended movement
+  ---
+  duration_ms: 0.458531
+  type: 'test'
+  ...
+# Subtest: movement preview separates normal range from Dash range
+ok 4 - movement preview separates normal range from Dash range
+  ---
+  duration_ms: 0.606843
+  type: 'test'
+  ...
+# Subtest: characters sharing a cell receive distinct, non-overlapping model slots
+ok 5 - characters sharing a cell receive distinct, non-overlapping model slots
+  ---
+  duration_ms: 0.43147
+  type: 'test'
+  ...
+# Subtest: cell world coordinates resolve to the geometric center
+ok 6 - cell world coordinates resolve to the geometric center
+  ---
+  duration_ms: 0.144457
+  type: 'test'
+  ...
+# Subtest: rendered characters use cell centers, non-overlapping co-occupancy slots, and terrain-relative altitude
+ok 7 - rendered characters use cell centers, non-overlapping co-occupancy slots, and terrain-relative altitude
+  ---
+  duration_ms: 0.591881
+  type: 'test'
+  ...
+# Subtest: movement preserves altitude while spending Dash only for a Dash-region destination
+ok 8 - movement preserves altitude while spending Dash only for a Dash-region destination
+  ---
+  duration_ms: 0.434974
+  type: 'test'
+  ...
+# [SpatialTransform] Geometry: poincare
+# Subtest: third-person camera boom stays inside its spatial projection bounds
+ok 9 - third-person camera boom stays inside its spatial projection bounds
+  ---
+  duration_ms: 2.57722
+  type: 'test'
+  ...
+# Subtest: third-person camera leaves positions unchanged when a transform has no finite bounds
+ok 10 - third-person camera leaves positions unchanged when a transform has no finite bounds
+  ---
+  duration_ms: 0.602708
+  type: 'test'
+  ...
+# Subtest: 4D vector operations preserve orthogonal components and lengths
+ok 11 - 4D vector operations preserve orthogonal components and lengths
+  ---
+  duration_ms: 2.051098
+  type: 'test'
+  ...
+# Subtest: zero vectors and non-finite coordinates are rejected
+ok 12 - zero vectors and non-finite coordinates are rejected
+  ---
+  duration_ms: 0.264258
+  type: 'test'
+  ...
+# Subtest: canonical slice frames round-trip local coordinates and expose normal offset
+ok 13 - canonical slice frames round-trip local coordinates and expose normal offset
+  ---
+  duration_ms: 0.385411
+  type: 'test'
+  ...
+# Subtest: rotated slice frames remain orthonormal in the XW plane
+ok 14 - rotated slice frames remain orthonormal in the XW plane
+  ---
+  duration_ms: 0.26584
+  type: 'test'
+  ...
+# Subtest: 4D perpendicular frames are orthonormal and orthogonal to the tangent
+ok 15 - 4D perpendicular frames are orthonormal and orthogonal to the tangent
+  ---
+  duration_ms: 0.829028
+  type: 'test'
+  ...
+# Subtest: cubic corridor interpolation returns exact endpoints and stable midpoint
+ok 16 - cubic corridor interpolation returns exact endpoints and stable midpoint
+  ---
+  duration_ms: 0.550609
+  type: 'test'
+  ...
+# Subtest: stationary Bezier endpoints use a one-sided corridor tangent
+ok 17 - stationary Bezier endpoints use a one-sided corridor tangent
+  ---
+  duration_ms: 0.134092
+  type: 'test'
+  ...
+# Subtest: corridor frame sampling is deterministic, orthogonal, and smoothly transported
+ok 18 - corridor frame sampling is deterministic, orthogonal, and smoothly transported
+  ---
+  duration_ms: 3.299257
+  type: 'test'
+  ...
+# Subtest: corridor radius profile interpolates deterministically
+ok 19 - corridor radius profile interpolates deterministically
+  ---
+  duration_ms: 0.51135
+  type: 'test'
+  ...
+# Subtest: slice addresses include slice identity and accept negative chunk coordinates
+ok 20 - slice addresses include slice identity and accept negative chunk coordinates
+  ---
+  duration_ms: 0.423257
+  type: 'test'
+  ...
+# Subtest: numeric proximity in w does not create cross-slice adjacency
+ok 21 - numeric proximity in w does not create cross-slice adjacency
+  ---
+  duration_ms: 0.50462
+  type: 'test'
+  ...
+# Subtest: visible portals expose preview destinations without enabling traversal
+ok 22 - visible portals expose preview destinations without enabling traversal
+  ---
+  duration_ms: 0.341874
+  type: 'test'
+  ...
+# Subtest: traversable corridors can be hidden independently of preview visibility
+ok 23 - traversable corridors can be hidden independently of preview visibility
+  ---
+  duration_ms: 0.440744
+  type: 'test'
+  ...
+# Subtest: traversable corridors create explicit bidirectional topology edges
+ok 24 - traversable corridors create explicit bidirectional topology edges
+  ---
+  duration_ms: 0.256226
+  type: 'test'
+  ...
+# Subtest: visibility is independent of one-way traversal permissions
+ok 25 - visibility is independent of one-way traversal permissions
+  ---
+  duration_ms: 0.307273
+  type: 'test'
+  ...
+# Subtest: corridor endpoints must agree with the registered slice frames
+ok 26 - corridor endpoints must agree with the registered slice frames
+  ---
+  duration_ms: 0.197528
+  type: 'test'
+  ...
+# Subtest: topology getters return copies rather than mutable internal records
+ok 27 - topology getters return copies rather than mutable internal records
+  ---
+  duration_ms: 0.278699
+  type: 'test'
+  ...
+# Subtest: topology updates require increasing revisions and preserve slice references
+ok 28 - topology updates require increasing revisions and preserve slice references
+  ---
+  duration_ms: 0.366842
+  type: 'test'
+  ...
+# Subtest: topology serializes and restores its versioned domain records
+ok 29 - topology serializes and restores its versioned domain records
+  ---
+  duration_ms: 0.937561
+  type: 'test'
+  ...
+# Subtest: Poincare metric factor and bounded visual scale match their definitions
+ok 30 - Poincare metric factor and bounded visual scale match their definitions
+  ---
+  duration_ms: 0.227042
+  type: 'test'
+  ...
+# Subtest: registered spatial mode activates, pauses, resumes, and deactivates its own systems
+ok 31 - registered spatial mode activates, pauses, resumes, and deactivates its own systems
+  ---
+  duration_ms: 1.715332
+  type: 'test'
+  ...
+# Subtest: spatial modes reject missing controllers and duplicate registrations
+ok 32 - spatial modes reject missing controllers and duplicate registrations
+  ---
+  duration_ms: 0.384639
+  type: 'test'
+  ...
+# Subtest: clamp defaults to the normalized range and rejects invalid values
+ok 33 - clamp defaults to the normalized range and rejects invalid values
+  ---
+  duration_ms: 0.59775
+  type: 'test'
+  ...
+# Subtest: topographic elevation maps to the configured soil classes
+ok 34 - topographic elevation maps to the configured soil classes
+  ---
+  duration_ms: 0.170987
+  type: 'test'
+  ...
+# Subtest: terrain vertex colors remain finite and visible across elevation and slope ranges
+ok 35 - terrain vertex colors remain finite and visible across elevation and slope ranges
+  ---
+  duration_ms: 1.014588
+  type: 'test'
+  ...
+# Subtest: invalid height and slope samples do not propagate NaN into vertex colors
+ok 36 - invalid height and slope samples do not propagate NaN into vertex colors
+  ---
+  duration_ms: 0.122444
+  type: 'test'
+  ...
+# Subtest: terrain worker emits finite RGB vertex colors for a generated chunk
+ok 37 - terrain worker emits finite RGB vertex colors for a generated chunk
+  ---
+  duration_ms: 6.517221
+  type: 'test'
+  ...
+# Subtest: synchronous chunk rendering uses the same soil palette as worker generation
+ok 38 - synchronous chunk rendering uses the same soil palette as worker generation
+  ---
+  duration_ms: 0.615296
+  type: 'test'
+  ...
+# [SpatialTransform] Geometry: spherical
+# [SpatialTransform] Geometry: inverted-poincare
+# Subtest: heightmap sampler bilinearly interpolates grayscale terrain and clamps edges
+ok 39 - heightmap sampler bilinearly interpolates grayscale terrain and clamps edges
+  ---
+  duration_ms: 1.074127
+  type: 'test'
+  ...
+# Subtest: heightmap validates dimensions, channels, and elevation limits
+ok 40 - heightmap validates dimensions, channels, and elevation limits
+  ---
+  duration_ms: 0.531701
+  type: 'test'
+  ...
+# Subtest: color-ramp decoding and sampled statistics are deterministic
+ok 41 - color-ramp decoding and sampled statistics are deterministic
+  ---
+  duration_ms: 0.342615
+  type: 'test'
+  ...
+# Subtest: topographic factory creates an independent slice and terrain sampler
+ok 42 - topographic factory creates an independent slice and terrain sampler
+  ---
+  duration_ms: 2.102545
+  type: 'test'
+  ...
+# Subtest: independent topographic inputs create isolated world slices
+ok 43 - independent topographic inputs create isolated world slices
+  ---
+  duration_ms: 1.72005
+  type: 'test'
+  ...
+# Subtest: topographic mesh buffers generate indexed geometry at bounded resolution
+ok 44 - topographic mesh buffers generate indexed geometry at bounded resolution
+  ---
+  duration_ms: 0.643129
+  type: 'test'
+  ...
+# Subtest: spherical and inverted-Poincare charts round-trip away from singularities
+ok 45 - spherical and inverted-Poincare charts round-trip away from singularities
+  ---
+  duration_ms: 1.430783
+  type: 'test'
+  ...
+# [HeightmapTerrain] Primary map failed validation; loading fallback fallback-map.png. Error: truncated image
+#     at Object.load (file:///mnt/data/phase2fix/somnium_open_the_door/tests/topography-generation.test.mjs:157:52)
+#     at HeightmapTerrain.load (file:///mnt/data/phase2fix/somnium_open_the_door/src/environment/heightmap-terrain.js:29:46)
+#     at TestContext.fallbackTerrain (file:///mnt/data/phase2fix/somnium_open_the_door/tests/topography-generation.test.mjs:170:19)
+#     at async Test.run (node:internal/test_runner/test:1054:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# [HeightmapTerrain] Loaded: {
+#   ready: true,
+#   image: { width: 2, height: 2 },
+#   source: 'fallback-map.png',
+#   usingFallback: true,
+#   worldSize: 100,
+#   heightChannel: 'average',
+#   configuredHeightRange: { min: -2, max: 2 },
+#   sampledHeightRange: { min: -2, max: 2, variation: 4 },
+#   averageHeight: -0.24705882352941141,
+#   sampleCount: 1089,
+#   samples: [
+#     { x: -50, z: -50, height: -2 },
+#     { x: 0, z: -50, height: -1.4980392156862745 },
+#     { x: 50, z: -50, height: -0.996078431372549 },
+#     { x: -50, z: 0, height: -0.996078431372549 },
+#     { x: 0, z: 0, height: -0.24705882352941178 },
+#     { x: 50, z: 0, height: 0.5019607843137255 },
+#     { x: -50, z: 50, height: 0.007843137254901933 },
+#     { x: 0, z: 50, height: 1.003921568627451 },
+#     { x: 50, z: 50, height: 2 }
+#   ]
+# }
+# Subtest: gameplay terrain falls back cleanly when its primary topographic asset is unreadable
+ok 46 - gameplay terrain falls back cleanly when its primary topographic asset is unreadable
+  ---
+  duration_ms: 10.965407
+  type: 'test'
+  ...
+# [SpatialTransform] Geometry: spherical
+# [GeometryRenderer] Initialized: {
+#   geometry: 'spherical',
+#   enabled: true,
+#   renderScale: 10,
+#   projection: {
+#     geometry: 'poincare-3d',
+#     dimensions: 3,
+#     curvature: -1,
+#     radius: 1,
+#     center: { x: 0, y: 0, z: 0 },
+#     bounds: { minX: -20, maxX: 20, minY: -20, maxY: 20, minZ: -20, maxZ: 20 },
+#     characteristicLength: 100000,
+#     boundaryReachable: false
+#   },
+#   metric: {
+#     geometry: 'poincare-3d',
+#     curvature: -1,
+#     radius: 1,
+#     dimensions: 3,
+#     boundaryReachable: false
+#   },
+#   visualScale: 'unit'
+# }
+# [GeometryRenderer] Disposed: {
+#   enabled: false,
+#   geometry: 'spherical',
+#   transformedMeshes: 1,
+#   transformedVertices: 3,
+#   restoredMeshes: 1
+# }
+# [HeightmapTerrain] Primary map failed validation; loading fallback complete-demo.png. Error: Topographic raster has 14 fully transparent trailing rows.
+#     at assertCompleteRaster (file:///mnt/data/phase2fix/somnium_open_the_door/src/environment/heightmap-terrain.js:206:15)
+#     at HeightmapTerrain.load (file:///mnt/data/phase2fix/somnium_open_the_door/src/environment/heightmap-terrain.js:30:13)
+#     at async TestContext.transparentTailFallback (file:///mnt/data/phase2fix/somnium_open_the_door/tests/topography-generation.test.mjs:234:5)
+#     at async Test.run (node:internal/test_runner/test:1054:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# [HeightmapTerrain] Loaded: {
+#   ready: true,
+#   image: { width: 2, height: 16 },
+#   source: 'complete-demo.png',
+#   usingFallback: true,
+#   worldSize: 20,
+#   heightChannel: 'average',
+#   configuredHeightRange: { min: -1, max: 1 },
+#   sampledHeightRange: { min: -1, max: 0.9063725490196077, variation: 1.9063725490196077 },
+#   averageHeight: -0.8911616161616162,
+#   sampleCount: 1089,
+#   samples: [
+#     { x: -10, z: -10, height: -1 },
+#     { x: 0, z: -10, height: -0.7490196078431373 },
+#     { x: 10, z: -10, height: -0.4980392156862745 },
+#     { x: -10, z: 0, height: -1 },
+#     { x: 0, z: 0, height: -1 },
+#     { x: 10, z: 0, height: -1 },
+#     { x: -10, z: 10, height: -1 },
+#     { x: 0, z: 10, height: -1 },
+#     { x: 10, z: 10, height: -1 }
+#   ]
+# }
+# Subtest: Babylon adapter projects by slice and restores original mesh buffers without replacing materials
+ok 47 - Babylon adapter projects by slice and restores original mesh buffers without replacing materials
+  ---
+  duration_ms: 7.740013
+  type: 'test'
+  ...
+# Subtest: terrain fallback detects a silently truncated image with a transparent tail
+ok 48 - terrain fallback detects a silently truncated image with a transparent tail
+  ---
+  duration_ms: 2.409167
+  type: 'test'
+  ...
+1..48
+# tests 48
+# suites 0
+# pass 48
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 371.328074

@@ -1,0 +1,35 @@
+SOMNIUM — GEOMETRY FOUNDATION PHASE 1
+=====================================
+
+This is a full project snapshot containing the Phase 1 4D geometry and topology foundation.
+Unpack it into a new directory first so your current working project remains available as a backup.
+
+No npm packages or other dependencies were added.
+
+VERIFY THE PROJECT
+------------------
+From the project root, run:
+
+  node --test tests/*.test.mjs
+
+Expected result for this snapshot: 34 tests passed.
+
+The new domain modules are native ES modules under:
+
+  src/world/fields/geometry/
+
+Architecture and API decisions are documented in:
+
+  docs/decisions/ADR-0001-four-dimensional-world-slices.md
+  GEOMETRY-PHASE-1-IMPLEMENTATION.txt
+  docs/STYLE-CONFORMANCE.md
+
+SCOPE NOTE
+----------
+This phase adds pure 4D math, versioned world-slice and corridor records, explicit topology
+queries, deterministic corridor cross-section frames, and the bounded Poincare visual-scale
+function. It does not yet connect slice IDs to chunk streaming, add portal rendering, change
+player movement, or add the computational scheduler. Those integrations remain in later phases.
+
+Browser rendering has not been changed or runtime-tested by this phase because the new code is
+engine-independent and not yet connected to Babylon.js.

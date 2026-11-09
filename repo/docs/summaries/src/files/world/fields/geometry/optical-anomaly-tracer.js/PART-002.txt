@@ -1,0 +1,300 @@
+            (chunkReachability === null || chunkReachability.reachable);
+        return {
+            reachable,
+            reason: !wReachable ? 'insufficient-optical-w-reach' :
+                !apertureReachable ? 'outside-optical-aperture' :
+                    chunkReachability && !chunkReachability.reachable
+                        ? chunkReachability.reason ??
+                            (!chunkReachability.spatialReachable
+                                ? 'spatial-distance-exceeded'
+                                : !chunkReachability.wReachable
+                                    ? 'insufficient-optical-w-reach'
+                                    : 'optical-chunk-unreachable')
+                        : null,
+            anomalyId,
+            fromSliceId,
+            targetSliceId,
+            wDistance: targetPlaneDistance,
+            opticalWReach: coupling.opticalWReach,
+            coupling: coupling.coupling,
+            apertureDistance: endpointDistance,
+            chunkReachability
+        };
+    }
+
+    function trace(initialRay, options = {}) {
+        const startSliceId = options.sliceId ?? initialRay?.sliceId;
+        if (typeof startSliceId !== 'string' || !startSliceId.trim()) {
+            throw new TypeError('An initial sliceId is required for topology-aware optical tracing.');
+        }
+        const maxTransitions = options.maxTransitions ?? DEFAULT_MAX_TRANSITIONS;
+        if (!Number.isSafeInteger(maxTransitions) || maxTransitions < 0 || maxTransitions > 128) {
+            throw new RangeError('maxTransitions must be an integer from zero through 128.');
+        }
+
+        let state = createOpticalRayState(initialRay);
+        let context = { kind: 'slice', sliceId: startSliceId };
+        const pathSegments = [];
+        const transitions = [];
+        let status = 'max-path-length';
+        let terminalEvent = null;
+        let segmentCount = 0;
+        let transitionCount = 0;
+        // Preserve the exact field instance used to solve the entry interface.
+        // In endpoint mode it may contain an aperture-local metric override;
+        // recreating it for the anomaly segment would introduce an artificial
+        // metric jump immediately after the boundary.
+        let activeAnomalyField = null;
+
+        while (segmentCount < (maxTransitions * 2 + 1)) {
+            if (context.kind === 'slice') {
+                const binding = sliceRegistry.require(context.sliceId);
+                const field = getSliceField(context.sliceId, options.sliceMetricOptions ?? {});
+                const neighbors = topology.getOpticallyConnectedNeighbors(context.sliceId);
+                const candidates = neighbors.map((neighbor) => ({
+                    neighbor,
+                    anomaly: topology.getCorridor(neighbor.corridorId)
+                })).filter(({ anomaly }) => anomaly.type === SLICE_TRANSITION_ANOMALY);
+                const callerEvent = options.sliceTraceOptions?.segmentEvent;
+                const sliceOptions = { ...(options.sliceTraceOptions ?? {}) };
+                delete sliceOptions.segmentEvent;
+                sliceOptions.segmentEvent = (segment) => {
+                    const entry = findApertureEntry(segment, candidates, binding);
+                    if (entry) return entry;
+                    return typeof callerEvent === 'function' ? callerEvent(segment) : null;
+                };
+                const result = traceOpticalRayInSlice(
+                    field, sceneRegistry, context.sliceId, state, sliceOptions
+                );
+                pathSegments.push({ kind: 'slice', sliceId: context.sliceId, result });
+                segmentCount++;
+                if (result.event?.kind !== 'anomaly-entry') {
+                    status = result.status;
+                    terminalEvent = result.event;
+                    state = result.finalState;
+                    break;
+                }
+
+                if (transitionCount >= maxTransitions) {
+                    result.status = 'max-transitions';
+                    result.event = { kind: 'max-transitions', maxTransitions };
+                    status = 'max-transitions';
+                    terminalEvent = result.event;
+                    state = result.finalState;
+                    break;
+                }
+                const anomaly = topology.getCorridor(result.event.anomalyId);
+                const incidentMetric = field.sample(result.event.ambientPosition).tangentMetric;
+                const anomalyField = getAnomalyField(anomaly, {
+                    ...(options.anomalyMetricOptions ?? {}),
+                    endpointMetricOverride: { side: result.event.side, metric: incidentMetric }
+                });
+                if (Math.abs(anomalyField.signedSpan) > anomaly.optics.maxWOpticalReach + EPSILON) {
+                    result.status = 'optical-range-limit';
+                    result.event = {
+                        kind: 'optical-range-limit', anomalyId: anomaly.id,
+                        requiredWReach: Math.abs(anomalyField.signedSpan),
+                        maximumWReach: anomaly.optics.maxWOpticalReach
+                    };
+                    status = result.status;
+                    terminalEvent = result.event;
+                    state = result.finalState;
+                    break;
+                }
+                const entryTargetSliceId = result.event.side === 'source'
+                    ? anomaly.destination.sliceId : anomaly.source.sliceId;
+                const entryReachability = evaluateReachability(
+                    anomaly.id,
+                    result.event.ambientPosition,
+                    entryTargetSliceId,
+                    {
+                        ...(options.chunkReachabilityOptions ?? {}),
+                        // Validate the anomaly's full configured W bridge at
+                        // its maximum-coupling centre. Local coupling at the
+                        // aperture still controls whether momentum can enter.
+                        couplingPosition4D: anomaly.influence.center
+                    }
+                );
+                if (!entryReachability.reachable) {
+                    result.status = 'optical-entry-blocked';
+                    result.event = {
+                        kind: 'optical-entry-blocked',
+                        anomalyId: anomaly.id,
+                        reachability: entryReachability
+                    };
+                    status = result.status;
+                    terminalEvent = result.event;
+                    state = result.finalState;
+                    break;
+                }
+                const entryResult = transferSliceMomentumIntoAnomaly({
+                    anomaly,
+                    anomalyField,
+                    sliceField: field,
+                    slice: binding.slice,
+                    state: result.finalState,
+                    event: result.event,
+                    side: result.event.side
+                });
+                result.status = entryResult.transmitted ? 'anomaly-entry' : 'interface-blocked';
+                result.interface = entryResult.diagnostics;
+                if (!entryResult.transmitted) {
+                    status = 'interface-blocked';
+                    terminalEvent = { kind: 'interface-blocked', ...entryResult.diagnostics };
+                    state = result.finalState;
+                    break;
+                }
+                state = createOpticalRayState({
+                    ...result.finalState,
+                    momentum: entryResult.momentum
+                });
+                activeAnomalyField = anomalyField;
+                context = {
+                    kind: 'anomaly',
+                    anomalyId: anomaly.id,
+                    entrySide: result.event.side
+                };
+                transitions.push({
+                    anomalyId: anomaly.id,
+                    fromSliceId: context.entrySide === 'source' ? anomaly.source.sliceId : anomaly.destination.sliceId,
+                    toSliceId: context.entrySide === 'source' ? anomaly.destination.sliceId : anomaly.source.sliceId,
+                    direction: 'into-anomaly',
+                    interface: entryResult.diagnostics
+                });
+                continue;
+            }
+
+            const anomaly = topology.getCorridor(context.anomalyId);
+            const anomalyField = activeAnomalyField ??
+                getAnomalyField(anomaly, options.anomalyMetricOptions ?? {});
+            const entryOpticalPath = state.opticalPathLength;
+            const result = traceOpticalRay(anomalyField, state, {
+                ...(options.anomalyTraceOptions ?? {}),
+                segmentEvent: (segment) => findAnomalyEvent(
+                    segment,
+                    anomaly,
+                    context.entrySide,
+                    anomalyField,
+                    (event) => evaluateReachability(
+                        anomaly.id,
+                        event.ambientPosition,
+                        event.sliceId,
+                        options.chunkReachabilityOptions ?? {}
+                    )
+                )
+            });
+            const attenuationDistance = Math.max(0,
+                result.finalState.opticalPathLength - entryOpticalPath
+            );
+            const attenuation = Math.exp(-anomaly.optics.attenuationPerUnit * attenuationDistance);
+            result.finalState.intensity *= attenuation;
+            pathSegments.push({ kind: 'anomaly', anomalyId: anomaly.id, result });
+            segmentCount++;
+
+            if (result.event?.kind !== 'anomaly-exit') {
+                status = result.event?.kind ?? result.status;
+                terminalEvent = result.event;
+                state = result.finalState;
+                break;
+            }
+
+            const exit = result.event;
+            const destinationBinding = sliceRegistry.require(exit.sliceId);
+            const destinationField = getSliceField(exit.sliceId, options.sliceMetricOptions ?? {});
+            const exitResult = transferAnomalyMomentumIntoSlice({
+                anomaly,
+                anomalyField,
+                sliceField: destinationField,
+                slice: destinationBinding.slice,
+                state: result.finalState,
+                event: exit
+            });
+            result.status = exitResult.transmitted ? 'anomaly-exit' : 'interface-blocked';
+            result.interface = exitResult.diagnostics;
+            if (!exitResult.transmitted) {
+                status = 'interface-blocked';
+                terminalEvent = { kind: 'interface-blocked', ...exitResult.diagnostics };
+                state = result.finalState;
+                break;
+            }
+            state = createOpticalRayState({
+                ...result.finalState,
+                momentum: exitResult.momentum,
+                intensity: result.finalState.intensity * anomaly.optics.transmission
+            });
+            transitions.push({
+                anomalyId: anomaly.id,
+                fromSliceId: anomaly.source.sliceId === exit.sliceId
+                    ? anomaly.destination.sliceId : anomaly.source.sliceId,
+                toSliceId: exit.sliceId,
+                direction: 'out-of-anomaly',
+                interface: exitResult.diagnostics
+            });
+            activeAnomalyField = null;
+            context = { kind: 'slice', sliceId: exit.sliceId };
+            transitionCount++;
+            if (transitionCount > maxTransitions) {
+                status = 'max-transitions';
+                terminalEvent = { kind: 'max-transitions', maxTransitions };
+                break;
+            }
+        }
+
+        const diagnostics = {
+            segmentCount,
+            transitionCount,
+            sliceSegments: pathSegments.filter((segment) => segment.kind === 'slice').length,
+            anomalySegments: pathSegments.filter((segment) => segment.kind === 'anomaly').length,
+            acceptedSteps: pathSegments.reduce((sum, segment) => sum + (segment.result.diagnostics?.acceptedSteps ?? 0), 0),
+            rejectedSteps: pathSegments.reduce((sum, segment) => sum + (segment.result.diagnostics?.rejectedSteps ?? 0), 0),
+            pathLength: state.opticalPathLength,
+            travelTime: state.travelTime,
+            intensity: state.intensity
+        };
+        const combined = {
+            status,
+            event: terminalEvent,
+            finalState: state,
+            context,
+            pathSegments,
+            transitions,
+            diagnostics
+        };
+
+        if (options.drawDebug && debugRenderer) {
+            renderTopologyDebug(combined, sliceRegistry, debugRenderer, options.debugStyle ?? {});
+        }
+        return combined;
+    }
+
+    return Object.freeze({
+        trace,
+        createAnomalyField(anomalyId, metricOptions = {}) {
+            return getAnomalyField(topology.getCorridor(anomalyId), metricOptions);
+        },
+        evaluateReachability,
+        getOpticallyConnectedNeighbors(sliceId) {
+            return topology.getOpticallyConnectedNeighbors(sliceId);
+        },
+        getOpticalChunkReachability(sourceAddress, targetAddress, reachabilityOptions = {}) {
+            if (!chunkGraph || typeof chunkGraph.getOpticalReachability !== 'function') {
+                throw new Error('Optical chunk reachability requires a SpatialChunkGraph.');
+            }
+            return chunkGraph.getOpticalReachability(sourceAddress, targetAddress, reachabilityOptions);
+        },
+        getOpticallyReachableChunkCandidates(sourceSliceId, position4, reachabilityOptions = {}) {
+            if (!chunkGraph || typeof chunkGraph.getOpticallyReachableChunkCandidates !== 'function') {
+                throw new Error('Optically reachable chunk candidates require a SpatialChunkGraph.');
+            }
+            return chunkGraph.getOpticallyReachableChunkCandidates(sourceSliceId, position4, reachabilityOptions);
+        },
+        clearCache() {
+            sliceFieldCache.clear();
+            anomalyFieldCache.clear();
+        }
+    });
+}
+
+function findApertureEntry(segment, candidates, binding) {
+    const start = ambientToSlice(binding.slice.frame, segment.startPosition).position;
+    const end = ambientToSlice(binding.slice.frame, segment.endPosition).position;

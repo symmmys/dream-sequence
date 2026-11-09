@@ -1,0 +1,153 @@
+SOMNIUM — CURRENT PROJECT STATE
+Last updated: November 8, 2026
+Current baseline: Geometry Phase 16D — View-Dependent Anomaly Aperture Rendering
+
+1. PROJECT OVERVIEW
+
+Somnium is a browser-based Babylon.js world simulation with an extensible spatial architecture. Its geometry system represents ordinary worlds as independent three-dimensional WorldSlices embedded in an ambient four-dimensional R4 space. Explicit anomaly topology connects selected slices. Ordinary gameplay is three-dimensional; anomaly influence fields can expose movement along the fourth spatial axis.
+
+Rendering projections are derived views. Authoritative positions, slice frames, geometry, metrics, chunk identities, and optical paths remain independent of render-space coordinates.
+
+2. CURRENT GEOMETRY ARCHITECTURE
+
+- WorldSlice provides stable identity, geometry type, revision, and an orthonormal 4D frame.
+- WorldTopology stores explicit slice/anomaly relationships, with independent player-traversal and optical-connectivity permissions.
+- SpatialChunkGraph preserves 3D chunk addresses: (sliceId, chunkX, chunkZ). Anomaly chunks remain explicit graph nodes.
+- SpatialTransform owns intrinsic slice metrics and world/render projection.
+- Slice-transition anomalies use bounded ambient 4D regions and continuous smootherstep influence fields.
+- Player W movement and optical W propagation have independent permissions and coefficients.
+- The legacy cubic Bezier corridor implementation remains available.
+
+3. COMPLETED GEOMETRY MILESTONES
+
+Phases 1–15 established the 4D world-slice architecture, chunk/topology relationships, slice-transition anomalies, four-axis anomaly traversal, the rotating tesseract chamber, Poincare chart safety, camera refinements, Main World re-entry, and the metric-grid visualization.
+
+Phase 16A — Optical Mathematics and CPU Reference Solver:
+- Versioned optical material and anomaly-permission contracts.
+- Ambient R4 optical metric/cometric construction.
+- Independent optical W coupling using the anomaly radial envelope.
+- Adaptive CPU Hamiltonian ray integration and deterministic diagnostics.
+- Scale-relative positive-definite matrix validation for small physical metric tensors.
+- Explicit metric-domain guards and controlled chart-boundary termination.
+
+Phase 16B — Slice-Native Ray Paths and Intersections:
+- Scene-scoped OpticalSceneRegistry.
+- Deterministic per-registration triangle BVHs with slice/chunk identity.
+- Analytic streamed-terrain heightfield intersection.
+- Babylon geometry adapter that registers authoritative geometry before nonlinear visual projection.
+- Euclidean and Poincare slice-native ray tracing.
+- Render-space-only debug ray visualization.
+
+Phase 16C — Cross-Slice Anomaly Optical Transport:
+- Independent optically-enabled topology edges; player traversal permission is not consulted.
+- Anomaly-specific optical W reach, W coupling, aperture radius, refractive index, attenuation, transmission, directionality, and entry bias.
+- Stable endpoint-sampled blend of the source/destination slice tangent metrics in the anomaly bridge; pointwise chart sampling remains opt-in.
+- True ambient R4 Hamiltonian propagation inside bounded slice-transition anomaly regions.
+- Aperture entry/exit event detection, with interface transfer preserving aperture-tangential canonical momentum and the Hamiltonian constraint.
+- Optical chunk reachability checks before entering and exiting an anomaly.
+- Multi-anomaly path traversal with explicit transition and segment limits.
+- Controlled `chart-domain-boundary` ray events for finite Poincare metric domains.
+- All three demo anomaly connections are optically enabled in both configured directions.
+
+Phase 16D — View-Dependent Anomaly Aperture Rendering:
+- Replaces the fixed remote preview-camera pose with a view camera transported through the anomaly's endpoint-frame correspondence.
+- The mapped remote camera updates from the active viewer's current position, forward direction, and up vector.
+- The direct Hypercube-to-Main-World demo aperture is a circular render surface rather than a square/rectangular preview plane.
+- Adds an anomaly `view` contract, independent of player traversal and optical ray permissions, with endpoint-frame/static mapping, circle/ellipse/rectangle shapes, and constant/Euclidean-4D-ball cross-section profiles.
+- A Euclidean 4D spherical aperture's 3D section uses `sqrt(R² - d²)` and is hidden after its section radius reaches zero.
+- Destination chunk focus follows the mapped remote camera direction/position; portal diagnostics expose camera pose, shape, scale, and remote render-list size.
+- Existing world lighting and atmospheric response are intentionally unchanged. Optional anomaly-driven sky glow is deferred as an artistic feature.
+
+4. CURRENT OPTICAL MODULES
+
+- src/world/fields/geometry/optical-contracts.js
+- src/world/fields/geometry/optical-metric.js
+- src/world/fields/geometry/optical-ray-integrator.js
+- src/world/fields/geometry/optical-scene-registry.js
+- src/world/fields/geometry/optical-slice-tracer.js
+- src/world/fields/geometry/optical-anomaly-tracer.js
+- src/world/fields/geometry/optical-debug-renderer.js
+- src/world/fields/geometry/babylon-geometry-adapter.js
+- src/world/fields/geometry/anomaly-view-transform.js
+- src/world/fields/geometry/portal-preview-renderer.js
+
+The scene creates one optical registry shared by the geometry demo and Main World. Resident Main World chunks register analytic heightfields and unregister them when mesh resources are disposed. Eligible demo meshes and the dynamic tesseract cross-section register slice-local triangle geometry. Scene metadata exposes the registry, stats, debug renderer, and factories for slice-native and topology-aware anomaly tracers.
+
+The anomaly tracer uses only explicit optical topology. It traces a 3D slice segment to an aperture, transfers the ray into a bounded 4D anomaly metric, finds a reachable destination aperture, transfers the ray back into the destination slice, and may continue through another explicitly connected anomaly.
+
+5. CURRENT TEST STATUS
+
+Command:
+  node --test tests/*.test.mjs
+
+Latest Phase 16D-2 verification:
+  267 tests passed
+  0 failures
+
+Focused optics tests:
+  anomaly-view-transform.test.mjs
+  portal-preview-renderer.test.mjs
+  geometry-demo-portal-preview.test.mjs
+  optical-foundation.test.mjs
+  optical-intersections.test.mjs
+  optical-debug-renderer.test.mjs
+  optical-anomaly-tracing.test.mjs
+  optical-demo-transport.test.mjs
+
+Static verification also checks JavaScript syntax and relative module references. See GEOMETRY-PHASE-16D-TEST-RESULTS.txt.
+
+6. CURRENT LIMITATIONS / NEXT WORK
+
+The Phase 16A–16C ray transport engine remains a CPU reference for topology-aware light propagation. It does not yet:
+- Intersect arbitrary 4D mesh geometry placed inside anomaly interiors; the current 4D bridge traces the optical metric and aperture/horizon/region events.
+- Render anomaly-interior R4 ray segments as a 3D/4D diagnostic visualization. Current debug rendering draws slice-native segments only; R4 samples remain available in trace results.
+- Apply reflection, refraction, or total internal reflection at optical surfaces. The current aperture interface is an idealized momentum-transfer boundary, not a dielectric Fresnel/Snell model.
+- Validate the aperture camera mapping and portal composition in a live browser/WebGL session across camera orbit, observer movement, and both travel directions. Automated tests cover camera transport and live render-target configuration.
+- Implement custom anomaly-view mappings and cross-section evaluators beyond the initial endpoint-frame mapping and the constant/Euclidean-4D-ball cross-section profiles. Circle, ellipse, and rectangle aperture surfaces are currently supported.
+- Generate sunlight rays, material response, or Babylon direct-light integration (Phase 16E).
+- Produce cross-slice shadows, multiple-bounce global illumination, or diffraction.
+- Add optional anomaly-driven atmospheric glow/sky-colour response as a later artistic layer.
+- Use a GPU/optimized optics backend and production ray budgets (Phase 16F).
+
+The default anomaly bridge metric uses endpoint-sampled tangent metrics blended along the common slice normal. This avoids extrapolating a Poincare chart beyond its valid aperture domain. Pointwise endpoint-chart sampling is supported as an opt-in but will terminate cleanly at declared chart boundaries.
+
+The interface law preserves tangential canonical momentum and solves the normal coefficient to preserve the Hamiltonian. It currently uses a deterministic aperture-normal transfer rule; later surface optics may add reflected/transmitted energy branches.
+
+The triangle BVH is currently per mesh registration and tagged with chunk identity, rather than aggregated into one chunk-wide hierarchy. This is an intentional first implementation; Phase 16F should use profiling to decide whether chunk-level aggregation is worthwhile.
+
+Curved ray/triangle intersection uses short chords between adaptive integration samples. The maximum integration step controls the approximation. Terrain intersections sample at density derived from the source raster's independent X/Z world spans and refine detected crossings by bisection.
+
+A live browser/WebGL visual validation has not been completed in the automated environment. In particular, actual visible sunlight, shadow behavior, and an anomaly-interior R4 debug display remain future work.
+
+7. DEVELOPMENT COMMANDS
+
+Run the complete automated suite from the project root:
+  node --test tests/*.test.mjs
+
+Start the local application from the directory containing index.html:
+  python3 -m http.server 8081
+
+Open:
+  http://127.0.0.1:8081/
+
+8. PROJECT DOCUMENTATION
+
+- GEOMETRY-PHASE-16-ANOMALY-OPTICS-IMPLEMENTATION-PLAN.md
+- GEOMETRY-PHASE-16A-OPTICAL-FOUNDATION.md
+- GEOMETRY-PHASE-16B-SLICE-NATIVE-RAY-TRACING.md
+- GEOMETRY-PHASE-16C-ANOMALY-OPTICAL-BRIDGES.md
+- GEOMETRY-PHASE-16C-TEST-RESULTS.txt
+- GEOMETRY-PHASE-16D-ANOMALY-APERTURE-VIEW-RENDERING.md
+- GEOMETRY-PHASE-16D-ANOMALY-APERTURE-VIEW-RENDERING.md
+- GEOMETRY-PHASE-16D-TEST-RESULTS.txt
+- INSTALLATION-GEOMETRY-PHASE-16D.txt
+- INSTALLATION-GEOMETRY-PHASE-16D.txt
+- docs/decisions/ADR-0011-optical-metric-and-cpu-reference-rays.md
+- docs/decisions/ADR-0012-slice-native-optical-intersections.md
+- docs/decisions/ADR-0013-four-dimensional-anomaly-optical-bridges.md
+- docs/decisions/ADR-0014-view-dependent-anomaly-apertures.md
+- docs/DEPENDENCY-GRAPH.md
+- docs/STYLE-GUIDE.txt
+- docs/STYLE-CONFORMANCE.md
+
+Earlier project-state notes are retained separately in docs/HISTORICAL-PROJECT-STATE.txt.

@@ -1,0 +1,39 @@
+SOMNIUM — GEOMETRY PHASE 8 INSTALLATION
+Build: 2026-11-08-hypercube-visibility-short-corridors-1
+
+RECOMMENDED INSTALLATION
+1. Back up your current Somnium directory.
+2. Extract somnium_geometry_phase8_hypercube_visibility_project.zip into a NEW, clean directory.
+3. Enter the extracted project directory containing index.html.
+4. Start the local server:
+
+   python3 -m http.server 8081 --bind 127.0.0.1
+
+5. Open http://127.0.0.1:8081/.
+6. Select 4D GEOMETRY DEMO from the main menu.
+7. Confirm the console contains:
+
+   [Main] Build: 2026-11-08-hypercube-visibility-short-corridors-1
+   [GeometryDemo] Build: 2026-11-08-hypercube-visibility-short-corridors-1
+
+CONTROLS
+- WASD: player movement in the chamber.
+- Shift: sprint.
+- C: toggle follow/free camera.
+- Free camera W/S: forward/back.
+- Free camera A/D: lateral.
+- Free camera R/F: vertical.
+- Free camera E/Q: W coordinate.
+- Mouse drag: look around in free camera.
+- Mouse wheel: adjust free-camera speed.
+- G: toggle geometry debug grid.
+
+WHAT TO VERIFY
+- The starting hypercube chamber shows a large cyan tesseract with thick glowing edges and 16 vertex markers.
+- The follow camera frames the tesseract rather than looking down at the player.
+- The tesseract changes shape continuously as it rotates in the XW plane.
+- Press C and use E/Q to inspect the projection at different W viewpoints.
+- The two anomaly corridors traverse in roughly four seconds at normal demo speed, depending on frame rate and input.
+- Both corridor routes still connect the hypercube chamber, Poincare chamber, and main world.
+
+The ZIP includes the previous project features. No migration is required for existing corridor descriptors: omitted intrinsicLengthScale defaults to 1.

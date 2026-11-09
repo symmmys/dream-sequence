@@ -1,0 +1,110 @@
+/** Slice-native ray tracing: Hamiltonian integration plus authoritative surface events. */
+
+import { ambientToSlice, assertVector4, dot4, sliceToAmbient } from './spatial-4d.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+import { createOpticalMetricField, spatialTransformMetricProvider } from './optical-metric.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+import { traceOpticalRay } from './optical-ray-integrator.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+
+const DEFAULT_SLICE_TOLERANCE = 1e-7;
+
+function createSliceOpticalField(slice, spatialTransform, options = {}) {
+    if (!slice?.id || !slice.frame) throw new TypeError('A registered WorldSlice is required for slice optics.');
+    if (!spatialTransform || typeof spatialTransform.metricAtWorld !== 'function') {
+        throw new TypeError('A slice SpatialTransform with metricAtWorld() is required.');
+    }
+    if (options.wCoupling !== undefined && options.wCoupling !== 0) {
+        throw new RangeError('Slice-native optical fields must constrain the slice-normal direction (wCoupling = 0).');
+    }
+    return createOpticalMetricField({
+        sliceFrame: slice.frame,
+        sliceMetricAt: spatialTransformMetricProvider(spatialTransform),
+        refractiveIndexAt: options.refractiveIndexAt ?? options.refractiveIndex ?? 1,
+        wCoupling: 0,
+        gradientStep: options.gradientStep,
+        containsPosition(position) {
+            const local = ambientToSlice(slice.frame, position).position;
+            return typeof spatialTransform.containsMetricDomainPosition !== 'function' ||
+                spatialTransform.containsMetricDomainPosition(local);
+        }
+    });
+}
+
+/**
+ * Trace within one 3D slice and stop at the first registered triangle or
+ * analytic heightfield hit. Every segment is queried in slice-local physical
+ * coordinates; render-space mesh projections are never consulted.
+ */
+function traceOpticalRayInSlice(field, sceneRegistry, sliceId, initialRay, options = {}) {
+    if (!field?.frame || typeof field.sample !== 'function') {
+        throw new TypeError('A slice OpticalMetricField is required.');
+    }
+    if (!sceneRegistry || typeof sceneRegistry.intersectSegment !== 'function') {
+        throw new TypeError('An OpticalSceneRegistry is required.');
+    }
+    if (typeof sliceId !== 'string' || !sliceId.trim()) throw new TypeError('A sliceId is required.');
+
+    const tolerance = options.sliceTolerance ?? DEFAULT_SLICE_TOLERANCE;
+    if (!Number.isFinite(tolerance) || tolerance <= 0) throw new RangeError('Slice tolerance must be positive and finite.');
+    assertVector4(initialRay?.position);
+    assertVector4(initialRay?.momentum);
+    const initialLocal = ambientToSlice(field.frame, initialRay.position);
+    if (Math.abs(initialLocal.normalOffset) > tolerance) {
+        throw new RangeError('Slice-native optical ray must begin on its registered 3D slice.');
+    }
+    const momentumMagnitude = Math.hypot(
+        initialRay.momentum.x, initialRay.momentum.y,
+        initialRay.momentum.z, initialRay.momentum.w
+    );
+    if (Math.abs(dot4(initialRay.momentum, field.frame.normal)) > tolerance * Math.max(1, momentumMagnitude)) {
+        throw new RangeError('Slice-native optical ray momentum must be tangent to its registered 3D slice.');
+    }
+    const callerEvent = options.segmentEvent;
+    const integrationOptions = { ...options };
+    delete integrationOptions.sliceTolerance;
+    delete integrationOptions.allowedChunkAddresses;
+    integrationOptions.segmentEvent = (segment) => {
+        const start = ambientToSlice(field.frame, segment.startPosition);
+        const end = ambientToSlice(field.frame, segment.endPosition);
+        if (Math.abs(start.normalOffset) > tolerance || Math.abs(end.normalOffset) > tolerance) {
+            throw new RangeError('Slice-native optical ray left its 3D slice.');
+        }
+        const hit = sceneRegistry.intersectSegment(sliceId, start.position, end.position, {
+            allowedChunkAddresses: options.allowedChunkAddresses,
+            minimumParameter: options.minimumHitParameter ?? 1e-7
+        });
+        const surfaceEvent = hit ? { ...hit, kind: 'surface-hit' } : null;
+        const topologyEvent = typeof callerEvent === 'function' ? callerEvent(segment) : null;
+        if (surfaceEvent && topologyEvent) {
+            return surfaceEvent.parameter <= topologyEvent.parameter ? surfaceEvent : topologyEvent;
+        }
+        return surfaceEvent ?? topologyEvent;
+    };
+
+    const result = traceOpticalRay(field, initialRay, integrationOptions);
+    if (result.event?.kind === 'surface-hit' && result.event.point) {
+        const ambientPosition = sliceToAmbient(field.frame, result.event.point);
+        result.finalState.position = ambientPosition;
+        result.event.ambientPosition = { ...ambientPosition };
+        const finalSample = result.samples[result.samples.length - 1];
+        if (finalSample) finalSample.position = { ...ambientPosition };
+        result.status = 'surface-hit';
+    }
+    result.sliceId = sliceId;
+    return result;
+}
+
+function createSliceOpticalTracer({ slice, spatialTransform, sceneRegistry, debugRenderer = null, metricOptions = {} }) {
+    const field = createSliceOpticalField(slice, spatialTransform, metricOptions);
+    return Object.freeze({
+        sliceId: slice.id,
+        field,
+        trace(initialRay, options = {}) {
+            const result = traceOpticalRayInSlice(field, sceneRegistry, slice.id, initialRay, options);
+            if (options.drawDebug && debugRenderer) {
+                debugRenderer.renderTrace(result, { slice, spatialTransform, ...options.debugStyle });
+            }
+            return result;
+        }
+    });
+}
+
+export { createSliceOpticalField, createSliceOpticalTracer, traceOpticalRayInSlice };

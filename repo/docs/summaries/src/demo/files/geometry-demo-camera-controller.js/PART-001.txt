@@ -1,0 +1,300 @@
+/** Switches between player-following and independent 3D/4D inspection views. */
+
+import { CharacterCameraController } from '../game/camera-controller.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { add4, ambientToSlice, dot4, scale4, sliceToAmbient } from '../world/fields/geometry/spatial-4d.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { SLICE_TRANSITION_ANOMALY } from '../world/fields/geometry/spatial-anomaly.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { evaluateAnomalyInfluence, resolveAnomalyInfluence } from '../world/fields/geometry/anomaly-influence-field.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+
+const CAMERA_BUILD = '2026-11-08-phase15-main-world-reentry-metric-grid-1';
+const MOVEMENT_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyR', 'KeyF', 'KeyE', 'KeyQ', 'ShiftLeft'];
+
+class GeometryDemoCameraController extends CharacterCameraController {
+    constructor(scene, camera, character, transform, playerController, options = {}) {
+        super(scene, camera, character, transform, options);
+        this.playerController = playerController;
+        this.traversal = null;
+        this.mode = 'follow';
+        this.freeKeys = new Set();
+        this.freePosition = null;
+        this.freeSliceId = null;
+        this.freeW = 0;
+        this.freeEntryLock = null;
+        this.freeTransit = null;
+        this.freeYaw = 0;
+        this.freePitch = 0;
+        this.lookYawOffset = 0;
+        this.lookPitchOffset = 0;
+        this.freeSpeed = options.freeSpeed ?? 18;
+        this.freeEntryDistance = options.freeEntryDistance ?? 14;
+        this.freeTransverseSpeed = options.freeTransverseSpeed ?? 7;
+        this.freeMouseSensitivity = options.freeMouseSensitivity ?? 0.0035;
+        this.freeDragging = false;
+        this.previousMouse = { x: 0, y: 0 };
+        this.onFreeKeyDown = this.handleFreeKeyDown.bind(this);
+        this.onFreeKeyUp = this.handleFreeKeyUp.bind(this);
+        this.onFreeBlur = this.handleFreeBlur.bind(this);
+        this.onFreePointerDown = this.handleFreePointerDown.bind(this);
+        this.onFreePointerMove = this.handleFreePointerMove.bind(this);
+        this.onFreePointerUp = this.handleFreePointerUp.bind(this);
+        window.addEventListener('keydown', this.onFreeKeyDown);
+        window.addEventListener('keyup', this.onFreeKeyUp);
+        window.addEventListener('blur', this.onFreeBlur);
+        this.canvas?.addEventListener('pointerdown', this.onFreePointerDown);
+        window.addEventListener('pointermove', this.onFreePointerMove);
+        window.addEventListener('pointerup', this.onFreePointerUp);
+        this.onModeChanged = options.onModeChanged ?? function ignoreModeChange() {};
+        console.info(`[GeometryDemoCamera] Build: ${CAMERA_BUILD}`);
+    }
+
+
+    setTraversalController(controller) {
+        this.traversal = controller;
+    }
+
+    setEnabled(enabled) {
+        if (!enabled && this.mode === 'free') this.setMode('follow');
+        super.setEnabled(enabled);
+        this.playerController?.setInputEnabled(this.mode !== 'free');
+        if (!enabled) this.freeKeys.clear();
+    }
+
+    toggleMode() {
+        return this.setMode(this.mode === 'follow' ? 'free' : 'follow');
+    }
+
+    setMode(mode) {
+        if (!['follow', 'free'].includes(mode)) throw new RangeError(`Unknown geometry camera mode: ${mode}`);
+        if (mode === this.mode) return this.mode;
+        if (mode === 'free' && (!this.enabled || this.disposed)) return this.mode;
+        if (mode === 'free') this.enterFreeMode();
+        else this.enterFollowMode();
+        this.mode = mode;
+        this.playerController?.setInputEnabled(mode !== 'free');
+        this.character.root?.setEnabled(mode !== 'free');
+        this.freeKeys.clear();
+        this.freeDragging = false;
+        this.onModeChanged(mode);
+        if (mode === 'follow' && this.enabled) super.setEnabled(true);
+        return this.mode;
+    }
+
+    enterFreeMode() {
+        this.lookYawOffset = 0;
+        this.lookPitchOffset = 0;
+        this.freePosition = copyVector(this.camera.position);
+        const forward = this.camera.getForwardRay().direction;
+        this.freeYaw = Math.atan2(forward.x, forward.z);
+        this.freePitch = Math.asin(clamp(forward.y, -1, 1));
+        const traversal = this.traversal;
+        this.freeSliceId = traversal?.state === 'transit'
+            ? traversal.startWorld.slice.id
+            : traversal?.currentSliceId ?? this.character.sliceId;
+        this.constrainFreePosition(traversal?.worlds.get(this.freeSliceId));
+        this.freeW = this.freeW || 0;
+        const world = traversal?.worlds.get(this.freeSliceId);
+        if (world) this.setSpatialContext(world.transform, world.layerMask);
+        this.freeTransit = traversal?.state === 'transit'
+            ? this.createTransitFromPlayer(traversal)
+            : null;
+        if (this.freeTransit) this.updateFreeTransitCamera();
+    }
+
+    enterFollowMode() {
+        const worldId = this.character.sliceId ?? this.traversal?.currentSliceId;
+        const world = this.traversal?.worlds.get(worldId);
+        if (world) this.setSpatialContext(world.transform, world.layerMask);
+        this.freeTransit = null;
+        this.freePosition = null;
+        this.freeSliceId = null;
+        this.freeW = 0;
+    }
+
+    setFreeView(position, target, sliceId, w = 0) {
+        this.freeSliceId = sliceId;
+        this.freeW = Number.isFinite(w) ? w : 0;
+        this.freePosition = copyVector(position);
+        const direction = normalize3(subtract3(target, position));
+        this.freeYaw = Math.atan2(direction.x, direction.z);
+        this.freePitch = Math.asin(clamp(direction.y, -1, 1));
+        const world = this.traversal?.worlds.get(sliceId);
+        if (world) {
+            this.setSpatialContext(world.transform, world.layerMask);
+            this.constrainFreePosition(world);
+        }
+        this.applyFreePose();
+    }
+
+    createTransitFromPlayer(traversal) {
+        const active = traversal.getActiveController?.() ?? traversal;
+        if (active.corridor?.type === SLICE_TRANSITION_ANOMALY) {
+            return {
+                type: SLICE_TRANSITION_ANOMALY,
+                controller: active,
+                anomaly: active.corridor,
+                corridor: active.corridor,
+                startWorld: active.startWorld,
+                targetWorld: active.target,
+                direction: active.direction,
+                progress: active.progress,
+                position4D: active.spatialPosition4D ? { ...active.spatialPosition4D } : null,
+                bounds: active.corridor.region
+            };
+        }
+        const length = active.corridorLength || traversal.corridorLength;
+        const lag = Math.min(0.18, (this.distance || 0) / length);
+        return {
+            type: 'bezier',
+            controller: active,
+            startWorld: active.startWorld,
+            targetWorld: active.target,
+            direction: active.direction,
+            progress: clamp(active.progress - lag, 0, 1),
+            offsetU: active.offsetU,
+            offsetV: active.offsetV,
+            offsetW: active.offsetW,
+            renderer: active.activeRenderer,
+            corridorLength: length
+        };
+    }
+
+    handleWheel(event) {
+        if (this.mode !== 'free') return super.handleWheel(event);
+        if (!this.enabled || this.disposed) return;
+        event.preventDefault();
+        this.freeSpeed = clamp(this.freeSpeed * Math.exp(-event.deltaY * 0.001), 2, 120);
+    }
+
+    handleFreeKeyDown(event) {
+        if (!this.enabled || this.disposed) return;
+        // Do not intercept browser shortcuts (notably Ctrl+R / Cmd+R).
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
+        if (event.code === 'KeyC' && !event.repeat) {
+            event.preventDefault();
+            this.toggleMode();
+            return;
+        }
+        if (this.mode !== 'free' || !MOVEMENT_KEYS.includes(event.code)) return;
+        this.freeKeys.add(event.code);
+        event.preventDefault();
+    }
+
+    handleFreeKeyUp(event) {
+        this.freeKeys.delete(event.code);
+    }
+
+    handleFreeBlur() {
+        this.freeKeys.clear();
+        this.freeDragging = false;
+    }
+
+    handleFreePointerDown(event) {
+        if (!this.enabled || this.mode !== 'free' || event.button !== 0) return;
+        this.freeDragging = true;
+        this.previousMouse = { x: event.clientX, y: event.clientY };
+        event.preventDefault();
+    }
+
+    handleFreePointerMove(event) {
+        if (!this.freeDragging || !this.enabled || this.mode !== 'free' || this.disposed) return;
+        const yawDelta = (event.clientX - this.previousMouse.x) * this.freeMouseSensitivity;
+        const pitchDelta = -(event.clientY - this.previousMouse.y) * this.freeMouseSensitivity;
+        if (this.freeTransit) {
+            this.lookYawOffset += yawDelta;
+            this.lookPitchOffset = clamp(this.lookPitchOffset + pitchDelta, -1.2, 1.2);
+        } else {
+            this.freeYaw += yawDelta;
+            this.freePitch = clamp(this.freePitch + pitchDelta, -1.48, 1.48);
+        }
+        this.previousMouse = { x: event.clientX, y: event.clientY };
+    }
+
+    handleFreePointerUp() {
+        this.freeDragging = false;
+    }
+
+    update(deltaSeconds) {
+        if (this.mode === 'follow') {
+            super.update(deltaSeconds);
+            return;
+        }
+        if (!this.enabled || this.disposed) return;
+        const delta = clamp(deltaSeconds, 0, 0.1);
+        const input = this.getFreeInput();
+        if (this.freeTransit?.type === SLICE_TRANSITION_ANOMALY) this.updateFreeAnomaly(delta, input);
+        else if (this.freeTransit) this.updateFreeTransit(delta, input);
+        else if (!this.tryEnterCorridor(input.forward)) this.updateFreeWorld(delta, input);
+    }
+
+    getFreeInput() {
+        return {
+            forward: keyAxis(this.freeKeys, 'KeyW', 'KeyS'),
+            strafe: keyAxis(this.freeKeys, 'KeyD', 'KeyA'),
+            vertical: keyAxis(this.freeKeys, 'KeyR', 'KeyF'),
+            crossSectionW: keyAxis(this.freeKeys, 'KeyE', 'KeyQ'),
+            sprint: this.freeKeys.has('ShiftLeft')
+        };
+    }
+
+    updateFreeWorld(delta, input) {
+        const speed = this.freeSpeed * (input.sprint ? 2 : 1);
+        const forward = this.getForwardVector();
+        const right = { x: Math.cos(this.freeYaw), y: 0, z: -Math.sin(this.freeYaw) };
+        const movement = add3(
+            add3(scale3(forward, input.forward), scale3(right, input.strafe)),
+            { x: 0, y: input.vertical, z: 0 }
+        );
+        const length = length3(movement);
+        if (length > 1e-9) {
+            const candidate = add3(
+                this.freePosition,
+                scale3(movement, speed * delta / Math.max(1, length))
+            );
+            this.freePosition = this.constrainFreePosition(
+                this.traversal?.worlds.get(this.freeSliceId), candidate
+            );
+        }
+        this.advanceFreeInfluenceMovement(delta, input, speed);
+        this.applyFreePose();
+    }
+
+    advanceFreeInfluenceMovement(delta, input, speed) {
+        if (!input.crossSectionW || !this.traversal || !this.freeSliceId) return false;
+        const world = this.traversal.worlds.get(this.freeSliceId);
+        const worldPosition = this.renderFreePositionToWorld(world);
+        if (!world || !worldPosition) return false;
+        const base = sliceToAmbient(world.slice.frame, worldPosition);
+        const current = add4(base, scale4(world.slice.frame.normal, this.freeW));
+        const routes = this.traversal.getRoutesForSlice?.(this.freeSliceId) ?? this.getLegacyRoute();
+        const candidates = routes.map((route) => {
+            const info = route.controller?.getInfluenceMovementInfo?.(current, input.crossSectionW, this.freeSliceId);
+            return info ? { route, info } : null;
+        }).filter(Boolean).sort((left, right) =>
+            right.info.movementScale - left.info.movementScale
+        );
+        if (!candidates.length) return false;
+
+        const { route, info } = candidates[0];
+        const amount = Math.sign(input.crossSectionW) * speed * delta * info.movementScale;
+        if (Math.abs(amount) <= 1e-10) return false;
+        const normal = world.slice.frame.normal;
+        let candidate = add4(current, scale4(normal, amount));
+        const nextPlane = dot4(candidate, normal);
+        const targetPlane = dot4(info.targetWorld.slice.frame.origin, normal);
+        const crossed = info.direction > 0
+            ? nextPlane >= targetPlane - 1e-8
+            : nextPlane <= targetPlane + 1e-8;
+
+        if (crossed) {
+            candidate = add4(candidate, scale4(normal, targetPlane - nextPlane));
+            const sourceLocal = ambientToSlice(world.slice.frame, candidate).position;
+            const targetLocal = ambientToSlice(info.targetWorld.slice.frame, candidate).position;
+            const graph = route.controller?.chunkGraph;
+            const sourceAddress = graph?.getAddress(this.freeSliceId, sourceLocal);
+            const targetAddress = graph?.getAddress(info.targetSliceId, targetLocal);
+            const reachability = sourceAddress && targetAddress
+                ? graph.getReachability(sourceAddress, targetAddress, {
+                    position4D: candidate, corridorId: info.anomalyId
+                }) : { reachable: true };
+            if (reachability.reachable) {
+                this.completeFreeInfluenceHandoff(info.targetWorld, candidate);
+                return true;

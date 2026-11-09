@@ -1,0 +1,10 @@
+        }
+    }
+
+    dispose() {
+        this.revision++;
+        this.disposeMesh();
+        this.loaded = false;
+        this.disposed = true;
+    }
+}

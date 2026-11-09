@@ -1,0 +1,243 @@
+            cloud.velocity.z * deltaTime * 0.5;
+    }
+
+    // ------------------------------------------
+    // CLOUD SIMULATION
+    // ------------------------------------------
+
+    update(deltaYears) {
+        if (this.disposed) return;
+
+        const deltaTime = Math.max(
+            0,
+            Math.min(deltaYears, 0.25)
+        );
+
+        this.elapsed += deltaTime;
+
+        this.pressureField.update(deltaTime);
+
+        let activeRainCloud = null;
+
+        for (const cloud of this.clouds) {
+            this.updateCloud(cloud, deltaTime);
+
+            if (
+                cloud.isRaining &&
+                (
+                    !activeRainCloud ||
+                    cloud.rainIntensity >
+                    activeRainCloud.rainIntensity
+                )
+            ) {
+                activeRainCloud = cloud;
+            }
+        }
+
+        this.rainingCloud = activeRainCloud;
+
+        if (activeRainCloud) {
+            const rainPosition =
+                activeRainCloud.position.clone();
+
+            rainPosition.y -= 10;
+
+            this.rainSystem.start(
+                rainPosition,
+                activeRainCloud.rainIntensity
+            );
+        } else {
+            this.rainSystem.stop();
+        }
+
+        this.renderAccumulator += deltaTime;
+
+        if (
+            this.renderDirty &&
+            this.renderAccumulator >=
+                this.renderInterval
+        ) {
+            this.updateRendering();
+
+            this.renderAccumulator = 0;
+        }
+    }
+
+    updateCloud(cloud, deltaTime) {
+        this.updateWind(cloud, deltaTime);
+
+        // Cache environmental sampling.
+        cloud.environmentSampleTimer -= deltaTime;
+
+        if (cloud.environmentSampleTimer <= 0) {
+            cloud.evaporationPotential =
+                BABYLON.Scalar.Clamp(
+                    this.waterSystem.getEvaporationPotential(
+                        cloud.position
+                    ),
+                    0,
+                    1
+                );
+
+            cloud.environmentSampleTimer = 1.0;
+        }
+
+        // Moisture accumulation.
+        if (!cloud.isRaining) {
+            cloud.waterContent +=
+                cloud.absorptionRate *
+                cloud.evaporationPotential *
+                deltaTime;
+        }
+
+        cloud.waterContent = Math.min(
+            cloud.waterContent,
+            cloud.maxWaterCapacity
+        );
+
+        // Precipitation threshold.
+        if (
+            cloud.waterContent >=
+            cloud.maxWaterCapacity
+        ) {
+            this.startRain(cloud);
+        }
+
+        // Rainfall duration.
+        if (cloud.isRaining) {
+            cloud.rainRemaining -= deltaTime;
+
+            if (cloud.rainRemaining <= 0) {
+                cloud.isRaining = false;
+                cloud.rainIntensity = 0;
+                cloud.rainRemaining = 0;
+            }
+        }
+
+        this.renderDirty = true;
+    }
+
+    startRain(cloud) {
+        cloud.isRaining = true;
+
+        cloud.rainRemaining =
+            cloud.rainDuration;
+
+        cloud.rainIntensity =
+            0.5 + cloud.moistureRatio * 1.5;
+
+        const releasedWater =
+            cloud.maxWaterCapacity * 0.45;
+
+        cloud.waterContent -= releasedWater;
+
+        const rainfallAmount =
+            0.25 * cloud.rainIntensity;
+
+        const rainfallRadius =
+            cloud.scale * 4;
+
+        this.hydrology.addRain(
+            cloud.position,
+            rainfallRadius,
+            rainfallAmount
+        );
+    }
+
+    // ------------------------------------------
+    // RENDERING
+    // ------------------------------------------
+
+    updateRendering(force = false) {
+        if (
+            !force &&
+            !this.renderDirty
+        ) {
+            return;
+        }
+
+        this.renderer.clear();
+
+        for (const cloud of this.clouds) {
+            const localMatrices =
+                cloud.geometryMatrices;
+
+            if (!localMatrices) continue;
+
+            const worldMatrices = [];
+
+            for (const localMatrix of localMatrices) {
+                const matrix = localMatrix.clone();
+
+                // Translate the local formation into
+                // its current world position.
+                matrix.m[12] += cloud.position.x;
+                matrix.m[13] += cloud.position.y;
+                matrix.m[14] += cloud.position.z;
+
+                worldMatrices.push(matrix);
+            }
+
+            this.renderer.addCloud(
+                worldMatrices,
+                cloud.moistureRatio,
+                cloud.speciesName,
+                cloud.position
+            );
+        }
+
+        this.renderer.update();
+
+        this.renderDirty = false;
+    }
+
+    // ------------------------------------------
+    // DIAGNOSTICS
+    // ------------------------------------------
+
+    getStats() {
+        const speciesCounts = {
+            cumulus: 0,
+            towering: 0,
+            cumulonimbus: 0
+        };
+
+        for (const cloud of this.clouds) {
+            speciesCounts[cloud.speciesName]++;
+        }
+
+        return {
+            totalClouds: this.clouds.length,
+            speciesCounts,
+            weatherRegions: this.weatherCells.size,
+            rainingClouds: this.clouds.filter(
+                cloud => cloud.isRaining
+            ).length,
+            averageWindSpeed:
+                this.clouds.length
+                    ? this.clouds.reduce(
+                        (sum, cloud) =>
+                            sum + cloud.velocity.length(),
+                        0
+                    ) / this.clouds.length
+                    : 0
+        };
+    }
+
+    dispose() {
+        if (this.disposed) return;
+
+        this.disposed = true;
+
+        this.rainSystem.stop();
+
+        this.renderer.mesh.dispose();
+
+        this.clouds.length = 0;
+
+        this.weatherCells.clear();
+    }
+}
+
+export { CloudSystem };
+

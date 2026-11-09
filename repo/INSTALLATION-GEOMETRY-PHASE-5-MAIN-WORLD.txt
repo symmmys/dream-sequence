@@ -1,0 +1,37 @@
+SOMNIUM — GEOMETRY PHASE 5: MAIN-WORLD CORRIDOR CONNECTION
+
+RECOMMENDED INSTALLATION
+
+1. Back up the current Somnium working directory.
+2. Extract somnium_geometry_phase5_main_world_project.zip into a new directory.
+3. Confirm that index.html is in the directory from which you start the server.
+4. Start the local server:
+
+   python3 -m http.server 8081 --bind 127.0.0.1
+
+5. Open or hard-refresh:
+
+   http://127.0.0.1:8081/
+
+The build identifier for this update is:
+
+   2026-11-07-main-world-corridor-1
+
+EXPECTED BEHAVIOR
+
+- Enter GEOMETRY DEMO.
+- The source room and its Poincare grid remain in their separate slice.
+- The corridor label identifies SOMNIUM MAIN WORLD as the destination.
+- The live main-world WorldManager streams the chunk at the anomaly exit while the demo is active.
+- Enter the corridor and continue forward to emerge on the main world's sampled terrain near world origin.
+- The reverse mouth permits return traversal.
+
+PATCH INSTALLATION
+
+The replacement patch contains paths relative to the project root. Back up the current project, then extract the patch into that root while preserving directory structure. The complete project archive is preferred because it avoids merging files from older builds.
+
+TROUBLESHOOTING
+
+If the console does not show the build identifier above, the browser is not running this build. Stop any old local server, ensure the server's working directory contains this archive's index.html, restart the server, and hard-refresh with caching disabled.
+
+The automated suite passes, but a real browser/WebGL traversal session is still required to confirm visual presentation and user-facing movement in the local browser.

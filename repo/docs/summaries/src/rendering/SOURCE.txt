@@ -1,0 +1,827 @@
+SOMNIUM — DIRECTORY SOURCE DUMP
+========================================================================
+
+Directory: src/rendering/
+Generated: 2026-11-09T03:15:29
+
+This file contains recursively collected UTF-8 text files.
+Binary files and excluded directories are omitted.
+File paths are relative to the project root.
+
+
+========================================================================
+FILE: src/rendering/adaptive-graphics-controller.js
+========================================================================
+
+
+export class AdaptiveGraphicsController {
+    constructor(engine, camera, world, options = {}) {
+        this.engine = engine;
+        this.camera = camera;
+        this.world = world;
+
+        this.targetFPS = options.targetFPS ?? 55;
+        this.minimumFPS = options.minimumFPS ?? 35;
+
+        this.profiles = {
+            low: {
+                radius: 7,
+                detailRadius: 1,
+                generationBudget: 3,
+                hardwareScale: 1.5
+            },
+
+            medium: {
+                radius: 14,
+                detailRadius: 2,
+                generationBudget: 6,
+                hardwareScale: 1.0
+            },
+
+            high: {
+                radius: 18,
+                detailRadius: 2,
+                generationBudget: 8,
+                hardwareScale: 0.85
+            }
+        };
+
+        this.profileName = this.detectInitialProfile();
+
+        this.fpsHistory = [];
+        this.historyLimit = 30;
+
+        this.elapsed = 0;
+        this.lowFPSDuration = 0;
+        this.highFPSDuration = 0;
+
+        this.setProfile(this.profileName);
+
+        console.log(
+            "[Graphics] Initialized:",
+            this.getStats()
+        );
+    }
+
+    detectInitialProfile() {
+        const cores = navigator.hardwareConcurrency || 4;
+        const memory = navigator.deviceMemory || 4;
+
+        const mobile =
+            /Android|iPhone|iPad|iPod/i.test(
+                navigator.userAgent
+            );
+
+        if (cores <= 2 || memory <= 2) {
+            return "low";
+        }
+
+        if (
+            cores >= 8 &&
+            memory >= 8 &&
+            !mobile
+        ) {
+            return "high";
+        }
+
+        return "medium";
+    }
+
+    setProfile(name) {
+        const profile = this.profiles[name];
+
+        if (!profile) return;
+
+        this.profileName = name;
+
+        this.world.renderRadius = profile.radius;
+
+        this.world.highDetailRadius =
+            profile.detailRadius;
+
+        this.world.maxChunksPerUpdate =
+            profile.generationBudget;
+
+        this.camera.maxZ =
+            this.world.chunkSize *
+            (profile.radius + 3) * 2;
+
+        this.engine.setHardwareScalingLevel(
+            profile.hardwareScale
+        );
+
+        console.log("[Graphics] Profile:", name);
+    }
+
+    getAverageFPS() {
+        if (!this.fpsHistory.length) {
+            return this.engine.getFps();
+        }
+
+        return this.fpsHistory.reduce(
+            (sum, fps) => sum + fps,
+            0
+        ) / this.fpsHistory.length;
+    }
+
+    update(deltaSeconds) {
+        this.elapsed += deltaSeconds;
+
+        if (this.elapsed < 2) return;
+
+        const elapsed = this.elapsed;
+        this.elapsed = 0;
+
+        const fps = this.engine.getFps();
+
+        if (Number.isFinite(fps) && fps > 0) {
+            this.fpsHistory.push(fps);
+
+            if (this.fpsHistory.length > this.historyLimit) {
+                this.fpsHistory.shift();
+            }
+        }
+
+        const average = this.getAverageFPS();
+
+        if (average < this.minimumFPS) {
+            this.lowFPSDuration += elapsed;
+            this.highFPSDuration = 0;
+        } else if (average > this.targetFPS) {
+            this.highFPSDuration += elapsed;
+            this.lowFPSDuration = 0;
+        } else {
+            this.lowFPSDuration = Math.max(
+                0,
+                this.lowFPSDuration - elapsed
+            );
+
+            this.highFPSDuration = 0;
+        }
+
+        if (this.lowFPSDuration >= 6) {
+            if (this.profileName === "high") {
+                this.setProfile("medium");
+            } else if (this.profileName === "medium") {
+                this.setProfile("low");
+            }
+
+            this.lowFPSDuration = 0;
+            this.highFPSDuration = 0;
+        }
+
+        if (this.highFPSDuration >= 25) {
+            if (this.profileName === "low") {
+                this.setProfile("medium");
+            } else if (this.profileName === "medium") {
+                this.setProfile("high");
+            }
+
+            this.highFPSDuration = 0;
+            this.lowFPSDuration = 0;
+        }
+    }
+
+    getStats() {
+        return {
+            profile: this.profileName,
+            renderRadius: this.world.renderRadius,
+            averageFPS: Math.round(this.getAverageFPS()),
+            targetFPS: this.targetFPS,
+            minimumFPS: this.minimumFPS
+        };
+    }
+
+    dispose() {
+        this.fpsHistory.length = 0;
+    }
+}
+
+
+========================================================================
+FILE: src/rendering/cloud-renderer.js
+========================================================================
+
+import { ThinInstanceRenderer } from "./thin-instance-renderer.js";
+
+class CloudRenderer extends ThinInstanceRenderer {
+    constructor(scene) {
+        const mesh = BABYLON.MeshBuilder.CreateSphere(
+            "cloudPrototype",
+            {
+                diameter: 1,
+                segments: 10
+            },
+            scene
+        );
+
+        const material = new BABYLON.StandardMaterial(
+            "cloudMaterial",
+            scene
+        );
+
+        material.diffuseColor =
+            BABYLON.Color3.White();
+
+        material.emissiveColor =
+            new BABYLON.Color3(
+                0.035,
+                0.035,
+                0.045
+            );
+
+        material.specularColor =
+            BABYLON.Color3.Black();
+
+        material.useVertexColor = true;
+        material.useVertexAlpha = false;
+
+        material.backFaceCulling = false;
+
+        mesh.material = material;
+        mesh.isPickable = false;
+
+        super(scene, "clouds", mesh, null);
+
+        this.instanceColors = [];
+
+        this.cloudCount = 0;
+    }
+
+    clear() {
+        super.clear();
+
+        this.instanceColors.length = 0;
+        this.cloudCount = 0;
+    }
+
+    getCloudColor(
+        speciesName,
+        moistureRatio = 0,
+        relativeHeight = 0.5
+    ) {
+        const moisture = BABYLON.Scalar.Clamp(
+            moistureRatio,
+            0,
+            1
+        );
+
+        let color;
+
+        switch (speciesName) {
+            case "cumulonimbus":
+                color = BABYLON.Color3.Lerp(
+                    new BABYLON.Color3(
+                        0.24, 0.29, 0.39
+                    ),
+                    new BABYLON.Color3(
+                        0.89, 0.92, 0.98
+                    ),
+                    BABYLON.Scalar.Clamp(
+                        relativeHeight,
+                        0,
+                        1
+                    )
+                );
+                break;
+
+            case "towering":
+                color = new BABYLON.Color3(
+                    0.82, 0.87, 0.95
+                );
+                break;
+
+            default:
+                color = new BABYLON.Color3(
+                    0.98, 0.99, 1.0
+                );
+                break;
+        }
+
+        // Saturated clouds become darker.
+        const brightness =
+            1.0 - moisture * 0.30;
+
+        color.scaleInPlace(brightness);
+
+        return color;
+    }
+
+    addMatrix(
+        matrix,
+        speciesName = "cumulus",
+        moistureRatio = 0,
+        relativeHeight = 0.5
+    ) {
+        super.addMatrix(matrix);
+
+        const color = this.getCloudColor(
+            speciesName,
+            moistureRatio,
+            relativeHeight
+        );
+
+        this.instanceColors.push(
+            color.r,
+            color.g,
+            color.b,
+            1.0
+        );
+
+        this.cloudCount++;
+    }
+
+    addCloud(
+        matrices,
+        moistureRatio = 0,
+        speciesName = "cumulus",
+        cloudPosition = null
+    ) {
+        for (const matrix of matrices) {
+            const position = matrix.getTranslation();
+
+            const relativeHeight = cloudPosition
+                ? BABYLON.Scalar.Clamp(
+                    (position.y - cloudPosition.y) /
+                    Math.max(1, 1500),
+                    0,
+                    1
+                )
+                : 0.5;
+
+            this.addMatrix(
+                matrix,
+                speciesName,
+                moistureRatio,
+                relativeHeight
+            );
+        }
+    }
+
+    addMatrices(matrices) {
+        this.addCloud(matrices);
+    }
+
+    update() {
+        // Transform and upload instance matrices.
+        super.update();
+
+        const expectedColorLength =
+            this.matrices.length * 4;
+
+        if (this.instanceColors.length !== expectedColorLength) {
+            console.warn(
+                "[CloudRenderer] Instance color buffer mismatch:",
+                {
+                    matrices: this.matrices.length,
+                    colors: this.instanceColors.length / 4
+                }
+            );
+
+            return;
+        }
+
+        const colors = new Float32Array(
+            this.instanceColors
+        );
+
+        this.mesh.thinInstanceSetBuffer(
+            "color",
+            colors,
+            4,
+            true
+        );
+
+        this.mesh.thinInstanceRefreshBoundingInfo(true);
+    }
+}
+
+export { CloudRenderer };
+
+
+========================================================================
+FILE: src/rendering/rock-renderer.js
+========================================================================
+
+import { ThinInstanceRenderer } from "./thin-instance-renderer.js";
+class RockRenderer extends ThinInstanceRenderer {
+
+    constructor(scene, shadowGenerator) {
+
+        const mesh = BABYLON.MeshBuilder.CreateSphere(
+            "rockPrototype",
+            {
+                diameter: 1,
+                segments: 2
+            },
+            scene
+        );
+
+        const material = new BABYLON.StandardMaterial(
+            "rockMaterial",
+            scene
+        );
+
+        material.diffuseColor =
+            new BABYLON.Color3(0.38, 0.36, 0.32);
+
+        material.specularColor =
+            new BABYLON.Color3(0.08, 0.08, 0.08);
+
+        mesh.material = material;
+
+        super(
+            scene,
+            "rocks",
+            mesh,
+            shadowGenerator
+        );
+
+    }
+
+}
+export { RockRenderer }
+
+
+========================================================================
+FILE: src/rendering/surface-deposit-renderer.js
+========================================================================
+
+import { DirectionRotation } from "../ecology/tree-generator.js";
+
+class SurfaceDepositRenderer {
+
+    constructor(scene, speciesName, color) {
+
+        this.scene = scene;
+
+        this.speciesName = speciesName;
+
+        this.mesh = BABYLON.MeshBuilder.CreateCylinder(
+            "surface_" + speciesName,
+            {
+                height: 1,
+                diameter: 2,
+                tessellation: 16
+            },
+            scene
+        );
+
+        this.mesh.position.y = -10000;
+
+        this.mesh.computeWorldMatrix(true);
+
+        this.inverseMeshWorld =
+            this.mesh.getWorldMatrix().clone();
+
+        this.inverseMeshWorld.invert();
+
+
+        const material = new BABYLON.StandardMaterial(
+            "surfaceMaterial_" + speciesName,
+            scene
+        );
+
+        material.diffuseColor = color.clone();
+
+        material.specularColor =
+            new BABYLON.Color3(0, 0, 0);
+
+        material.roughness = 1;
+
+        this.mesh.material = material;
+
+        this.mesh.receiveShadows = true;
+
+        this.matrices = [];
+
+        this.buffer = null;
+
+    }
+
+
+    clear() {
+
+        this.matrices.length = 0;
+
+    }
+
+
+addPatch(
+    position,
+    radiusX,
+    radiusZ,
+    rotation = 0,
+    thickness = 0.04,
+    normal = BABYLON.Axis.Y
+) {
+        const scale = new BABYLON.Vector3(
+            radiusX,
+            thickness,
+            radiusZ
+        );
+
+const up = normal.normalize();
+
+const yaw = BABYLON.Quaternion.RotationAxis(
+    up,
+    rotation
+);
+
+	const align = DirectionRotation(normal);
+
+
+const quaternion = align.multiply(yaw);
+
+	const center = position.add(
+		normal.normalize().scale(thickness * 0.5)
+	);
+
+        const matrix = BABYLON.Matrix.Compose(
+            scale,
+            quaternion,
+            center
+        );
+
+        this.matrices.push(matrix);
+
+    }
+
+
+    update() {
+
+        const requiredSize =
+            this.matrices.length * 16;
+
+        if (
+            !this.buffer ||
+            this.buffer.length < requiredSize
+        ) {
+
+            this.buffer = new Float32Array(
+                Math.max(
+                    requiredSize,
+                    this.buffer
+                        ? this.buffer.length * 2
+                        : 1024
+                )
+            );
+
+        }
+
+
+        for (
+            let i = 0;
+            i < this.matrices.length;
+            i++
+        ) {
+
+            const localMatrix =
+                this.matrices[i].multiply(
+                    this.inverseMeshWorld
+                );
+
+            localMatrix.copyToArray(
+                this.buffer,
+                i * 16
+            );
+
+        }
+
+
+        this.mesh.thinInstanceSetBuffer(
+            "matrix",
+            this.buffer.subarray(
+                0,
+                requiredSize
+            ),
+            16,
+            true
+        );
+
+        this.mesh.thinInstanceRefreshBoundingInfo(true);
+
+    }
+
+}
+export { SurfaceDepositRenderer }
+
+
+========================================================================
+FILE: src/rendering/thin-instance-renderer.js
+========================================================================
+
+
+class ThinInstanceRenderer {
+    constructor(scene, name, mesh, shadowGenerator) {
+        this.scene = scene;
+        this.mesh = mesh;
+        this.matrices = [];
+        this.buffer = null;
+
+        this.localMatrix = BABYLON.Matrix.Identity();
+
+        this.mesh.position.y = -10000;
+        this.mesh.computeWorldMatrix(true);
+
+        this.inverseMeshWorld =
+            this.mesh.getWorldMatrix().clone();
+
+        this.inverseMeshWorld.invert();
+
+        this.mesh.isPickable = false;
+
+        if (shadowGenerator) {
+            shadowGenerator.addShadowCaster(
+                this.mesh,
+                true
+            );
+        }
+    }
+
+    clear() {
+        this.matrices.length = 0;
+    }
+
+    addMatrix(matrix) {
+        this.matrices.push(matrix);
+    }
+
+    addMatrices(matrices) {
+        this.matrices.push(...matrices);
+    }
+
+    add(
+        position,
+        scale,
+        rotation = BABYLON.Quaternion.Identity()
+    ) {
+        const matrix = BABYLON.Matrix.Compose(
+            new BABYLON.Vector3(scale, scale, scale),
+            rotation,
+            position
+        );
+
+        this.matrices.push(matrix);
+    }
+
+    update() {
+        const geometryRenderer =
+            this.scene.metadata?.geometryRenderer;
+
+        const capacity = this.matrices.length * 16;
+
+        // Retain buffer capacity between updates.
+        if (
+            !this.buffer ||
+            this.buffer.length < capacity
+        ) {
+            this.buffer = new Float32Array(
+                Math.max(1024, capacity)
+            );
+        }
+
+        let writeIndex = 0;
+
+        for (
+            let i = 0;
+            i < this.matrices.length;
+            i++
+        ) {
+            const sourceMatrix = this.matrices[i];
+
+            if (!sourceMatrix || !sourceMatrix.m) {
+                continue;
+            }
+
+            // Validate directly without allocating an array.
+            const values = sourceMatrix.m;
+            let valid = true;
+
+            for (let j = 0; j < 16; j++) {
+                if (!Number.isFinite(values[j])) {
+                    valid = false;
+                    break;
+                }
+            }
+
+            if (!valid) continue;
+
+            const transformedMatrix =
+                geometryRenderer
+                    ? geometryRenderer.transformInstanceMatrix(
+                        sourceMatrix
+                    )
+                    : sourceMatrix;
+
+            if (!transformedMatrix) continue;
+
+            transformedMatrix.multiplyToRef(
+                this.inverseMeshWorld,
+                this.localMatrix
+            );
+
+            this.localMatrix.copyToArray(
+                this.buffer,
+                writeIndex * 16
+            );
+
+            writeIndex++;
+        }
+
+        const requiredSize = writeIndex * 16;
+
+        this.mesh.thinInstanceSetBuffer(
+            "matrix",
+            this.buffer.subarray(0, requiredSize),
+            16,
+            true
+        );
+
+        this.mesh.thinInstanceRefreshBoundingInfo(true);
+    }
+}
+
+export { ThinInstanceRenderer };
+
+
+========================================================================
+FILE: src/rendering/tree-renderers.js
+========================================================================
+
+import { ThinInstanceRenderer } from "./thin-instance-renderer.js";
+
+// Compatibility wrapper for existing tree code.
+
+class TreeRenderer extends ThinInstanceRenderer {
+
+    constructor(scene, name, shadowGenerator) {
+
+        const mesh = BABYLON.MeshBuilder.CreateCylinder(
+            name,
+            {
+                height: 1,
+                diameterBottom: 1,
+                diameterTop: 0.55,
+                tessellation: 8
+            },
+            scene
+        );
+
+        super(
+            scene,
+            name,
+            mesh,
+            shadowGenerator
+        );
+
+    }
+
+}
+
+
+// Compatibility wrapper for foliage.
+
+class FoliageRenderer extends ThinInstanceRenderer {
+
+    constructor(scene, name, color, shadowGenerator) {
+
+        const mesh = BABYLON.MeshBuilder.CreateSphere(
+            name,
+            {
+                diameter: 1,
+                segments: 2
+            },
+            scene
+        );
+
+        const material = new BABYLON.StandardMaterial(
+            name + "Material",
+            scene
+        );
+
+        material.diffuseColor = color;
+
+        material.specularColor =
+            new BABYLON.Color3(0.05, 0.05, 0.05);
+
+        mesh.material = material;
+
+        super(
+            scene,
+            name,
+            mesh,
+            shadowGenerator
+        );
+
+    }
+
+}
+export { TreeRenderer, FoliageRenderer }
+
+
+========================================================================
+END OF DIRECTORY SOURCE DUMP
+Files included: 6
+Binary/unreadable files skipped: 0
+========================================================================

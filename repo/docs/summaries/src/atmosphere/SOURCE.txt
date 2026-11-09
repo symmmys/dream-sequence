@@ -1,0 +1,975 @@
+SOMNIUM — DIRECTORY SOURCE DUMP
+========================================================================
+
+Directory: src/atmosphere/
+Generated: 2026-11-09T03:15:29
+
+This file contains recursively collected UTF-8 text files.
+Binary files and excluded directories are omitted.
+File paths are relative to the project root.
+
+
+========================================================================
+FILE: src/atmosphere/air-pressure-field.js
+========================================================================
+
+
+class AirPressureField {
+    constructor(options = {}) {
+        this.time = 0;
+
+        this.spatialScale = options.spatialScale ?? 100000;
+
+        this.gradientStep = options.gradientStep ?? 5000;
+
+        this.windStrength = options.windStrength ?? 0.85;
+
+        this.maxWindSpeed = options.maxWindSpeed ?? 1.1;
+
+        this.prevailingWind = new BABYLON.Vector3(
+            0.28,
+            0,
+            0.12
+        );
+
+        this.wind = new BABYLON.Vector3();
+    }
+
+    update(deltaTime) {
+        this.time += Math.max(0, deltaTime);
+    }
+
+    pressureAt(x, z, time = this.time) {
+        const scale = this.spatialScale;
+
+        const px = x / scale;
+        const pz = z / scale;
+
+        const wave1 = Math.sin(
+            px * 0.85 +
+            pz * 0.38 +
+            time * 0.018
+        );
+
+        const wave2 = Math.cos(
+            pz * 0.72 -
+            px * 0.31 -
+            time * 0.012
+        );
+
+        const wave3 = Math.sin(
+            (px + pz) * 0.42 +
+            time * 0.009
+        );
+
+        return (
+            wave1 * 0.42 +
+            wave2 * 0.34 +
+            wave3 * 0.24
+        );
+    }
+
+    sample(position, time = this.time) {
+        const x = position.x;
+        const z = position.z;
+        const h = this.gradientStep;
+
+        const pressure = this.pressureAt(
+            x,
+            z,
+            time
+        );
+
+        // Estimate the horizontal pressure gradient.
+        const gradientX = (
+            this.pressureAt(x + h, z, time) -
+            this.pressureAt(x - h, z, time)
+        ) / (2 * h);
+
+        const gradientZ = (
+            this.pressureAt(x, z + h, time) -
+            this.pressureAt(x, z - h, time)
+        ) / (2 * h);
+
+        // Air flows approximately from higher pressure
+        // toward lower pressure.
+        let windX =
+            -gradientX *
+            this.spatialScale *
+            this.windStrength;
+
+        let windZ =
+            -gradientZ *
+            this.spatialScale *
+            this.windStrength;
+
+        windX += this.prevailingWind.x;
+        windZ += this.prevailingWind.z;
+
+        const magnitude = Math.hypot(
+            windX,
+            windZ
+        );
+
+        if (magnitude > this.maxWindSpeed) {
+            const factor =
+                this.maxWindSpeed / magnitude;
+
+            windX *= factor;
+            windZ *= factor;
+        }
+
+        this.wind.set(
+            windX,
+            0,
+            windZ
+        );
+
+        return {
+            pressure,
+            wind: this.wind.clone()
+        };
+    }
+
+    getStats(position) {
+        const sample = this.sample(position);
+
+        return {
+            pressure: sample.pressure,
+            windSpeed: sample.wind.length(),
+            windDirection: sample.wind.clone().normalize()
+        };
+    }
+}
+
+export { AirPressureField };
+
+
+========================================================================
+FILE: src/atmosphere/cloud-generator.js
+========================================================================
+
+
+class CloudGenerator {
+    constructor(config) {
+        this.config = config;
+    }
+
+    createRandom(seed = 91827) {
+        let state = seed >>> 0;
+
+        return () => {
+            state = (
+                Math.imul(state, 1664525) +
+                1013904223
+            ) >>> 0;
+
+            return state / 4294967296;
+        };
+    }
+
+    generate(
+        position,
+        scale,
+        maxDepth = 2,
+        seed = 91827
+    ) {
+        const matrices = [];
+        const random = this.createRandom(seed);
+
+        this.generateRecursive(
+            position.clone(),
+            scale,
+            maxDepth,
+            0,
+            random,
+            matrices
+        );
+
+        return matrices;
+    }
+
+    generateRecursive(
+        position,
+        scale,
+        maxDepth,
+        currentDepth,
+        random,
+        matrices
+    ) {
+        const config = this.config;
+        const irregularity = config.irregularity;
+
+        const dimensions = new BABYLON.Vector3(
+            scale * config.width *
+                (0.80 + random() * irregularity),
+            scale * config.height *
+                (0.80 + random() * irregularity),
+            scale * config.depth *
+                (0.80 + random() * irregularity)
+        );
+
+        const rotation =
+            BABYLON.Quaternion.RotationYawPitchRoll(
+                random() * 0.35,
+                (random() - 0.5) * 0.22,
+                (random() - 0.5) * 0.22
+            );
+
+        matrices.push(
+            BABYLON.Matrix.Compose(
+                dimensions,
+                rotation,
+                position
+            )
+        );
+
+        if (currentDepth >= maxDepth) {
+            return;
+        }
+
+        for (
+            let i = 0;
+            i < config.branchCount;
+            i++
+        ) {
+            const angle = random() * Math.PI * 2;
+
+            const horizontal =
+                scale *
+                config.horizontalSpread *
+                (0.45 + random() * 0.75);
+
+            const vertical =
+                scale * config.verticalSpread;
+
+            let verticalOffset =
+                (random() * 2 - 1) * vertical;
+
+            if (config.height > 2) {
+                verticalOffset =
+                    verticalOffset * 0.45 +
+                    Math.abs(verticalOffset) * 0.75;
+            }
+
+            const offset = new BABYLON.Vector3(
+                Math.cos(angle) * horizontal,
+                verticalOffset,
+                Math.sin(angle) * horizontal
+            );
+
+            const childPosition =
+                position.add(offset);
+
+            const childScale =
+                scale *
+                config.scaleDecay *
+                (0.78 + random() * 0.38);
+
+            this.generateRecursive(
+                childPosition,
+                childScale,
+                maxDepth,
+                currentDepth + 1,
+                random,
+                matrices
+            );
+        }
+    }
+}
+
+export { CloudGenerator };
+
+
+========================================================================
+FILE: src/atmosphere/cloud-species.js
+========================================================================
+
+
+const CloudSpecies = {
+    cumulus: {
+        scale: 220,
+        recursionDepth: 1,
+        branchCount: 5,
+        scaleDecay: 0.68,
+        horizontalSpread: 1.05,
+        verticalSpread: 0.24,
+        irregularity: 0.30,
+        width: 1.65,
+        height: 0.75,
+        depth: 1.45,
+        moistureCapacity: 100,
+        absorptionRate: 16,
+        rainDuration: 1.5,
+        color: new BABYLON.Color3(
+            0.98, 0.99, 1.0
+        )
+    },
+
+    towering: {
+        scale: 440,
+        recursionDepth: 2,
+        branchCount: 4,
+        scaleDecay: 0.70,
+        horizontalSpread: 0.85,
+        verticalSpread: 0.65,
+        irregularity: 0.42,
+        width: 1.45,
+        height: 1.65,
+        depth: 1.35,
+        moistureCapacity: 150,
+        absorptionRate: 24,
+        rainDuration: 2.5,
+        color: new BABYLON.Color3(
+            0.91, 0.94, 0.98
+        )
+    },
+
+    cumulonimbus: {
+        scale: 820,
+        recursionDepth: 2,
+        branchCount: 5,
+        scaleDecay: 0.72,
+        horizontalSpread: 0.78,
+        verticalSpread: 1.05,
+        irregularity: 0.48,
+        width: 1.35,
+        height: 2.45,
+        depth: 1.35,
+        moistureCapacity: 200,
+        absorptionRate: 36,
+        rainDuration: 5.0,
+        color: new BABYLON.Color3(
+            0.63, 0.69, 0.79
+        )
+    }
+};
+
+export { CloudSpecies };
+
+
+========================================================================
+FILE: src/atmosphere/cloud-system.js
+========================================================================
+
+
+import { Cloud } from "./cloud.js";
+
+import { CloudSpecies } from "./cloud-species.js";
+
+import { CloudGenerator } from "./cloud-generator.js";
+
+import { AirPressureField } from "./air-pressure-field.js";
+
+import { CloudRenderer } from "../rendering/cloud-renderer.js";
+
+
+class CloudSystem {
+    constructor(
+        scene,
+        terrain,
+        waterSystem,
+        hydrology,
+        rainSystem
+    ) {
+        this.scene = scene;
+
+        this.terrain = terrain;
+        this.waterSystem = waterSystem;
+        this.hydrology = hydrology;
+        this.rainSystem = rainSystem;
+
+        this.clouds = [];
+
+        this.renderer = new CloudRenderer(scene);
+
+        this.maxClouds = 100;
+
+        this.rainingCloud = null;
+
+        // Atmospheric circulation.
+        this.pressureField = new AirPressureField();
+
+        this.elapsed = 0;
+
+        // Regional weather classification.
+        this.weatherCellSize = 100000;
+
+        this.weatherCells = new Map();
+
+        // Rendering update frequency.
+        this.renderAccumulator = 0;
+        this.renderInterval = 0.4;
+
+        this.renderDirty = false;
+
+        this.disposed = false;
+    }
+
+    // ------------------------------------------
+    // REGIONAL WEATHER
+    // ------------------------------------------
+
+    getWeatherCellKey(x, z) {
+        const cx = Math.floor(
+            x / this.weatherCellSize
+        );
+
+        const cz = Math.floor(
+            z / this.weatherCellSize
+        );
+
+        return `${cx},${cz}`;
+    }
+
+    getWeatherRegime(position) {
+        const key = this.getWeatherCellKey(
+            position.x,
+            position.z
+        );
+
+        if (this.weatherCells.has(key)) {
+            return this.weatherCells.get(key);
+        }
+
+        const centerX =
+            (Math.floor(
+                position.x / this.weatherCellSize
+            ) + 0.5) * this.weatherCellSize;
+
+        const centerZ =
+            (Math.floor(
+                position.z / this.weatherCellSize
+            ) + 0.5) * this.weatherCellSize;
+
+        const center = new BABYLON.Vector3(
+            centerX,
+            position.y,
+            centerZ
+        );
+
+        const atmospheric =
+            this.pressureField.sample(center);
+
+        const moisture = BABYLON.Scalar.Clamp(
+            this.waterSystem.getEvaporationPotential(
+                center
+            ),
+            0,
+            1
+        );
+
+        // Lower pressure favors rising air.
+        // Moisture is required for deep convection.
+        const instability = BABYLON.Scalar.Clamp(
+            0.5 - atmospheric.pressure,
+            0,
+            1
+        );
+
+        let regime = "stable";
+
+        if (
+            moisture >= 0.58 &&
+            atmospheric.pressure <= -0.12 &&
+            instability >= 0.62
+        ) {
+            regime = "storm";
+        } else if (
+            moisture >= 0.36 &&
+            atmospheric.pressure <= 0.20
+        ) {
+            regime = "convective";
+        }
+
+        this.weatherCells.set(key, regime);
+
+        return regime;
+    }
+
+    selectSpecies(regime, random = Math.random) {
+        const value = random();
+
+        switch (regime) {
+            case "storm":
+                if (value < 0.20) {
+                    return "cumulus";
+                }
+
+                if (value < 0.80) {
+                    return "towering";
+                }
+
+                return "cumulonimbus";
+
+            case "convective":
+                return value < 0.45
+                    ? "cumulus"
+                    : "towering";
+
+            default:
+                return value < 0.85
+                    ? "cumulus"
+                    : "towering";
+        }
+    }
+
+    // ------------------------------------------
+    // CLOUD GENERATION
+    // ------------------------------------------
+
+    generate(count = 35) {
+        if (this.disposed) return;
+
+        this.clouds = [];
+
+        this.weatherCells.clear();
+
+        this.renderer.clear();
+
+        const actualCount = Math.min(
+            count,
+            this.maxClouds
+        );
+
+        for (
+            let i = 0;
+            i < actualCount;
+            i++
+        ) {
+            const terrainPosition =
+                this.terrain.sample();
+
+            if (!terrainPosition) continue;
+
+            const weatherRegime =
+                this.getWeatherRegime(
+                    terrainPosition
+                );
+
+            const speciesName =
+                this.selectSpecies(weatherRegime);
+
+            const config =
+                CloudSpecies[speciesName];
+
+            const scale =
+                config.scale *
+                (
+                    speciesName === "cumulonimbus"
+                        ? 0.78 + Math.random() * 0.35
+                        : 0.70 + Math.random() * 0.55
+                );
+
+            const position =
+                terrainPosition.add(
+                    new BABYLON.Vector3(
+                        0,
+                        90 + Math.random() * 65,
+                        0
+                    )
+                );
+
+            const cloud = new Cloud(
+                position,
+                speciesName,
+                scale,
+                config,
+                weatherRegime
+            );
+
+            // Generate the formation relative to
+            // its own origin, not world coordinates.
+            const generator = new CloudGenerator(
+                config
+            );
+
+            cloud.geometryMatrices =
+                generator.generate(
+                    BABYLON.Vector3.Zero(),
+                    scale,
+                    config.recursionDepth,
+                    i + 91827
+                );
+
+            // Start with the prevailing wind.
+            const atmospheric =
+                this.pressureField.sample(position);
+
+            cloud.velocity.copyFrom(
+                atmospheric.wind.scale(0.35)
+            );
+
+            this.clouds.push(cloud);
+        }
+
+        this.updateRendering(true);
+    }
+
+    // ------------------------------------------
+    // WIND AND CLOUD MOVEMENT
+    // ------------------------------------------
+
+    updateWind(cloud, deltaTime) {
+        const atmospheric =
+            this.pressureField.sample(
+                cloud.position
+            );
+
+        const target = atmospheric.wind;
+
+        // Gradually approach the local wind velocity.
+        // This avoids abrupt changes between regions.
+        const response = 1 - Math.exp(
+            -cloud.windResponse * deltaTime
+        );
+
+        cloud.velocity.x +=
+            (target.x - cloud.velocity.x) *
+            response;
+
+        cloud.velocity.z +=
+            (target.z - cloud.velocity.z) *
+            response;
+
+        // Small, smooth atmospheric turbulence.
+        const turbulence =
+            cloud.windTurbulence;
+
+        const phase = this.elapsed * 0.12;
+
+        cloud.velocity.x +=
+            Math.sin(phase + cloud.position.z * 0.0001) *
+            turbulence *
+            deltaTime;
+
+        cloud.velocity.z +=
+            Math.cos(phase + cloud.position.x * 0.0001) *
+            turbulence *
+            deltaTime;
+
+        cloud.position.x +=
+            cloud.velocity.x * deltaTime * 0.5;
+
+        cloud.position.z +=
+            cloud.velocity.z * deltaTime * 0.5;
+    }
+
+    // ------------------------------------------
+    // CLOUD SIMULATION
+    // ------------------------------------------
+
+    update(deltaYears) {
+        if (this.disposed) return;
+
+        const deltaTime = Math.max(
+            0,
+            Math.min(deltaYears, 0.25)
+        );
+
+        this.elapsed += deltaTime;
+
+        this.pressureField.update(deltaTime);
+
+        let activeRainCloud = null;
+
+        for (const cloud of this.clouds) {
+            this.updateCloud(cloud, deltaTime);
+
+            if (
+                cloud.isRaining &&
+                (
+                    !activeRainCloud ||
+                    cloud.rainIntensity >
+                    activeRainCloud.rainIntensity
+                )
+            ) {
+                activeRainCloud = cloud;
+            }
+        }
+
+        this.rainingCloud = activeRainCloud;
+
+        if (activeRainCloud) {
+            const rainPosition =
+                activeRainCloud.position.clone();
+
+            rainPosition.y -= 10;
+
+            this.rainSystem.start(
+                rainPosition,
+                activeRainCloud.rainIntensity
+            );
+        } else {
+            this.rainSystem.stop();
+        }
+
+        this.renderAccumulator += deltaTime;
+
+        if (
+            this.renderDirty &&
+            this.renderAccumulator >=
+                this.renderInterval
+        ) {
+            this.updateRendering();
+
+            this.renderAccumulator = 0;
+        }
+    }
+
+    updateCloud(cloud, deltaTime) {
+        this.updateWind(cloud, deltaTime);
+
+        // Cache environmental sampling.
+        cloud.environmentSampleTimer -= deltaTime;
+
+        if (cloud.environmentSampleTimer <= 0) {
+            cloud.evaporationPotential =
+                BABYLON.Scalar.Clamp(
+                    this.waterSystem.getEvaporationPotential(
+                        cloud.position
+                    ),
+                    0,
+                    1
+                );
+
+            cloud.environmentSampleTimer = 1.0;
+        }
+
+        // Moisture accumulation.
+        if (!cloud.isRaining) {
+            cloud.waterContent +=
+                cloud.absorptionRate *
+                cloud.evaporationPotential *
+                deltaTime;
+        }
+
+        cloud.waterContent = Math.min(
+            cloud.waterContent,
+            cloud.maxWaterCapacity
+        );
+
+        // Precipitation threshold.
+        if (
+            cloud.waterContent >=
+            cloud.maxWaterCapacity
+        ) {
+            this.startRain(cloud);
+        }
+
+        // Rainfall duration.
+        if (cloud.isRaining) {
+            cloud.rainRemaining -= deltaTime;
+
+            if (cloud.rainRemaining <= 0) {
+                cloud.isRaining = false;
+                cloud.rainIntensity = 0;
+                cloud.rainRemaining = 0;
+            }
+        }
+
+        this.renderDirty = true;
+    }
+
+    startRain(cloud) {
+        cloud.isRaining = true;
+
+        cloud.rainRemaining =
+            cloud.rainDuration;
+
+        cloud.rainIntensity =
+            0.5 + cloud.moistureRatio * 1.5;
+
+        const releasedWater =
+            cloud.maxWaterCapacity * 0.45;
+
+        cloud.waterContent -= releasedWater;
+
+        const rainfallAmount =
+            0.25 * cloud.rainIntensity;
+
+        const rainfallRadius =
+            cloud.scale * 4;
+
+        this.hydrology.addRain(
+            cloud.position,
+            rainfallRadius,
+            rainfallAmount
+        );
+    }
+
+    // ------------------------------------------
+    // RENDERING
+    // ------------------------------------------
+
+    updateRendering(force = false) {
+        if (
+            !force &&
+            !this.renderDirty
+        ) {
+            return;
+        }
+
+        this.renderer.clear();
+
+        for (const cloud of this.clouds) {
+            const localMatrices =
+                cloud.geometryMatrices;
+
+            if (!localMatrices) continue;
+
+            const worldMatrices = [];
+
+            for (const localMatrix of localMatrices) {
+                const matrix = localMatrix.clone();
+
+                // Translate the local formation into
+                // its current world position.
+                matrix.m[12] += cloud.position.x;
+                matrix.m[13] += cloud.position.y;
+                matrix.m[14] += cloud.position.z;
+
+                worldMatrices.push(matrix);
+            }
+
+            this.renderer.addCloud(
+                worldMatrices,
+                cloud.moistureRatio,
+                cloud.speciesName,
+                cloud.position
+            );
+        }
+
+        this.renderer.update();
+
+        this.renderDirty = false;
+    }
+
+    // ------------------------------------------
+    // DIAGNOSTICS
+    // ------------------------------------------
+
+    getStats() {
+        const speciesCounts = {
+            cumulus: 0,
+            towering: 0,
+            cumulonimbus: 0
+        };
+
+        for (const cloud of this.clouds) {
+            speciesCounts[cloud.speciesName]++;
+        }
+
+        return {
+            totalClouds: this.clouds.length,
+            speciesCounts,
+            weatherRegions: this.weatherCells.size,
+            rainingClouds: this.clouds.filter(
+                cloud => cloud.isRaining
+            ).length,
+            averageWindSpeed:
+                this.clouds.length
+                    ? this.clouds.reduce(
+                        (sum, cloud) =>
+                            sum + cloud.velocity.length(),
+                        0
+                    ) / this.clouds.length
+                    : 0
+        };
+    }
+
+    dispose() {
+        if (this.disposed) return;
+
+        this.disposed = true;
+
+        this.rainSystem.stop();
+
+        this.renderer.mesh.dispose();
+
+        this.clouds.length = 0;
+
+        this.weatherCells.clear();
+    }
+}
+
+export { CloudSystem };
+
+
+========================================================================
+FILE: src/atmosphere/cloud.js
+========================================================================
+
+
+export class Cloud {
+    constructor(position, speciesName, scale, config) {
+        this.position = position.clone();
+        this.speciesName = speciesName;
+        this.scale = scale;
+        this.baseScale = scale;
+        this.config = config;
+
+        this.waterContent = 0;
+        this.maxWaterCapacity = config.moistureCapacity ?? 100;
+        this.absorptionRate = config.absorptionRate ?? 16;
+
+        this.rainIntensity = 0;
+        this.rainRemaining = 0;
+        this.rainDuration = config.rainDuration ?? 1.5;
+        this.isRaining = false;
+
+        // Atmospheric wind state.
+        this.velocity = BABYLON.Vector3.Zero();
+        this.windTarget = BABYLON.Vector3.Zero();
+        this.windResponse = 0.12;
+
+        this.localMoisture = 0;
+        this.evaporationPotential = 0;
+        this.environmentSampleTimer = 0;
+
+        // Persistent geometry cache.
+        this.moistureAtLastRender = -1;
+        this.baseGeometryMatrices = null;
+        this.baseGeometryPosition = null;
+
+        this.geometrySeed = 1;
+    }
+
+    get moistureRatio() {
+        return BABYLON.Scalar.Clamp(
+            this.waterContent / this.maxWaterCapacity,
+            0,
+            1
+        );
+    }
+
+    get isStormCloud() {
+        return this.speciesName === "cumulonimbus";
+    }
+
+    updateWind(target, deltaSeconds) {
+        this.windTarget.copyFrom(target);
+
+        const response = 1 - Math.exp(
+            -this.windResponse * deltaSeconds
+        );
+
+        BABYLON.Vector3.LerpToRef(
+            this.velocity,
+            this.windTarget,
+            response,
+            this.velocity
+        );
+
+        this.position.addInPlace(
+            this.velocity.scale(deltaSeconds*0.01)
+        );
+    }
+}
+
+
+========================================================================
+END OF DIRECTORY SOURCE DUMP
+Files included: 5
+Binary/unreadable files skipped: 0
+========================================================================

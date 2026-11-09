@@ -1,0 +1,21 @@
+SOMNIUM — GEOMETRY PHASE 5 TEST RESULTS
+Date: 2026-11-07
+
+Node test suite: 87 passed, 0 failed.
+JavaScript source/test syntax checks: 121 passed, 0 failed.
+Relative imports checked: 198.
+Missing relative import targets: 0.
+
+New regression tests:
+- Corridor destination is the existing somnium-main slice.
+- Destination elevation is sampled from the live main-world terrain.
+- Destination address maps to the main-world chunk containing world origin.
+- Source chunk routes to main chunk through the explicit corridor chunk.
+- A destination chunk is a logical neighbour before it is loaded.
+- Registering the real main-world chunk refreshes the source chunk's loaded neighbour reference.
+- Unloading the destination chunk removes the resident reference while preserving logical adjacency.
+- Scene composition shares the main terrain, SpatialTransform, Babylon adapter, WorldManager, and chunk graph.
+
+Limitations:
+- No interactive browser/WebGL test is claimed.
+- The geometry-demo's local player/camera update loop continues after arrival in the main-world slice. It streams the actual main-world terrain but does not yet transfer full ecology, building, weather, and world-session simulation ownership to the ordinary gameplay loop.

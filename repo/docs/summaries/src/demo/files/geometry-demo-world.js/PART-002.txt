@@ -1,0 +1,300 @@
+            corridor: anomaly,
+            corridorRenderers
+        });
+    }
+    return new CorridorTraversalController({
+        ...rest,
+        corridor: anomaly,
+        corridorRenderer: corridorRenderers?.get(options.source.slice.id),
+        corridorRenderers
+    });
+}
+
+function createDemoWorldBinding(slice, transform, terrain, layerMask, address, options = {}) {
+    return {
+        slice, transform, terrain, layerMask, address,
+        fourDimensionalRegion: Boolean(options.fourDimensionalRegion),
+        wBounds: options.wBounds ?? null,
+        movementProfile: options.movementProfile ? { ...options.movementProfile } : null,
+        spatialNeighbors: [], adjacentWorldChunks: [],
+        setSpatialNeighbors: function setSpatialNeighbors(neighbors, worldChunks) {
+            this.spatialNeighbors = neighbors;
+            this.adjacentWorldChunks = worldChunks;
+        }
+    };
+}
+
+function createMainPreviewCamera(transform, anchor) {
+    const bounds = transform.projection?.bounds;
+    const cameraWorld = {
+        x: anchor.x,
+        y: Math.min(anchor.y + 90, (bounds?.maxY ?? anchor.y + 90) - 1),
+        z: Math.max(anchor.z - 260, (bounds?.minZ ?? anchor.z - 260) + 1)
+    };
+    const targetWorld = {
+        x: anchor.x,
+        y: clamp(anchor.y + 18, (bounds?.minY ?? anchor.y - 18) + 1, (bounds?.maxY ?? anchor.y + 18) - 1),
+        z: clamp(anchor.z + 520, (bounds?.minZ ?? anchor.z + 520) + 1, (bounds?.maxZ ?? anchor.z + 520) - 1)
+    };
+    const position = transform.worldToRender(cameraWorld);
+    const target = transform.worldToRender(targetWorld);
+    return {
+        x: position.x, y: position.y, z: position.z,
+        targetX: target.x, targetY: target.y, targetZ: target.z,
+        fov: 0.88, maxZ: 100000
+    };
+}
+
+class GeometryDemoWorld {
+    constructor(resources) {
+        Object.assign(this, resources);
+        this.active = false;
+        this.disposed = false;
+        this.corridorRenderer = this.mainSourceRenderer;
+        this.destinationCorridorRenderer = this.mainDestinationRenderer;
+        this.didStart = false;
+        this.gridEnabled = false;
+        this.currentSliceId = this.hypercubeSlice.id;
+        this.grids = new Map([
+            [this.sourceSlice.id, this.sourceGrid],
+            [this.hypercubeSlice.id, this.hypercubeGrid],
+            [this.destination.slice.id, this.mainWorldGrid]
+        ]);
+        this.onGridKeyDown = this.handleGridKeyDown.bind(this);
+        if (typeof window !== 'undefined') window.addEventListener('keydown', this.onGridKeyDown);
+        this.corridorRenderers = [
+            [this.sourceSlice.id, this.mainSourceRenderer],
+            [this.destination.slice.id, this.mainDestinationRenderer],
+            [this.hypercubeSlice.id, this.hypercubeSourceRenderer],
+            [this.sourceSlice.id, this.hypercubeDestinationRenderer]
+        ].filter(([, renderer]) => Boolean(renderer))
+            .map(([sliceId, renderer]) => ({ sliceId, renderer }));
+        this.setActive(false);
+    }
+
+    setActive(active) {
+        if (this.disposed) return;
+        this.active = Boolean(active);
+        for (const mesh of [...this.sourceMeshes, ...this.hypercubeMeshes]) mesh.isVisible = this.active;
+        this.player.root.setEnabled(this.active && this.cameraController.mode !== 'free');
+        this.traversalController?.setActive(this.active);
+        for (const entry of this.corridorRenderers) entry.renderer.mesh.isVisible = this.active;
+        for (const pair of this.portalPairs) {
+            pair.sourcePortal.setVisible(false);
+            pair.destinationPortal.setVisible(false);
+            pair.sourcePortal.rim.isVisible = false;
+            pair.destinationPortal.rim.isVisible = false;
+        }
+        if (!this.active) {
+            for (const grid of this.grids.values()) grid.setActive(false);
+            return;
+        }
+        if (this.cameraController.mode !== 'follow') this.cameraController.setMode('follow');
+        this.didStart = true;
+        const transitioning = this.traversalController?.state === 'transit';
+        this.activateSlice(this.currentSliceId, {
+            transitioning,
+            renderSliceId: this.traversalController?.startWorld?.slice.id ?? this.currentSliceId
+        });
+        this.updateCameraPresentation();
+        this.updatePortalLists();
+    }
+
+    activateSlice(sliceId, state = {}) {
+        this.currentSliceId = sliceId;
+        const transitioning = Boolean(state.transitioning);
+        const renderWorld = this.getWorld(transitioning ? (state.renderSliceId ?? sliceId) : sliceId);
+        this.camera.layerMask = renderWorld.layerMask;
+        this.cameraController.setSpatialContext(renderWorld.transform, renderWorld.layerMask);
+        this.player.setLayerMask(renderWorld.layerMask);
+        this.updateCameraPresentation();
+    }
+
+    getWorld(sliceId) {
+        const world = [this.hypercubeWorld, this.sourceWorld, this.destinationWorld]
+            .find(function matchWorld(entry) { return entry.slice.id === sliceId; });
+        if (!world) throw new Error(`Unknown geometry demo slice: ${sliceId}`);
+        return world;
+    }
+
+    update(deltaSeconds) {
+        if (!this.active || this.disposed) return;
+        this.playerController.update(deltaSeconds);
+        this.traversalController.update(deltaSeconds);
+        this.cameraController.update(deltaSeconds);
+        const viewSliceId = this.cameraController.getViewSliceId();
+        const ambientPosition4D = this.cameraController.mode === 'free'
+            ? this.cameraController.getFreeAmbientPosition()
+            : this.traversalController.getAmbientPlayerPosition?.();
+        let viewerW = 0;
+        if (viewSliceId === this.hypercubeSlice.id) {
+            if (this.cameraController.mode === 'free') {
+                viewerW = this.cameraController.getFreeW();
+            } else if (ambientPosition4D) {
+                viewerW = ambientToSlice(this.hypercubeSlice.frame, ambientPosition4D).normalOffset;
+            }
+        }
+        this.hypercubeRenderer.update(deltaSeconds, viewerW);
+        this.updateHypercubeSliceHud();
+        this.updateCameraPresentation();
+        this.updatePortalPreview();
+        this.updatePortalLists();
+        const focus = this.getDestinationFocus();
+        const reachabilityContext = ambientPosition4D ? {
+            sourceSliceId: this.cameraController.mode === 'free'
+                ? this.cameraController.freeSliceId : this.traversalController.currentSliceId,
+            position4D: ambientPosition4D,
+            influenceOptions: this.playerController.getAnomalyInfluenceModifiers?.() ??
+                this.playerController.anomalyInfluenceModifiers ?? {}
+        } : null;
+        this.destinationWorldManager?.update(focus, { x: 0, z: 1 }, reachabilityContext);
+        const destinationMeshes = this.destinationWorldManager?.getMeshes() ?? [];
+        this.mainSourcePortal.setRenderList(destinationMeshes);
+        this.hypercubeMainPortal.setRenderList(destinationMeshes);
+    }
+
+    updateHypercubeSliceHud() {
+        const viewSliceId = this.cameraController.getViewSliceId();
+        if (viewSliceId !== this.hypercubeSlice.id) {
+            const position4D = this.cameraController.mode === 'free'
+                ? this.cameraController.getFreeAmbientPosition?.()
+                : this.traversalController.getAmbientPlayerPosition?.();
+            const routes = this.traversalController.getRoutesForSlice?.(viewSliceId) ?? [];
+            const availableFields = position4D ? routes.map((route) => ({
+                route,
+                influence: route.controller?.getAnomalyInfluence?.(position4D)
+            })).filter((entry) => Number(entry.influence?.wMovementScale) > 0) : [];
+            availableFields.sort((left, right) =>
+                right.influence.wMovementScale - left.influence.wMovementScale
+            );
+            const best = availableFields[0] ?? null;
+            const freedomPercent = best
+                ? Math.round(best.influence.wMovementScale * 100) : 0;
+            const label = best
+                ? `W FREEDOM ACTIVE · ${freedomPercent}%`
+                : 'W SLICE INACTIVE';
+            if (label !== this.lastHypercubeSliceLabel) {
+                this.lastHypercubeSliceLabel = label;
+                this.onSliceInfoChanged?.(label, best ? {
+                    anomalyId: best.route.corridorId,
+                    freedom: best.influence.freedom,
+                    wMovementScale: best.influence.wMovementScale,
+                    wReach: best.influence.wReach,
+                    position4D: { ...position4D }
+                } : null);
+            }
+            return;
+        }
+        const info = this.hypercubeRenderer.getInfo();
+        const active = this.cameraController.mode === 'free'
+            ? this.cameraController.getFreeTransitState()
+            : this.traversalController.getActiveController?.();
+        const inAnomaly = (active?.state === 'transit' || active?.type === SLICE_TRANSITION_ANOMALY) &&
+            active.startWorld?.slice.id === this.hypercubeSlice.id &&
+            (active.spatialPosition4D || active.position4D);
+        const label = inAnomaly
+            ? `ANOMALY W ${info.viewerW.toFixed(2)} · ${info.sliceVertexCount} VERTICES · ${info.sliceFaceCount} FACES`
+            : `W ${info.viewerW.toFixed(2)} · ${info.sliceVertexCount} VERTICES · ${info.sliceFaceCount} FACES`;
+        if (label === this.lastHypercubeSliceLabel) return;
+        this.lastHypercubeSliceLabel = label;
+        this.onSliceInfoChanged?.(label, info);
+    }
+
+    updateCameraPresentation() {
+        if (!this.corridorRenderers) return updateLegacyCameraPresentation(this);
+        const viewSliceId = this.cameraController.getViewSliceId();
+        const world = this.getWorld(viewSliceId);
+        this.camera.layerMask = world.layerMask;
+        for (const entry of this.corridorRenderers) {
+            entry.renderer.mesh.isVisible = this.active && entry.sliceId === viewSliceId;
+        }
+        for (const [sliceId, grid] of this.grids) {
+            grid.setActive(this.active && sliceId === viewSliceId);
+        }
+        for (const pair of this.portalPairs) {
+            const sourceActive = pair.sourceSliceId === viewSliceId;
+            const destinationActive = pair.destinationSliceId === viewSliceId;
+            pair.sourcePortal.setVisible(this.active && sourceActive);
+            pair.destinationPortal.setVisible(this.active && destinationActive);
+            pair.sourcePortal.rim.isVisible = this.active && sourceActive;
+            pair.destinationPortal.rim.isVisible = this.active && destinationActive;
+        }
+        this.onViewChanged?.(viewSliceId);
+    }
+
+    updatePortalLists() {
+        const poincareMeshes = [
+            ...this.sourceMeshes,
+            this.mainSourceRenderer?.mesh,
+            this.hypercubeDestinationRenderer?.mesh
+        ].filter(Boolean);
+        const hypercubeMeshes = [
+            ...this.hypercubeMeshes,
+            this.hypercubeSourceRenderer?.mesh
+        ].filter(Boolean);
+        this.mainDestinationPortal.setRenderList(poincareMeshes);
+        this.hypercubeSourcePortal.setRenderList(poincareMeshes);
+        this.hypercubeDestinationPortal.setRenderList(hypercubeMeshes);
+        this.hypercubeMainDestinationPortal.setRenderList(hypercubeMeshes);
+    }
+
+    getDestinationFocus() {
+        if (this.cameraController.mode === 'free' &&
+            this.cameraController.freeSliceId === this.destination.slice.id) {
+            return this.cameraController.getFreeWorldPosition() ?? this.mainAnchor;
+        }
+        return this.currentSliceId === this.destination.slice.id
+            ? this.player.worldPosition : this.mainAnchor;
+    }
+
+    beginEntityTransit(entity, fromSliceId = entity?.sliceId) {
+        return this.traversalController.beginEntityTransit(entity, fromSliceId);
+    }
+
+    tryBeginEntityTransit(entity, fromSliceId = entity?.sliceId) {
+        return this.traversalController.tryBeginEntityTransit(entity, fromSliceId);
+    }
+
+    toggleGrid() {
+        const sliceId = this.cameraController.getViewSliceId();
+        if (!this.grids.has(sliceId)) return false;
+        this.gridEnabled = !this.gridEnabled;
+        for (const grid of this.grids.values()) grid.setVisible(this.gridEnabled);
+        this.updateCameraPresentation();
+        return this.gridEnabled;
+    }
+
+    handleGridKeyDown(event) {
+        if (!this.active || this.disposed || event.code !== 'KeyG' || event.repeat ||
+            event.ctrlKey || event.metaKey || event.altKey) return;
+        const tagName = String(event.target?.tagName ?? '').toUpperCase();
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tagName) || event.target?.isContentEditable) return;
+        event.preventDefault?.();
+        this.toggleGrid();
+    }
+
+    toggleCameraMode() { return this.cameraController.toggleMode(); }
+
+    updatePortalPreview() {
+        if (!this.active) return;
+        if (!Array.isArray(this.portalPairs)) return updateLegacyPortalPreview(this);
+        const playerController = this.traversalController.getActiveController?.();
+        const playerTransit = playerController?.state === 'transit' ? playerController : null;
+        const cameraTransit = this.cameraController.getFreeTransitState();
+        const transit = this.cameraController.mode === 'free' ? cameraTransit : playerTransit;
+        if (transit?.type === SLICE_TRANSITION_ANOMALY || transit?.corridor?.type === SLICE_TRANSITION_ANOMALY) {
+            for (const pair of this.portalPairs) {
+                pair.sourcePortal.resetPose();
+                pair.destinationPortal.resetPose();
+            }
+            return;
+        }
+        if (!transit) {
+            for (const pair of this.portalPairs) {
+                pair.sourcePortal.resetPose();
+                pair.destinationPortal.resetPose();
+            }
+            return;
+        }
+        const corridorId = transit.corridorId ?? transit.corridor?.id ?? playerController?.corridor.id;
+        const pair = this.portalPairs.find(function findPair(entry) { return entry.corridor.id === corridorId; });

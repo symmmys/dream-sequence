@@ -1,0 +1,72 @@
+        return;
+
+    }
+
+
+    // --------------------------------
+    // COMBINED GROWTH
+    // --------------------------------
+
+const combinedGrowth =
+    this.growthMultiplier *
+    this.moistureMultiplier *
+    this.soilSuitability;
+
+    this.age += deltaYears * combinedGrowth;
+
+
+    if (this.age >= this.maximumAge) {
+
+        this.alive = false;
+
+    }
+
+
+    this.seedTimer += deltaYears;
+
+}
+
+
+    generateGeometry(environment) {
+
+        const generator = new TreeGenerator(
+            this.species,
+            environment,
+            this.genome
+        );
+
+        return generator.generate(
+            this.position,
+            this.ageFactor
+        );
+    }
+
+	
+produceSeeds() {
+
+    if (!this.alive || !this.isMature || this.isElder) {
+        return 0;
+    }
+
+    // One reproductive opportunity every five years
+    const seedInterval = 5;
+
+    if (this.seedTimer < seedInterval) {
+        return 0;
+    }
+
+    this.seedTimer -= seedInterval;
+
+    // Genetic influence on reproduction
+    const seedProduction = this.genome.seedProduction;
+
+    // Number of seeds produced in this event
+    return Math.max(
+        1,
+        Math.round(2 * seedProduction)
+    );
+}
+
+
+}
+export { Tree }

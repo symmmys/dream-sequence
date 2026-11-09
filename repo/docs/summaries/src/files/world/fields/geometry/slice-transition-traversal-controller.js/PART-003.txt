@@ -1,0 +1,17 @@
+
+function clampToTerrain(value, minimum, maximum) {
+    return clamp(value, minimum, maximum);
+}
+
+function clamp(value, minimum, maximum) {
+    return Math.min(maximum, Math.max(minimum, value));
+}
+
+function requireObject(value, label) {
+    if (!value || typeof value !== 'object') throw new TypeError(`${label} is required.`);
+    return value;
+}
+
+function noop() {}
+
+export { SliceTransitionTraversalController };

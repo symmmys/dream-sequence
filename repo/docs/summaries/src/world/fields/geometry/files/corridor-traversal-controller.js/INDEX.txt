@@ -1,0 +1,27 @@
+SOMNIUM — INDIVIDUAL SOURCE FILE INDEX
+================================================================
+
+Source file: src/world/fields/geometry/corridor-traversal-controller.js
+Source directory: src/world/fields/geometry/
+Generated: 2026-11-09T03:15:29
+Total source lines: 572
+Maximum chunk size: 300 lines
+Number of parts: 2
+
+SOURCE PARTS
+----------------------------------------------------------------
+Part: PART-001.txt
+Original lines: 1-300
+Lines in part: 300
+
+Part: PART-002.txt
+Original lines: 301-572
+Lines in part: 272
+
+READING INSTRUCTIONS
+----------------------------------------------------------------
+- Read parts in ascending numerical order.
+- Concatenate parts without adding separator lines.
+- Part contents are original UTF-8 source text.
+- Original source line numbering is preserved.
+- No source lines are intentionally omitted.

@@ -1,0 +1,327 @@
+SOMNIUM — DIRECTORY SUMMARY
+================================================================
+
+Directory: src/world/fields/geometry/
+Generated: 2026-11-09T03:15:29
+
+PURPOSE
+----------------------------------------------------------------
+Automatically generated source inventory.
+See individual modules for detailed responsibilities.
+
+SOURCE FILES (DIRECT CHILDREN)
+----------------------------------------------------------------
+- anomaly-influence-field.js
+  Exports: evaluateAnomalyInfluence, evaluateChunkReachability, resolveAnomalyInfluence, smootherstep
+- babylon-geometry-adapter.js
+  Exports: BabylonGeometryAdapter
+- corridor-renderer.js
+  Exports: CorridorRenderer
+- corridor-traversal-controller.js
+  Exports: CorridorTraversalController, measureCorridor
+- euclidean-geometry.js
+  Exports: EuclideanGeometry
+- geodesic-solver.js
+  Exports: GeodesicSolver
+- geometry-debug-grid.js
+  Exports: GeometryDebugGrid
+- geometry-model.js
+  Exports: GeometryModel
+- geometry-renderer.js
+  Exports: GeometryRenderer
+- geometry-shader-manager.js
+  Exports: GeometryShaderManager
+- hyperbolic-camera-controller.js
+  Exports: HyperbolicCameraController
+- hypercube-4d.js
+  Exports: createHypercubeEdges, createHypercubeSlice, createHypercubeVertices, rotateHypercubePoint
+- optical-anomaly-tracer.js
+  Exports: createAnomalyOpticalField, createAnomalyOpticalTracer
+- optical-contracts.js
+  Exports: ANOMALY_OPTICS_SCHEMA_VERSION, OPTICAL_MATERIAL_SCHEMA_VERSION, createAnomalyOptics, createOpticalMaterial, evaluateOpticalAnomalyCoupling, smootherstep
+- optical-debug-renderer.js
+  Exports: OpticalDebugRenderer
+- optical-metric.js
+  Exports: blendPositiveDefiniteMetrics3, blendScaledPositiveDefiniteMetrics3, createOpticalMetricField, geometricMeanMetricScale3, spatialTransformMetricProvider
+- optical-ray-integrator.js
+  Exports: createOpticalRayState, evaluateOpticalHamiltonian, normalizeOpticalMomentum, serializeOpticalRayResult, traceOpticalRay
+- optical-scene-registry.js
+  Exports: OpticalSceneRegistry
+- optical-slice-tracer.js
+  Exports: createSliceOpticalField, createSliceOpticalTracer, traceOpticalRayInSlice
+- poincare-geometry.js
+  Exports: PoincareGeometry
+- poincare-metric.js
+  Exports: PoincareMetric
+- poincare-projection.js
+  Exports: PoincareProjection
+- poincare-visual-scale.js
+  Exports: calculatePoincareMetricFactor, calculatePoincareVisualScale
+- portal-preview-renderer.js
+  Exports: PortalPreviewRenderer
+- slice-transition-traversal-controller.js
+  Exports: SliceTransitionTraversalController
+- spatial-4d.js
+  Exports: add4, ambientToSlice, assertVector4, createCanonicalSliceFrame, createPerpendicularFrame, createPosition3, createSliceFrame, createVector4, dot4, interpolate4, norm4, normalize4, rotate4, scale4, sliceToAmbient, subtract4, transportPerpendicularFrame
+- spatial-anomaly.js
+  Exports: BEZIER_CORRIDOR_ANOMALY, SLICE_TRANSITION_ANOMALY, SPATIAL_ANOMALY_SCHEMA_VERSION, containsAmbientPoint, createSliceTransitionAnomaly, createSpatialAnomaly
+- spatial-corridor.js
+  Exports: SPATIAL_CORRIDOR_SCHEMA_VERSION, createSpatialCorridor, cubicBezier, cubicBezierTangent, sampleRadiusProfile, sampleSpatialCorridor, sampleSpatialCorridorFrames
+- spatial-transform.js
+  Exports: SpatialTransform
+- topographic-terrain-mesh.js
+  Exports: buildTopographicTerrainBuffers, createTopographicTerrainMesh
+- world-slice.js
+  Exports: WORLD_SLICE_SCHEMA_VERSION, createSliceAddress, createWorldSlice, getSliceAddressKey
+- world-topology.js
+  Exports: WORLD_TOPOLOGY_SCHEMA_VERSION, WorldTopology
+
+DIRECT DEPENDENCIES
+----------------------------------------------------------------
+- src/world/fields/metric-tensor.js
+
+DEPENDENTS
+----------------------------------------------------------------
+- src/demo/geometry-demo-camera-controller.js
+- src/demo/geometry-demo-topology.js
+- src/demo/geometry-demo-world.js
+- src/demo/hypercube-4d-renderer.js
+- src/scene/create-scene.js
+- src/world/fields/world-field-system.js
+- src/world/spatial-chunk-graph.js
+- src/world/topographic-world-factory.js
+- src/world/world-chunk.js
+
+INDIVIDUAL SOURCE FILE MANIFEST
+----------------------------------------------------------------
+
+Documentation root: docs/summaries/src/world/fields/geometry/files/
+Maximum chunk size: 300 lines
+Text files documented: 32
+Binary/unreadable files skipped: 0
+
+Each source file has its own documentation directory.
+INDEX.txt identifies the original file and maps every
+numbered part to its exact original source line range.
+
+SOURCE: src/world/fields/geometry/anomaly-influence-field.js
+  Lines: 178
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/anomaly-influence-field.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/anomaly-influence-field.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/babylon-geometry-adapter.js
+  Lines: 124
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/babylon-geometry-adapter.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/babylon-geometry-adapter.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/corridor-renderer.js
+  Lines: 229
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/corridor-renderer.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/corridor-renderer.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/corridor-traversal-controller.js
+  Lines: 572
+  Parts: 2
+  Index: docs/summaries/src/world/fields/geometry/files/corridor-traversal-controller.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/corridor-traversal-controller.js/PART-001.txt
+    docs/summaries/src/world/fields/geometry/files/corridor-traversal-controller.js/PART-002.txt
+
+SOURCE: src/world/fields/geometry/euclidean-geometry.js
+  Lines: 34
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/euclidean-geometry.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/euclidean-geometry.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/geodesic-solver.js
+  Lines: 134
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/geodesic-solver.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/geodesic-solver.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/geometry-debug-grid.js
+  Lines: 136
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/geometry-debug-grid.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/geometry-debug-grid.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/geometry-model.js
+  Lines: 29
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/geometry-model.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/geometry-model.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/geometry-renderer.js
+  Lines: 473
+  Parts: 2
+  Index: docs/summaries/src/world/fields/geometry/files/geometry-renderer.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/geometry-renderer.js/PART-001.txt
+    docs/summaries/src/world/fields/geometry/files/geometry-renderer.js/PART-002.txt
+
+SOURCE: src/world/fields/geometry/geometry-shader-manager.js
+  Lines: 454
+  Parts: 2
+  Index: docs/summaries/src/world/fields/geometry/files/geometry-shader-manager.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/geometry-shader-manager.js/PART-001.txt
+    docs/summaries/src/world/fields/geometry/files/geometry-shader-manager.js/PART-002.txt
+
+SOURCE: src/world/fields/geometry/hyperbolic-camera-controller.js
+  Lines: 265
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/hyperbolic-camera-controller.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/hyperbolic-camera-controller.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/hypercube-4d.js
+  Lines: 195
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/hypercube-4d.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/hypercube-4d.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/optical-anomaly-tracer.js
+  Lines: 1101
+  Parts: 4
+  Index: docs/summaries/src/world/fields/geometry/files/optical-anomaly-tracer.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/optical-anomaly-tracer.js/PART-001.txt
+    docs/summaries/src/world/fields/geometry/files/optical-anomaly-tracer.js/PART-002.txt
+    docs/summaries/src/world/fields/geometry/files/optical-anomaly-tracer.js/PART-003.txt
+    docs/summaries/src/world/fields/geometry/files/optical-anomaly-tracer.js/PART-004.txt
+
+SOURCE: src/world/fields/geometry/optical-contracts.js
+  Lines: 200
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/optical-contracts.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/optical-contracts.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/optical-debug-renderer.js
+  Lines: 105
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/optical-debug-renderer.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/optical-debug-renderer.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/optical-metric.js
+  Lines: 390
+  Parts: 2
+  Index: docs/summaries/src/world/fields/geometry/files/optical-metric.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/optical-metric.js/PART-001.txt
+    docs/summaries/src/world/fields/geometry/files/optical-metric.js/PART-002.txt
+
+SOURCE: src/world/fields/geometry/optical-ray-integrator.js
+  Lines: 467
+  Parts: 2
+  Index: docs/summaries/src/world/fields/geometry/files/optical-ray-integrator.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/optical-ray-integrator.js/PART-001.txt
+    docs/summaries/src/world/fields/geometry/files/optical-ray-integrator.js/PART-002.txt
+
+SOURCE: src/world/fields/geometry/optical-scene-registry.js
+  Lines: 613
+  Parts: 3
+  Index: docs/summaries/src/world/fields/geometry/files/optical-scene-registry.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/optical-scene-registry.js/PART-001.txt
+    docs/summaries/src/world/fields/geometry/files/optical-scene-registry.js/PART-002.txt
+    docs/summaries/src/world/fields/geometry/files/optical-scene-registry.js/PART-003.txt
+
+SOURCE: src/world/fields/geometry/optical-slice-tracer.js
+  Lines: 110
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/optical-slice-tracer.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/optical-slice-tracer.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/poincare-geometry.js
+  Lines: 128
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/poincare-geometry.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/poincare-geometry.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/poincare-metric.js
+  Lines: 379
+  Parts: 2
+  Index: docs/summaries/src/world/fields/geometry/files/poincare-metric.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/poincare-metric.js/PART-001.txt
+    docs/summaries/src/world/fields/geometry/files/poincare-metric.js/PART-002.txt
+
+SOURCE: src/world/fields/geometry/poincare-projection.js
+  Lines: 313
+  Parts: 2
+  Index: docs/summaries/src/world/fields/geometry/files/poincare-projection.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/poincare-projection.js/PART-001.txt
+    docs/summaries/src/world/fields/geometry/files/poincare-projection.js/PART-002.txt
+
+SOURCE: src/world/fields/geometry/poincare-visual-scale.js
+  Lines: 57
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/poincare-visual-scale.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/poincare-visual-scale.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/portal-preview-renderer.js
+  Lines: 163
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/portal-preview-renderer.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/portal-preview-renderer.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/slice-transition-traversal-controller.js
+  Lines: 617
+  Parts: 3
+  Index: docs/summaries/src/world/fields/geometry/files/slice-transition-traversal-controller.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/slice-transition-traversal-controller.js/PART-001.txt
+    docs/summaries/src/world/fields/geometry/files/slice-transition-traversal-controller.js/PART-002.txt
+    docs/summaries/src/world/fields/geometry/files/slice-transition-traversal-controller.js/PART-003.txt
+
+SOURCE: src/world/fields/geometry/spatial-4d.js
+  Lines: 249
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/spatial-4d.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/spatial-4d.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/spatial-anomaly.js
+  Lines: 160
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/spatial-anomaly.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/spatial-anomaly.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/spatial-corridor.js
+  Lines: 212
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/spatial-corridor.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/spatial-corridor.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/spatial-transform.js
+  Lines: 574
+  Parts: 2
+  Index: docs/summaries/src/world/fields/geometry/files/spatial-transform.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/spatial-transform.js/PART-001.txt
+    docs/summaries/src/world/fields/geometry/files/spatial-transform.js/PART-002.txt
+
+SOURCE: src/world/fields/geometry/topographic-terrain-mesh.js
+  Lines: 91
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/topographic-terrain-mesh.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/topographic-terrain-mesh.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/world-slice.js
+  Lines: 103
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/world-slice.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/world-slice.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/world-topology.js
+  Lines: 236
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/world-topology.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/world-topology.js/PART-001.txt
+
+RECURSIVE SOURCE DUMP
+----------------------------------------------------------------
+- SOURCE.txt contains recursively collected text files.
+- Individual files are available under files/.
+- Individual PART files contain at most 300 lines.
+- Binary files are excluded from both representations.
+
+NOTES
+----------------------------------------------------------------
+- Dependencies are extracted from relative JavaScript imports.
+- External packages and browser globals are not represented.
+- Dynamic imports using computed paths may not be detected.
+- This inventory does not establish runtime initialization order.
+- Generated documentation is not authoritative application state.

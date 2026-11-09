@@ -1,0 +1,215 @@
+                        neighbor.sliceId, projectedAddress.chunkX + offsetX,
+                        projectedAddress.chunkZ + offsetZ
+                    );
+                    const reachability = this.getOpticalReachability(sourceAddress, address, {
+                        ...options, position4D, maxChunkDistance, corridorId: neighbor.corridorId
+                    });
+                    if (reachability.reachable) {
+                        candidates.set(getSliceAddressKey(address), { address, reachability });
+                    }
+                }
+            }
+        }
+        return Array.from(candidates.values());
+    }
+
+    /** Returns the target-slice chunks currently reachable from an ambient point. */
+    getReachableChunkCandidates(sourceSliceId, position4D, options = {}) {
+        this.assertActive();
+        const sourceSlice = this.topology.getSlice(sourceSliceId);
+        const sourceLocal = ambientToSlice(sourceSlice.frame, position4D).position;
+        const sourceAddress = this.getAddress(sourceSliceId, sourceLocal);
+        const maxChunkDistance = options.maxChunkDistance ?? 1;
+        const candidates = new Map();
+
+        for (const neighbor of this.topology.getTraversableNeighbors(sourceSliceId)) {
+            if (options.targetSliceId && neighbor.sliceId !== options.targetSliceId) continue;
+            const targetSlice = this.topology.getSlice(neighbor.sliceId);
+            const projected = ambientToSlice(targetSlice.frame, position4D).position;
+            const projectedAddress = this.getAddress(neighbor.sliceId, projected);
+            for (let offsetX = -Math.ceil(maxChunkDistance); offsetX <= Math.ceil(maxChunkDistance); offsetX++) {
+                for (let offsetZ = -Math.ceil(maxChunkDistance); offsetZ <= Math.ceil(maxChunkDistance); offsetZ++) {
+                    const address = createSliceAddress(
+                        neighbor.sliceId, projectedAddress.chunkX + offsetX, projectedAddress.chunkZ + offsetZ
+                    );
+                    const reachability = this.getReachability(sourceAddress, address, {
+                        ...options, position4D, maxChunkDistance, corridorId: neighbor.corridorId
+                    });
+                    if (reachability.reachable) {
+                        candidates.set(getSliceAddressKey(address), { address, reachability });
+                    }
+                }
+            }
+        }
+        return Array.from(candidates.values());
+    }
+
+    getReachableAdjacentWorldChunks(address, position4D, options = {}) {
+        const local = this.getNeighbors(address).filter((node) => node.kind === 'world');
+        const remote = this.getReachableChunkCandidates(address.sliceId, position4D, options)
+            .map(({ address: candidate }) => this.getChunk(candidate));
+        return deduplicateNodes([...local, ...remote]);
+    }
+
+    getAdjacentWorldChunks(address) {
+        const neighbors = this.getNeighbors(address);
+        const result = neighbors.filter(function isLocalChunk(node) {
+            return node.kind === 'world';
+        });
+        for (const corridorNode of neighbors.filter(function isCorridor(node) {
+            return node.kind === 'corridor';
+        })) {
+            for (const destination of this.getNeighbors(corridorNode.key)) {
+                if (destination.kind !== 'world' || sameAddress(destination.address, address)) continue;
+                result.push({ ...destination, viaCorridorId: corridorNode.id });
+            }
+        }
+        return deduplicateNodes(result);
+    }
+
+    getNeighborsOfCorridor(corridorId) {
+        return this.getNeighbors(this.getCorridorKey(corridorId));
+    }
+
+    getRoute(fromAddress, toAddress, maxNodes = 4096) {
+        const start = getSliceAddressKey(fromAddress);
+        const goal = getSliceAddressKey(toAddress);
+        if (fromAddress.sliceId !== toAddress.sliceId &&
+            !this.hasSliceRoute(fromAddress.sliceId, toAddress.sliceId)) return null;
+        const queue = [start];
+        const previous = new Map([[start, null]]);
+        while (queue.length && previous.size <= maxNodes) {
+            const current = queue.shift();
+            if (current === goal) break;
+            for (const node of this.getNeighbors(current)) {
+                const next = node.key;
+                if (previous.has(next)) continue;
+                previous.set(next, current);
+                queue.push(next);
+            }
+        }
+        if (!previous.has(goal)) return null;
+        const route = [];
+        for (let key = goal; key !== null; key = previous.get(key)) route.unshift(this.describeNode(key));
+        return route;
+    }
+
+    hasSliceRoute(fromSliceId, toSliceId) {
+        if (fromSliceId === toSliceId) return true;
+        const visited = new Set([fromSliceId]);
+        const queue = [fromSliceId];
+        while (queue.length) {
+            const current = queue.shift();
+            for (const neighbor of this.topology.getTraversableNeighbors(current)) {
+                if (neighbor.sliceId === toSliceId) return true;
+                if (visited.has(neighbor.sliceId)) continue;
+                visited.add(neighbor.sliceId);
+                queue.push(neighbor.sliceId);
+            }
+        }
+        return false;
+    }
+
+    getStats() {
+        let occupantCount = 0;
+        for (const link of this.corridors.values()) occupantCount += link.chunk.occupants.size;
+        return {
+            slices: this.slices.size,
+            loadedWorldChunks: this.loadedChunks.size,
+            corridorChunks: this.corridors.size,
+            corridorOccupants: occupantCount
+        };
+    }
+
+    describeWorldChunk(address, key) {
+        const chunk = this.loadedChunks.get(key) ?? null;
+        return { key, id: key, kind: 'world', address: { ...address }, loaded: Boolean(chunk), chunk };
+    }
+
+    describeNode(key, edge = null) {
+        const link = Array.from(this.corridors.values()).find(function findCorridor(entry) {
+            return entry.nodeKey === key;
+        });
+        if (link) {
+            return {
+                key, id: link.id, kind: 'corridor', chunk: link.chunk,
+                traversable: link.chunk.corridor.traversable,
+                direction: edge?.direction ?? 0,
+                corridorId: link.id
+            };
+        }
+        const address = parseAddressKey(key);
+        return this.describeWorldChunk(address, key);
+    }
+
+    addEdge(from, to, corridorId, direction) {
+        const list = this.edges.get(from) ?? [];
+        list.push({ to, corridorId, direction });
+        this.edges.set(from, list);
+    }
+
+    removeEdges(key, corridorId) {
+        const list = (this.edges.get(key) ?? []).filter(function keepOtherEdge(edge) {
+            return edge.corridorId !== corridorId;
+        });
+        if (list.length) this.edges.set(key, list);
+        else this.edges.delete(key);
+    }
+
+    refreshLoadedChunkNeighbors() {
+        for (const chunk of this.loadedChunks.values()) {
+            if (typeof chunk.setSpatialNeighbors !== 'function') continue;
+            chunk.setSpatialNeighbors(
+                this.getNeighbors(chunk.address),
+                this.getAdjacentWorldChunks(chunk.address)
+            );
+        }
+    }
+
+    getCorridorKey(corridorId) { return `corridor:${corridorId}`; }
+
+    requireSlice(sliceId) {
+        const slice = this.slices.get(sliceId);
+        if (!slice) throw new Error(`Chunk graph has no registered slice: ${sliceId}`);
+        return slice;
+    }
+
+    assertActive() {
+        if (this.disposed) throw new Error('SpatialChunkGraph has been disposed.');
+    }
+
+    dispose() {
+        if (this.disposed) return;
+        for (const link of this.corridors.values()) link.chunk.dispose();
+        this.corridors.clear();
+        this.edges.clear();
+        this.loadedChunks.clear();
+        this.slices.clear();
+        this.disposed = true;
+    }
+}
+
+function unreachableResult(reason, sourceAddress, targetAddress, anomalyId = null) {
+    return {
+        reachable: false, spatialReachable: false, wReachable: false,
+        spatialDistance: Infinity, spatialReach: 0, wDistance: Infinity, wReach: 0,
+        kind: 'cross-slice', reason, sourceAddress, targetAddress, anomalyId, freedom: 0
+    };
+}
+
+function parseAddressKey(key) {
+    const [sliceId, chunkX, chunkZ] = JSON.parse(key);
+    return createSliceAddress(sliceId, chunkX, chunkZ);
+}
+
+function sameAddress(left, right) {
+    return left.sliceId === right.sliceId && left.chunkX === right.chunkX && left.chunkZ === right.chunkZ;
+}
+
+function deduplicateNodes(nodes) {
+    const unique = new Map();
+    for (const node of nodes) unique.set(node.key, node);
+    return Array.from(unique.values());
+}
+
+export { SpatialChunkGraph };

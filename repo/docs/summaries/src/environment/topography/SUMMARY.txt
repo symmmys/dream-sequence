@@ -1,0 +1,65 @@
+SOMNIUM — DIRECTORY SUMMARY
+================================================================
+
+Directory: src/environment/topography/
+Generated: 2026-11-09T03:15:29
+
+PURPOSE
+----------------------------------------------------------------
+Automatically generated source inventory.
+See individual modules for detailed responsibilities.
+
+SOURCE FILES (DIRECT CHILDREN)
+----------------------------------------------------------------
+- browser-heightmap-loader.js
+  Exports: BrowserHeightmapLoader
+- heightmap-data.js
+  Exports: createHeightmapData, decodeHeightmapPixel, getHeightmapStatistics, sampleHeightmapData, sampleNormalizedHeightmapData
+
+DIRECT DEPENDENCIES
+----------------------------------------------------------------
+(No external local-directory imports detected.)
+
+DEPENDENTS
+----------------------------------------------------------------
+- src/environment/heightmap-terrain.js
+- src/world/topographic-world-factory.js
+
+INDIVIDUAL SOURCE FILE MANIFEST
+----------------------------------------------------------------
+
+Documentation root: docs/summaries/src/environment/topography/files/
+Maximum chunk size: 300 lines
+Text files documented: 2
+Binary/unreadable files skipped: 0
+
+Each source file has its own documentation directory.
+INDEX.txt identifies the original file and maps every
+numbered part to its exact original source line range.
+
+SOURCE: src/environment/topography/browser-heightmap-loader.js
+  Lines: 90
+  Parts: 1
+  Index: docs/summaries/src/environment/topography/files/browser-heightmap-loader.js/INDEX.txt
+    docs/summaries/src/environment/topography/files/browser-heightmap-loader.js/PART-001.txt
+
+SOURCE: src/environment/topography/heightmap-data.js
+  Lines: 194
+  Parts: 1
+  Index: docs/summaries/src/environment/topography/files/heightmap-data.js/INDEX.txt
+    docs/summaries/src/environment/topography/files/heightmap-data.js/PART-001.txt
+
+RECURSIVE SOURCE DUMP
+----------------------------------------------------------------
+- SOURCE.txt contains recursively collected text files.
+- Individual files are available under files/.
+- Individual PART files contain at most 300 lines.
+- Binary files are excluded from both representations.
+
+NOTES
+----------------------------------------------------------------
+- Dependencies are extracted from relative JavaScript imports.
+- External packages and browser globals are not represented.
+- Dynamic imports using computed paths may not be detected.
+- This inventory does not establish runtime initialization order.
+- Generated documentation is not authoritative application state.

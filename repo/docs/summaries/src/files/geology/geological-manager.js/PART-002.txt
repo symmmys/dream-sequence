@@ -1,0 +1,300 @@
+
+        const primaryCount = 7;
+
+        for (let i = 0; i < primaryCount; i++) {
+
+            const sample = samplePosition();
+
+            if (!sample) continue;
+
+            const config =
+                RockSpecies[sample.speciesName];
+
+            addFormation(
+
+                sample,
+
+                config.scale * 4.0,
+
+                Math.min(2, config.recursionDepth),
+
+                i + 1000
+
+            );
+
+        }
+
+
+        // SECONDARY FORMATIONS
+        // Medium-scale geological structures.
+
+        const secondaryCount = 7;
+
+        for (let i = 0; i < secondaryCount; i++) {
+
+            const sample = samplePosition();
+
+            if (!sample) continue;
+
+            const config =
+                RockSpecies[sample.speciesName];
+
+            addFormation(
+
+                sample,
+
+                config.scale * 1.7,
+
+                Math.min(2, config.recursionDepth),
+
+                i + 2000
+
+            );
+
+        }
+
+
+        // FINE GEOLOGICAL DETAIL
+
+        const detailCount = 32;
+
+        for (let i = 0; i < detailCount; i++) {
+
+            const sample = samplePosition();
+
+            if (!sample) continue;
+
+            const config =
+                RockSpecies[sample.speciesName];
+
+            addFormation(
+
+                sample,
+
+                config.scale * (
+                    0.35 + random() * 0.4
+                ),
+
+                Math.min(1, config.recursionDepth),
+
+                i + 3000
+
+            );
+
+        }
+
+
+        region.generated = true;
+
+        this.renderDirty = true;
+
+    }
+
+
+    generateAll() {
+
+        const minX = Math.floor(
+            this.terrain.min.x / this.regionSize
+        );
+
+        const maxX = Math.floor(
+            this.terrain.max.x / this.regionSize
+        );
+
+        const minZ = Math.floor(
+            this.terrain.min.z / this.regionSize
+        );
+
+        const maxZ = Math.floor(
+            this.terrain.max.z / this.regionSize
+        );
+
+        for (let x = minX; x <= maxX; x++) {
+
+            for (let z = minZ; z <= maxZ; z++) {
+
+                this.generateRegion(x, z);
+
+            }
+
+        }
+
+	this.surfaceDeposits.generate();
+
+this.rebuildRendering();
+
+
+    }
+
+
+    // ---------------------------------
+    // GEOLOGICAL EROSION
+    // ---------------------------------
+
+    erodeFormation(formation, deltaYears) {
+
+        if (!formation.alive) return false;
+
+        const config =
+            RockSpecies[formation.speciesName];
+
+        formation.age += deltaYears;
+
+        // Hardness and cohesion both resist erosion.
+        const resistance =
+            0.5 + config.hardness * 0.5;
+
+        const cohesionResistance =
+            0.5 + config.cohesion * 0.5;
+
+        const erosion =
+            config.erosionRate *
+            deltaYears /
+            (resistance * cohesionResistance);
+
+        formation.erosionProgress += erosion;
+
+        if (formation.erosionProgress < 1.0) {
+
+            return false;
+
+        }
+
+        formation.erosionProgress -= 1.0;
+
+        this.fragmentFormation(formation);
+
+        return true;
+
+    }
+
+
+    fragmentFormation(parent) {
+
+        const config =
+            RockSpecies[parent.speciesName];
+
+        parent.erosionEvents++;
+
+        // Smaller parent after fracturing.
+        parent.scale *= 0.72;
+
+        parent.integrity = 1.0;
+
+        const canFragment =
+
+            parent.fragmentDepth <
+                this.maxFragmentDepth &&
+
+            parent.scale >
+                this.minFragmentScale &&
+
+            parent.erosionEvents <= 3 &&
+
+            this.formations.length <
+                this.maxFormations;
+
+
+        if (!canFragment) {
+
+            if (
+                parent.erosionEvents >= 3 ||
+                parent.scale <= this.minFragmentScale
+            ) {
+
+                parent.alive = false;
+
+            }
+
+            return;
+
+        }
+
+
+        const random = CreateSeededRandom(
+            parent.seed ^
+            Math.imul(parent.erosionEvents, 7919)
+        );
+
+
+        const fragmentCount = Math.max(
+
+            2,
+
+            Math.round(
+                2 + config.fragmentation * 3
+            )
+
+        );
+
+
+        for (
+            let i = 0;
+            i < fragmentCount;
+            i++
+        ) {
+
+            const angle =
+                random() * Math.PI * 2;
+
+            const distance =
+                parent.scale *
+                (1.0 + random() * 2.0) *
+                config.fragmentation;
+
+            const x =
+                parent.position.x +
+                Math.cos(angle) * distance;
+
+            const z =
+                parent.position.z +
+                Math.sin(angle) * distance;
+
+            const position =
+                this.terrain.sampleAt(x, z);
+
+            if (!position) continue;
+
+
+            const fragmentScale =
+                parent.scale *
+                (0.25 + random() * 0.18);
+
+
+            const fragmentSeed =
+                (
+                    parent.seed ^
+                    Math.imul(i + 1, 2654435761) ^
+                    parent.erosionEvents
+                ) >>> 0;
+
+
+            this.createFormation(
+
+                parent.speciesName,
+
+                position,
+
+                fragmentScale,
+
+                fragmentSeed,
+
+                parent.fragmentDepth + 1
+
+            );
+
+        }
+
+
+        // Fine sediment is gradually incorporated
+        // into the surrounding ground.
+        if (
+            parent.fragmentDepth >=
+                this.maxFragmentDepth ||
+            parent.scale < this.minFragmentScale * 2
+        ) {
+
+            parent.alive = false;
+
+        }
+

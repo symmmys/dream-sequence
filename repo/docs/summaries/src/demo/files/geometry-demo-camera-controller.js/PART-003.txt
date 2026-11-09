@@ -1,0 +1,168 @@
+            x: Math.sin(this.freeYaw) * horizontal,
+            y: Math.sin(this.freePitch),
+            z: Math.cos(this.freeYaw) * horizontal
+        };
+    }
+
+    applyFreePose() {
+        if (!this.freePosition) return;
+        const forward = this.getForwardVector();
+        this.camera.position.set(this.freePosition.x, this.freePosition.y, this.freePosition.z);
+        this.camera.setTarget(new BABYLON.Vector3(
+            this.freePosition.x + forward.x,
+            this.freePosition.y + forward.y,
+            this.freePosition.z + forward.z
+        ));
+    }
+
+    getModeInfo() {
+        return {
+            mode: this.mode,
+            freeSliceId: this.freeSliceId,
+            inCorridor: Boolean(this.freeTransit),
+            anomalyType: this.freeTransit?.type ?? null,
+            corridorProgress: this.freeTransit?.progress ?? null,
+            corridorPosition4D: this.freeTransit?.position4D ?? this.freeTransit?.spatialPosition4D ?? null,
+            fourthCoordinate: this.freeW,
+            speed: this.freeSpeed
+        };
+    }
+
+    getFreeTransitState() {
+        return this.freeTransit;
+    }
+
+    getViewSliceId() {
+        if (this.mode === 'free') {
+            return this.freeTransit?.startWorld.slice.id ??
+                this.freeSliceId ?? this.traversal?.currentSliceId ?? this.character.sliceId;
+        }
+        if (this.traversal?.state === 'transit') return this.traversal.startWorld.slice.id;
+        return this.traversal?.currentSliceId ?? this.character.sliceId;
+    }
+
+    getFreeW() { return this.mode === 'free' ? this.freeW : 0; }
+
+    getFreeWorldPosition() {
+        if (this.mode !== 'free' || this.freeTransit || !this.freePosition) return null;
+        const world = this.traversal?.worlds.get(this.freeSliceId);
+        if (typeof world?.transform?.renderToWorld !== 'function') return null;
+        const position = this.renderFreePositionToWorld(world);
+        return isFinitePosition(position) ? position : null;
+    }
+
+    constrainFreePosition(world, position = this.freePosition) {
+        if (!position) return position;
+        const constrained = world?.transform?.constrainRenderPosition?.(position) ?? position;
+        this.freePosition = copyVector(constrained);
+        return this.freePosition;
+    }
+
+    renderFreePositionToWorld(world) {
+        if (typeof world?.transform?.renderToWorld !== 'function' || !this.freePosition) return null;
+        this.constrainFreePosition(world);
+        try {
+            return world.transform.renderToWorld(this.freePosition);
+        } catch (error) {
+            // A chart-boundary miss should prevent corridor entry for this
+            // frame, not terminate the entire render/update loop.
+            if (error instanceof RangeError) return null;
+            throw error;
+        }
+    }
+
+    dispose() {
+        if (this.disposed) return;
+        window.removeEventListener('keydown', this.onFreeKeyDown);
+        window.removeEventListener('keyup', this.onFreeKeyUp);
+        window.removeEventListener('blur', this.onFreeBlur);
+        this.canvas?.removeEventListener('pointerdown', this.onFreePointerDown);
+        window.removeEventListener('pointermove', this.onFreePointerMove);
+        window.removeEventListener('pointerup', this.onFreePointerUp);
+        this.playerController?.setInputEnabled(true);
+        this.freeKeys.clear();
+        this.freeTransit = null;
+        super.dispose();
+    }
+}
+
+function constrainAmbientPositionToWorldChart(world, position4D) {
+    if (typeof world?.transform?.constrainWorldPosition !== 'function') return position4D;
+    const frame = world.slice.frame;
+    const local = ambientToSlice(frame, position4D);
+    const constrained = world.transform.constrainWorldPosition(local.position);
+    if (['x', 'y', 'z'].every((axis) => Math.abs(constrained[axis] - local.position[axis]) <= 1e-10)) {
+        return position4D;
+    }
+    return add4(
+        sliceToAmbient(frame, constrained),
+        scale4(frame.normal, local.normalOffset)
+    );
+}
+
+function applyAmbientOffsets(sample, transit) {
+    const position = { ...sample.spatialPosition4D };
+    for (const [index, key] of ['offsetU', 'offsetV', 'offsetW'].entries()) {
+        const axis = sample.axes4D[index];
+        const amount = transit[key];
+        position.x += axis.x * amount;
+        position.y += axis.y * amount;
+        position.z += axis.z * amount;
+        position.w += axis.w * amount;
+    }
+    return position;
+}
+
+function getDisplayAxes(sample) {
+    const first = normalize3(sample.axes?.[0] ?? sample.crossSectionAxes?.[0]);
+    const secondRaw = normalize3(sample.axes?.[1] ?? sample.crossSectionAxes?.[1]);
+    const second = normalize3(subtract3(secondRaw, scale3(first, dot3(secondRaw, first))));
+    const third = normalize3(sample.crossSectionAxes?.[2] ?? cross3(sample.tangent, first));
+    return [first, second, length3(third) > 1e-9 ? third : normalize3(cross3(first, second))];
+}
+
+function isInsideBounds(position, bounds) {
+    return ['x', 'y', 'z', 'w'].every((axis) =>
+        position[axis] >= bounds.min[axis] - 1e-7 && position[axis] <= bounds.max[axis] + 1e-7
+    );
+}
+
+function clampAmbient(position, bounds) {
+    return {
+        x: clamp(position.x, bounds.min.x, bounds.max.x),
+        y: clamp(position.y, bounds.min.y, bounds.max.y),
+        z: clamp(position.z, bounds.min.z, bounds.max.z),
+        w: clamp(position.w, bounds.min.w, bounds.max.w)
+    };
+}
+
+function keyAxis(keys, positive, negative) {
+    return Number(keys.has(positive)) - Number(keys.has(negative));
+}
+
+function copyVector(value) { return { x: value.x, y: value.y, z: value.z }; }
+function add3(left, right) { return { x: left.x + right.x, y: left.y + right.y, z: left.z + right.z }; }
+function subtract3(left, right) { return { x: left.x - right.x, y: left.y - right.y, z: left.z - right.z }; }
+function scale3(value, amount) { return { x: value.x * amount, y: value.y * amount, z: value.z * amount }; }
+function dot3(left, right) { return left.x * right.x + left.y * right.y + left.z * right.z; }
+function cross3(left, right) {
+    return {
+        x: left.y * right.z - left.z * right.y,
+        y: left.z * right.x - left.x * right.z,
+        z: left.x * right.y - left.y * right.x
+    };
+}
+function length3(value) { return Math.hypot(value.x, value.y, value.z); }
+function normalize3(value) {
+    const length = length3(value);
+    return length > 1e-9 ? scale3(value, 1 / length) : { x: 0, y: 0, z: 1 };
+}
+function clamp(value, minimum, maximum) { return Math.min(maximum, Math.max(minimum, value)); }
+
+function isFinitePosition(position) {
+    return Boolean(position && ['x', 'y', 'z'].every(function finiteAxis(axis) {
+        return Number.isFinite(position[axis]);
+    }));
+}
+
+export { GeometryDemoCameraController };

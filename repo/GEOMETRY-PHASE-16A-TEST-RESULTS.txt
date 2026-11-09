@@ -1,0 +1,40 @@
+SOMNIUM — GEOMETRY PHASE 16A TEST RESULTS
+Optical contracts, ambient 4D optical metric, and CPU reference rays
+
+Automated test command:
+  node --test tests/*.test.mjs
+
+Baseline Phase 15 tests: 186
+New Phase 16A optical tests: 15
+Total tests: 201
+Passed: 201
+Failed: 0
+
+Static checks:
+  Source JavaScript files syntax-checked: 119 / 119
+  Test MJS files syntax-checked: 23 / 23
+  Relative module references checked: 186
+  Missing relative module references: 0
+  Cache-busting build identifier: somnium-20261108-phase16a-optical-reference-1
+
+Optical reference coverage:
+  - optical material and anomaly optics contract validation
+  - independent optical permission and player traversal
+  - anomaly smootherstep optical W coupling
+  - Euclidean straight rays and constant canonical momentum
+  - uniform refractive-index optical travel time
+  - graded-index ray bending and Hamiltonian conservation
+  - SpatialTransform metric provider adapter
+  - zero W coupling as an exact normal constraint
+  - partial W optical coupling and normal propagation
+  - positive-definite metric/cometric validation in a rotated frame
+  - convex blend of positive-definite slice metrics
+  - radial Poincare geodesic reference case
+  - strict invalid Poincare chart rejection
+  - deterministic ray debug serialization
+  - invalid input and solver option rejection
+
+Limitations:
+  No Babylon/WebGL optics rendering was introduced in Phase 16A.
+  The CPU solver is a correctness reference; performance optimization is deferred.
+  No live browser rendering test was performed.

@@ -1,0 +1,300 @@
+import { GeologicalField } from "./geological-field.js";
+import { SurfaceDepositSystem } from "./surface-deposit-system.js";
+import { RockSpecies } from "./rock-species.js";
+import { ThinInstanceRenderer } from "../rendering/thin-instance-renderer.js";
+import { CreateSeededRandom } from "../core/random.js";
+import { RockGenerator } from "../geology/rock-generator.js";
+
+let nextFormationId = 0;
+
+class GeologicalManager {
+
+    constructor(scene, terrain, shadowGenerator) {
+
+        this.scene = scene;
+
+        this.terrain = terrain;
+
+        this.shadowGenerator = shadowGenerator;
+
+        this.regionSize = 250;
+
+        this.seed = 91827;
+
+        this.field = new GeologicalField(
+            terrain,
+            this.seed
+        );
+
+	this.surfaceDeposits =
+    new SurfaceDepositSystem(
+        scene,
+        terrain,
+        this.field
+    );
+
+        this.regions = new Map();
+
+        this.formations = [];
+
+        this.maxFormations = 15000;
+
+        this.minFragmentScale = 0.35;
+
+        this.maxFragmentDepth = 2;
+
+        this.renderDirty = true;
+
+        this.simulationSteps = 0;
+
+        this.renderEverySteps = 5;
+
+        this.renderers = {};
+
+
+        // One independent rendering batch per material.
+        for (const speciesName in RockSpecies) {
+
+            const config = RockSpecies[speciesName];
+
+            const mesh = BABYLON.MeshBuilder.CreateSphere(
+                "geology_" + speciesName,
+                {
+                    diameter: 1,
+                    segments: 2
+                },
+                scene
+            );
+
+            const material = new BABYLON.StandardMaterial(
+                "geologyMaterial_" + speciesName,
+                scene
+            );
+
+            material.diffuseColor =
+                config.color.clone();
+
+            material.specularColor =
+                new BABYLON.Color3(
+                    0.06,
+                    0.06,
+                    0.06
+                );
+
+            if (speciesName === "anomaly") {
+
+                material.emissiveColor =
+                    config.color.scale(0.35);
+
+            }
+
+            mesh.material = material;
+
+            this.renderers[speciesName] =
+                new ThinInstanceRenderer(
+                    scene,
+                    "geology_" + speciesName,
+                    mesh,
+                    shadowGenerator
+                );
+
+        }
+
+    }
+
+
+    getRegionKey(x, z) {
+
+        return `${x},${z}`;
+
+    }
+
+
+    createFormation(
+        speciesName,
+        position,
+        scale,
+        seed,
+        fragmentDepth = 0
+    ) {
+
+        if (
+            !position ||
+            this.formations.length >= this.maxFormations
+        ) {
+            return null;
+        }
+
+        const formation = {
+
+            id: nextFormationId++,
+
+            speciesName,
+
+            position: position.clone(),
+
+            scale,
+
+            age: 0,
+
+            integrity: 1.0,
+
+            erosionProgress: 0,
+
+            erosionEvents: 0,
+
+            fragmentDepth,
+
+            seed: seed >>> 0,
+
+            alive: true
+
+        };
+
+        this.formations.push(formation);
+
+        return formation;
+
+    }
+
+
+    createRegion(regionX, regionZ) {
+
+        const key = this.getRegionKey(
+            regionX,
+            regionZ
+        );
+
+        if (this.regions.has(key)) {
+
+            return this.regions.get(key);
+
+        }
+
+        const seed = (
+            Math.imul(regionX, 73856093) ^
+            Math.imul(regionZ, 19349663) ^
+            this.seed
+        ) >>> 0;
+
+        const centerX =
+            (regionX + 0.5) * this.regionSize;
+
+        const centerZ =
+            (regionZ + 0.5) * this.regionSize;
+
+        const centerSample =
+            this.field.sample(centerX, centerZ);
+
+        const region = {
+
+            x: regionX,
+
+            z: regionZ,
+
+            seed,
+
+            dominantSpecies:
+                centerSample
+                    ? centerSample.speciesName
+                    : "granite",
+
+            generated: false,
+
+            formationIds: []
+
+        };
+
+        this.regions.set(key, region);
+
+        return region;
+
+    }
+
+
+    generateRegion(regionX, regionZ) {
+
+        const region = this.createRegion(
+            regionX,
+            regionZ
+        );
+
+        if (region.generated) return;
+
+        const random =
+            CreateSeededRandom(region.seed);
+
+        const originX =
+            regionX * this.regionSize;
+
+        const originZ =
+            regionZ * this.regionSize;
+
+
+        const samplePosition = () => {
+
+            const x = originX +
+                random() * this.regionSize;
+
+            const z = originZ +
+                random() * this.regionSize;
+
+            return this.field.sample(x, z);
+
+        };
+
+
+        const addFormation = (
+            sample,
+            scale,
+            depth,
+            salt
+        ) => {
+
+            if (!sample) return;
+		// These materials have their own surface renderer.
+    if (
+        sample.speciesName === "sand" ||
+        sample.speciesName === "clay" ||
+        sample.speciesName === "fertileSoil"
+    ) {
+        return;
+    }
+
+            const speciesName =
+                sample.speciesName;
+
+            const config =
+                RockSpecies[speciesName];
+
+            // Small local variations.
+            const variation =
+                0.8 + random() * 0.4;
+
+            const formation = this.createFormation(
+
+                speciesName,
+
+                sample.position,
+
+                scale * variation,
+
+                region.seed ^ salt,
+
+                depth
+
+            );
+
+            if (formation) {
+
+                region.formationIds.push(
+                    formation.id
+                );
+
+            }
+
+        };
+
+
+        // PRIMARY GEOLOGICAL FORMATIONS
+        // Large formations establish the region.

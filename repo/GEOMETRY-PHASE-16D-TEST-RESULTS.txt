@@ -1,0 +1,40 @@
+SOMNIUM — GEOMETRY PHASE 16D TEST RESULTS
+Date: November 8, 2026
+Build: somnium-20261108-phase16d-anomaly-aperture-views-2
+
+FULL AUTOMATED SUITE
+Command: node --test tests/*.test.mjs
+Result: 267 passed, 0 failed.
+
+BASELINE AND NEW COVERAGE
+- Phase 16C baseline: 255 tests.
+- Phase 16D baseline and continuation hardening: 12 focused tests are now present in the view/renderer test modules.
+- Final suite: 267 tests passed.
+
+NEW PHASE 16D COVERAGE
+- Camera translation maps into the remote endpoint frame.
+- Viewer orbit, lateral movement, and camera screen-up orientation update the remote camera pose.
+- Endpoint mapping works in both directions.
+- Different source/destination render scales are respected.
+- Declared finite destination chart boundaries disable only the preview frame.
+- Rotated slice frames are accepted through endpoint-local tangent correspondence.
+- Euclidean 4D spherical aperture sections use sqrt(R^2 - d^2), derive d from the anomaly centre by default, allow an explicit centre override, and vanish outside the sphere.
+- GeometryDemoWorld updates the remote preview camera continuously as the observer moves and rotates.
+- Anomaly view contract validates mapping, aperture shape, cross-section profile, and optional centre-offset override.
+- Portal renderer matches the render-target aspect to the aperture and refreshes it every frame.
+- Rectangular apertures scale with their cross-section just like circular and elliptical apertures.
+
+REGRESSION COVERAGE
+- Existing geometry portal-preview tests.
+- Existing optical foundation, slice intersections, optical debug renderer, anomaly tracing, and demo transport tests.
+- Existing topology, traversal, chunk streaming, camera, and world-manager tests.
+- Application entry chain and cache-busting build identifier.
+
+STATIC VERIFICATION
+- Source JavaScript syntax: 124/124 passed.
+- Test module syntax: 29/29 passed.
+- Relative imports: 311 checked, 0 missing.
+- Build identifier: somnium-20261108-phase16d-anomaly-aperture-views-2.
+
+VISUAL VERIFICATION
+No live browser/WebGL session was available in this environment. The remote view camera, circular aperture, and cross-section behavior are covered by deterministic tests, but final in-game composition and clipping have not been visually verified here.

@@ -1,0 +1,23 @@
+SOMNIUM — INDIVIDUAL SOURCE FILE INDEX
+================================================================
+
+Source file: src/world/persistence/world-persistence.js
+Source directory: src/
+Generated: 2026-11-09T03:15:29
+Total source lines: 245
+Maximum chunk size: 300 lines
+Number of parts: 1
+
+SOURCE PARTS
+----------------------------------------------------------------
+Part: PART-001.txt
+Original lines: 1-245
+Lines in part: 245
+
+READING INSTRUCTIONS
+----------------------------------------------------------------
+- Read parts in ascending numerical order.
+- Concatenate parts without adding separator lines.
+- Part contents are original UTF-8 source text.
+- Original source line numbering is preserved.
+- No source lines are intentionally omitted.

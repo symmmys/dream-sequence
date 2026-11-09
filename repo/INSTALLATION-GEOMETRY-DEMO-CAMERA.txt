@@ -1,0 +1,46 @@
+SOMNIUM — GEOMETRY DEMO CAMERA UPDATE
+Build: 2026-11-08-free-camera-3
+
+RECOMMENDED INSTALLATION
+1. Back up the current project directory.
+2. Extract the complete project archive into a clean new directory, or apply the replacement patch at the existing project root.
+3. Start the server from the directory containing index.html:
+
+   python3 -m http.server 8081 --bind 127.0.0.1
+
+4. Open http://127.0.0.1:8081/ and hard-refresh with browser caching disabled.
+5. Confirm the console reports:
+
+   [Main] Build: 2026-11-08-free-camera-3
+   [GeometryDemoCamera] Build: 2026-11-08-free-camera-3
+
+CAMERA CONTROLS
+Follow mode is the default. Press C or click FREE CAMERA (C) to enter inspection mode.
+
+Free camera outside a corridor:
+  W / S       Forward / backward
+  A / D       Strafe
+  R / F       Up / down
+  Mouse drag  Look
+  Wheel       Adjust speed
+  Shift       Faster
+  C           Return to following the player
+
+Free camera inside a corridor:
+  W / S       Along the corridor tangent
+  A / D       First cross-section axis
+  R / F       Second cross-section axis
+  E / Q       Third cross-section axis
+  Mouse drag  Look
+  Wheel       Adjust speed
+  Shift       Faster
+  C           Return to following the player
+
+The four corridor directions are the tangent plus the three transported perpendicular directions. The controls provide an independent forward/back pair for each direction: W/S, A/D, R/F, and E/Q respectively. The free camera can cross a corridor independently; the player remains stationary while the inspection camera moves. Switching back to Follow returns to the player.
+
+VERIFICATION
+Run the tests from the project root:
+
+   node --test tests/*.test.mjs
+
+This update's automated Node suite passed 107/107 tests. JavaScript syntax checks passed 124/124 source and test modules; 201/201 relative static import targets resolved. The complete project archive was extracted into a clean directory and its 107-test suite passed again. The update was not verified in a live browser/WebGL session; visually inspect the destination portal and translucent corridor shell after installation.

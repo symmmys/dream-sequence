@@ -1,0 +1,300 @@
+/** Deterministic CPU reference integrator for Hamiltonian optical rays in R4. */
+
+import { assertVector4 } from './spatial-4d.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+
+const AXES = ['x', 'y', 'z', 'w'];
+const STATE_SIZE = 8;
+const DEFAULTS = Object.freeze({
+    maxPathLength: 10,
+    initialStepSize: 0.025,
+    minStepSize: 1e-7,
+    maxStepSize: 0.1,
+    absoluteTolerance: 1e-9,
+    relativeTolerance: 1e-7,
+    gradientStep: 1e-4,
+    maxSteps: 4096,
+    speedOfLight: 1,
+    includeSamples: true,
+    segmentEvent: null
+});
+
+function createOpticalRayState(options = {}) {
+    assertVector4(options.position);
+    assertVector4(options.momentum);
+    const opticalPathLength = options.opticalPathLength ?? 0;
+    const travelTime = options.travelTime ?? 0;
+    const intensity = options.intensity ?? 1;
+    validateNonNegative(opticalPathLength, 'Optical path length');
+    validateNonNegative(travelTime, 'Ray travel time');
+    if (!Number.isFinite(intensity) || intensity < 0 || intensity > 1) {
+        throw new RangeError('Ray intensity must be between zero and one.');
+    }
+    return {
+        position: copy4(options.position),
+        momentum: copy4(options.momentum),
+        opticalPathLength,
+        travelTime,
+        intensity
+    };
+}
+
+/** Scales a canonical covector so its initial Hamiltonian equals targetH. */
+function normalizeOpticalMomentum(field, position, momentum, targetH = 0.5) {
+    requireField(field);
+    assertVector4(position);
+    assertVector4(momentum);
+    validatePositive(targetH, 'Target optical Hamiltonian');
+    const sample = field.sample(position);
+    const currentH = hamiltonianFromCometric(sample.cometric, momentum);
+    if (!Number.isFinite(currentH) || currentH <= 1e-15) {
+        throw new RangeError('Optical ray momentum has no component in an available propagation direction.');
+    }
+    const scale = Math.sqrt(targetH / currentH);
+    return {
+        x: momentum.x * scale,
+        y: momentum.y * scale,
+        z: momentum.z * scale,
+        w: momentum.w * scale
+    };
+}
+
+function evaluateOpticalHamiltonian(field, position, momentum) {
+    requireField(field);
+    assertVector4(position);
+    assertVector4(momentum);
+    return hamiltonianFromCometric(field.cometricAt(position), momentum);
+}
+
+/**
+ * Traces one ray with adaptive RK4 step-doubling.
+ * The path parameter is normalized optical arclength when H = 1/2. The solver
+ * also accumulates the measured optical path and travel time independently.
+ *
+ * Declared metric-domain boundaries are handled as explicit terminal events: the
+ * adaptive integrator reduces a step that crosses the boundary and returns the
+ * last valid state if no safe step remains. All other metric/geometry errors
+ * propagate unchanged so invalid configurations are not silently hidden.
+ */
+function traceOpticalRay(field, initialRay, options = {}) {
+    requireField(field);
+    const config = { ...DEFAULTS, ...options };
+    validateTraceOptions(config);
+
+    const ray = createOpticalRayState(initialRay);
+    let vector = stateToArray(ray);
+    let lambda = 0;
+    let stepSize = config.initialStepSize;
+    let opticalPathLength = ray.opticalPathLength;
+    let travelTime = ray.travelTime;
+    let acceptedSteps = 0;
+    let rejectedSteps = 0;
+    let maxRelativeStepError = 0;
+    let event = null;
+    const samples = [];
+    if (typeof field.containsPosition === 'function' && !field.containsPosition(ray.position)) {
+        throw new RangeError('Initial optical ray lies outside the metric domain.');
+    }
+    let initialHamiltonian = evaluateOpticalHamiltonian(field, ray.position, ray.momentum);
+    if (!Number.isFinite(initialHamiltonian) || initialHamiltonian <= 1e-15) {
+        throw new RangeError('Initial optical ray must have positive finite Hamiltonian.');
+    }
+    const startingHamiltonian = initialHamiltonian;
+    if (config.includeSamples) samples.push(makeSample(vector, lambda, opticalPathLength, travelTime, initialHamiltonian));
+
+    let status = 'max-path-length';
+    while (opticalPathLength - ray.opticalPathLength < config.maxPathLength && acceptedSteps + rejectedSteps < config.maxSteps) {
+        const currentPosition = arrayToPosition(vector);
+        const currentMomentum = arrayToMomentum(vector);
+        const currentHamiltonian = evaluateOpticalHamiltonian(field, currentPosition, currentMomentum);
+        const opticalSpeed = Math.sqrt(Math.max(0, 2 * currentHamiltonian));
+        if (!Number.isFinite(opticalSpeed) || opticalSpeed <= 1e-14) {
+            status = 'stalled';
+            break;
+        }
+
+        const remainingOpticalPath = config.maxPathLength - (opticalPathLength - ray.opticalPathLength);
+        if (remainingOpticalPath <= 1e-12) break;
+        const h = Math.min(stepSize, config.maxStepSize, remainingOpticalPath / opticalSpeed);
+        if (h < config.minStepSize) {
+            status = 'step-underflow';
+            break;
+        }
+
+        // Step doubling estimates the fourth-order RK error and provides a
+        // Richardson-corrected candidate without external numerical libraries.
+        // If an intermediate RK stage crosses a finite chart boundary, reject
+        // and halve the step until the last valid state is safely retained.
+        let full;
+        let halfA;
+        let halfB;
+        let error;
+        let corrected = null;
+        let nextPosition = null;
+        let nextMomentum = null;
+        let nextHamiltonian = null;
+        try {
+            full = rk4Step(field, vector, h, config.gradientStep);
+            halfA = rk4Step(field, vector, h / 2, config.gradientStep);
+            halfB = rk4Step(field, halfA, h / 2, config.gradientStep);
+            error = estimateStepError(full, halfB, config.absoluteTolerance, config.relativeTolerance);
+            maxRelativeStepError = Math.max(maxRelativeStepError, error);
+
+            if (error <= 1) {
+                corrected = halfB.map((value, index) => value + (value - full[index]) / 15);
+                nextPosition = arrayToPosition(corrected);
+                assertInsideMetricDomain(field, nextPosition);
+                nextMomentum = arrayToMomentum(corrected);
+                nextHamiltonian = evaluateOpticalHamiltonian(field, nextPosition, nextMomentum);
+            }
+        } catch (error) {
+            if (!isMetricDomainBoundaryError(error)) throw error;
+            rejectedSteps++;
+            const reducedStep = h * 0.5;
+            if (reducedStep < config.minStepSize) {
+                status = 'domain-boundary';
+                event = { kind: 'chart-domain-boundary', position: currentPosition };
+                break;
+            }
+            stepSize = reducedStep;
+            continue;
+        }
+
+        if (error <= 1) {
+            if (!Number.isFinite(nextHamiltonian) || nextHamiltonian <= 0) {
+                throw new RangeError('Optical ray integration produced an invalid Hamiltonian state.');
+            }
+
+            const nextOpticalSpeed = Math.sqrt(2 * nextHamiltonian);
+            const opticalIncrement = h * (opticalSpeed + nextOpticalSpeed) / 2;
+            const boundedIncrement = Math.min(remainingOpticalPath, opticalIncrement);
+            const segment = {
+                startPosition: currentPosition,
+                endPosition: nextPosition,
+                startMomentum: currentMomentum,
+                endMomentum: nextMomentum,
+                startOpticalPathLength: opticalPathLength,
+                endOpticalPathLength: opticalPathLength + boundedIncrement,
+                startTravelTime: travelTime,
+                endTravelTime: travelTime + boundedIncrement / config.speedOfLight
+            };
+            const detectedEvent = typeof config.segmentEvent === 'function'
+                ? config.segmentEvent(segment)
+                : null;
+            if (detectedEvent) {
+                const parameter = detectedEvent.parameter;
+                if (!Number.isFinite(parameter) || parameter < 0 || parameter > 1) {
+                    throw new RangeError('Optical segment event parameter must be between zero and one.');
+                }
+                vector = corrected.map((value, index) => vector[index] + (value - vector[index]) * parameter);
+                const hitPosition = arrayToPosition(vector);
+                if (typeof field.containsPosition === 'function' && !field.containsPosition(hitPosition)) {
+                    vector = stateToArray({ position: currentPosition, momentum: currentMomentum });
+                    status = 'domain-boundary';
+                    event = { kind: 'chart-domain-boundary', position: currentPosition };
+                    break;
+                }
+                const hitMomentum = arrayToMomentum(vector);
+                const hitHamiltonian = evaluateOpticalHamiltonian(field, hitPosition, hitMomentum);
+                if (!Number.isFinite(hitHamiltonian) || hitHamiltonian <= 0) {
+                    throw new RangeError('Optical segment event produced an invalid Hamiltonian state.');
+                }
+                const hitOpticalIncrement = boundedIncrement * parameter;
+                opticalPathLength += hitOpticalIncrement;
+                travelTime += hitOpticalIncrement / config.speedOfLight;
+                lambda += h * parameter;
+                acceptedSteps++;
+                initialHamiltonian = hitHamiltonian;
+                event = { ...detectedEvent, parameter };
+                if (config.includeSamples) samples.push(makeSample(
+                    vector, lambda, opticalPathLength, travelTime, hitHamiltonian
+                ));
+                status = 'event';
+                break;
+            }
+
+            opticalPathLength += boundedIncrement;
+            travelTime += boundedIncrement / config.speedOfLight;
+            lambda += h;
+            vector = corrected;
+            acceptedSteps++;
+            initialHamiltonian = nextHamiltonian;
+            if (config.includeSamples) samples.push(makeSample(
+                vector, lambda, opticalPathLength, travelTime, nextHamiltonian
+            ));
+
+            const factor = error <= 1e-12 ? 2.5 : clamp(0.9 * Math.pow(1 / error, 0.2), 0.2, 2.5);
+            stepSize = clamp(h * factor, config.minStepSize, config.maxStepSize);
+        } else {
+            rejectedSteps++;
+            const factor = clamp(0.9 * Math.pow(1 / error, 0.2), 0.1, 0.5);
+            stepSize = h * factor;
+            if (stepSize < config.minStepSize) {
+                status = 'step-underflow';
+                break;
+            }
+        }
+    }
+
+    if (acceptedSteps + rejectedSteps >= config.maxSteps &&
+        opticalPathLength - ray.opticalPathLength < config.maxPathLength) {
+        status = 'max-steps';
+    }
+
+    const finalPosition = arrayToPosition(vector);
+    const finalMomentum = arrayToMomentum(vector);
+    const finalHamiltonian = evaluateOpticalHamiltonian(field, finalPosition, finalMomentum);
+    const absoluteHamiltonianDrift = Math.abs(finalHamiltonian - startingHamiltonian);
+    const relativeHamiltonianDrift = absoluteHamiltonianDrift / Math.max(Math.abs(startingHamiltonian), 1e-15);
+    const finalState = {
+        position: finalPosition,
+        momentum: finalMomentum,
+        opticalPathLength,
+        travelTime,
+        intensity: ray.intensity
+    };
+
+    return {
+        status,
+        event,
+        finalState,
+        samples,
+        diagnostics: {
+            initialHamiltonian: startingHamiltonian,
+            finalHamiltonian,
+            absoluteHamiltonianDrift,
+            relativeHamiltonianDrift,
+            acceptedSteps,
+            rejectedSteps,
+            maxRelativeStepError,
+            pathParameter: lambda
+        }
+    };
+}
+
+/** Stable, timestamp-free JSON representation for deterministic ray debugging. */
+function serializeOpticalRayResult(result, precision = 12) {
+    if (!result || !result.finalState || !Array.isArray(result.samples) || !result.diagnostics) {
+        throw new TypeError('A complete optical ray result is required for serialization.');
+    }
+    if (!Number.isSafeInteger(precision) || precision < 0 || precision > 15) {
+        throw new RangeError('Optical ray serialization precision must be an integer from zero through fifteen.');
+    }
+    const round = (value) => Number(value.toFixed(precision));
+    const point = (value) => AXES.map((axis) => round(value[axis]));
+    const output = {
+        schemaVersion: 1,
+        status: result.status,
+        finalState: {
+            position: point(result.finalState.position),
+            momentum: point(result.finalState.momentum),
+            opticalPathLength: round(result.finalState.opticalPathLength),
+            travelTime: round(result.finalState.travelTime),
+            intensity: round(result.finalState.intensity)
+        },
+        samples: result.samples.map((sample) => ({
+            pathParameter: round(sample.pathParameter),
+            opticalPathLength: round(sample.opticalPathLength),
+            travelTime: round(sample.travelTime),
+            position: point(sample.position),
+            momentum: point(sample.momentum),
+            hamiltonian: round(sample.hamiltonian)

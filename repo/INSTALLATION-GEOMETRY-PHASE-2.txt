@@ -1,0 +1,38 @@
+SOMNIUM GEOMETRY PHASE 2 — INSTALLATION NOTES
+
+1. Unzip the complete project archive into a fresh directory, or use the replacement-files archive against a backup of your current project.
+2. Serve the project over HTTP. From the directory containing index.html, run:
+
+   python3 -m http.server 8081 --bind 127.0.0.1
+
+3. Open http://localhost:8081 in a current desktop browser. Do not open index.html directly with file:// because ES modules and image fetch require an HTTP origin.
+4. Select GEOMETRY DEMO on the main menu.
+5. Use WASD to move, Shift to run, left-mouse drag to turn, G to toggle the metric grid, and Esc to pause.
+
+The demo fixture is assets/geometry-demo-topography.png. The existing 0_somnium_map_topographic.png is preserved. If its browser decoder rejects it or exposes a suspicious fully transparent trailing region, the main terrain adapter will use the demo fixture as a fallback and expose this in getHeightmapStats().
+
+The corridor is a 4D topology connection and visible 3D proxy; player traversal through it is not part of this phase. The destination is rendered only through the portal preview and is not a simulation neighbour.
+
+GPU projection is not activated in this phase because the existing shader manager replaces source materials and cannot yet preserve arbitrary textures/vertex colours. The CPU mesh projection is used for correctness.
+
+Node tests can be run from the project root with:
+
+   node --test tests/*.test.mjs
+
+Browser/GPU rendering should be checked in a normal browser. Headless browser verification was blocked in the environment used to prepare this archive.
+
+
+REUSABLE TOPOGRAPHIC WORLD GENERATION
+-------------------------------------
+The reusable pipeline is split by responsibility:
+
+  BrowserHeightmapLoader       URL / Blob / File / ImageData -> RGBA pixels
+  TopographicWorldFactory      RGBA pixels -> WorldSlice + terrain sampler
+  buildTopographicTerrainBuffers  terrain sampler -> indexed vertex buffers
+  createTopographicTerrainMesh    terrain sampler -> Babylon mesh
+  BabylonGeometryAdapter         mesh sliceId -> per-slice spatial projection
+
+A new map should create a new unique slice ID and its own SpatialTransform. Register
+the slice in WorldTopology before registering any corridor that references it. A
+visible portal is a render-preview relation; it does not activate destination
+simulation or imply ordinary chunk adjacency.

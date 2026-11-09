@@ -1,0 +1,91 @@
+SOMNIUM — DIRECTORY SUMMARY
+================================================================
+
+Directory: src/ecology/
+Generated: 2026-11-09T03:15:29
+
+PURPOSE
+----------------------------------------------------------------
+Automatically generated source inventory.
+See individual modules for detailed responsibilities.
+
+SOURCE FILES (DIRECT CHILDREN)
+----------------------------------------------------------------
+- forest.js
+  Exports: Forest
+- tree-generator.js
+  Exports: DirectionRotation, TreeGenerator
+- tree.js
+  Exports: Tree
+
+DIRECT DEPENDENCIES
+----------------------------------------------------------------
+- src/atmosphere/cloud-generator.js
+- src/atmosphere/cloud-species.js
+- src/atmosphere/cloud-system.js
+- src/core/genetics.js
+- src/core/species.js
+- src/environment/environment.js
+- src/environment/spatial-grid.js
+- src/environment/terrain.js
+- src/geology/geological-field.js
+- src/geology/geological-manager.js
+- src/rendering/rock-renderer.js
+- src/rendering/tree-renderers.js
+- src/water/hydrology.js
+- src/water/rain-system.js
+- src/water/water-system.js
+- src/world/fields/world-field-system.js
+
+DEPENDENTS
+----------------------------------------------------------------
+- src/rendering/surface-deposit-renderer.js
+- src/world/chunk-ecology-system.js
+
+INDIVIDUAL SOURCE FILE MANIFEST
+----------------------------------------------------------------
+
+Documentation root: docs/summaries/src/ecology/files/
+Maximum chunk size: 300 lines
+Text files documented: 3
+Binary/unreadable files skipped: 0
+
+Each source file has its own documentation directory.
+INDEX.txt identifies the original file and maps every
+numbered part to its exact original source line range.
+
+SOURCE: src/ecology/forest.js
+  Lines: 533
+  Parts: 2
+  Index: docs/summaries/src/ecology/files/forest.js/INDEX.txt
+    docs/summaries/src/ecology/files/forest.js/PART-001.txt
+    docs/summaries/src/ecology/files/forest.js/PART-002.txt
+
+SOURCE: src/ecology/tree-generator.js
+  Lines: 441
+  Parts: 2
+  Index: docs/summaries/src/ecology/files/tree-generator.js/INDEX.txt
+    docs/summaries/src/ecology/files/tree-generator.js/PART-001.txt
+    docs/summaries/src/ecology/files/tree-generator.js/PART-002.txt
+
+SOURCE: src/ecology/tree.js
+  Lines: 372
+  Parts: 2
+  Index: docs/summaries/src/ecology/files/tree.js/INDEX.txt
+    docs/summaries/src/ecology/files/tree.js/PART-001.txt
+    docs/summaries/src/ecology/files/tree.js/PART-002.txt
+
+RECURSIVE SOURCE DUMP
+----------------------------------------------------------------
+- SOURCE.txt contains recursively collected text files.
+- Individual files are available under files/.
+- Individual PART files contain at most 300 lines.
+- Binary files are excluded from both representations.
+
+NOTES
+----------------------------------------------------------------
+- Dependencies are extracted from relative JavaScript imports.
+- External packages and browser globals are not represented.
+- Dynamic imports using computed paths may not be detected.
+- This inventory does not establish runtime initialization order.
+- Generated documentation is not authoritative application state.

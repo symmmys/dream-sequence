@@ -1,0 +1,167 @@
+        })),
+        diagnostics: Object.fromEntries(Object.entries(result.diagnostics).map(([key, value]) => [key, round(value)]))
+    };
+    return JSON.stringify(output);
+}
+
+function rk4Step(field, state, h, gradientStep) {
+    const k1 = derivative(field, state, gradientStep);
+    const k2 = derivative(field, addScaled(state, k1, h / 2), gradientStep);
+    const k3 = derivative(field, addScaled(state, k2, h / 2), gradientStep);
+    const k4 = derivative(field, addScaled(state, k3, h), gradientStep);
+    return state.map((value, index) => value + h * (
+        k1[index] + 2 * k2[index] + 2 * k3[index] + k4[index]
+    ) / 6);
+}
+
+function derivative(field, state, gradientStep) {
+    const position = arrayToPosition(state);
+    assertInsideMetricDomain(field, position);
+    const momentum = arrayToMomentum(state);
+    const sample = field.sample(position);
+    const velocity = multiply4(sample.cometric, momentum);
+    const gradient = field.cometricGradientAt(position, { step: gradientStep });
+    const momentumDerivative = new Array(4).fill(0);
+    for (let coordinate = 0; coordinate < 4; coordinate++) {
+        let contraction = 0;
+        for (let row = 0; row < 4; row++) {
+            for (let column = 0; column < 4; column++) {
+                contraction += gradient[coordinate][row * 4 + column] *
+                    momentum[AXES[row]] * momentum[AXES[column]];
+            }
+        }
+        momentumDerivative[coordinate] = -0.5 * contraction;
+    }
+    return [
+        velocity.x, velocity.y, velocity.z, velocity.w,
+        ...momentumDerivative
+    ];
+}
+
+
+function assertInsideMetricDomain(field, position) {
+    if (typeof field.containsPosition === 'function' && !field.containsPosition(position)) {
+        const error = new RangeError('Optical ray reached a finite geometry chart boundary.');
+        error.code = 'OPTICAL_METRIC_DOMAIN_BOUNDARY';
+        throw error;
+    }
+}
+
+function isMetricDomainBoundaryError(error) {
+    return error?.code === 'OPTICAL_METRIC_DOMAIN_BOUNDARY';
+}
+
+function estimateStepError(full, half, absoluteTolerance, relativeTolerance) {
+    let maximum = 0;
+    for (let index = 0; index < STATE_SIZE; index++) {
+        const scale = absoluteTolerance + relativeTolerance * Math.max(Math.abs(full[index]), Math.abs(half[index]));
+        maximum = Math.max(maximum, Math.abs(half[index] - full[index]) / (15 * scale));
+    }
+    return maximum;
+}
+
+function hamiltonianFromCometric(cometric, momentum) {
+    const values = AXES.map((axis) => momentum[axis]);
+    let result = 0;
+    for (let row = 0; row < 4; row++) {
+        for (let column = 0; column < 4; column++) {
+            result += values[row] * cometric[row * 4 + column] * values[column];
+        }
+    }
+    return 0.5 * result;
+}
+
+function multiply4(matrix, vector) {
+    const values = AXES.map((axis) => vector[axis]);
+    const result = new Array(4).fill(0);
+    for (let row = 0; row < 4; row++) {
+        for (let column = 0; column < 4; column++) {
+            result[row] += matrix[row * 4 + column] * values[column];
+        }
+    }
+    return { x: result[0], y: result[1], z: result[2], w: result[3] };
+}
+
+function makeSample(state, pathParameter, opticalPathLength, travelTime, hamiltonian) {
+    return {
+        pathParameter,
+        opticalPathLength,
+        travelTime,
+        position: arrayToPosition(state),
+        momentum: arrayToMomentum(state),
+        hamiltonian
+    };
+}
+
+function stateToArray(state) {
+    return [
+        state.position.x, state.position.y, state.position.z, state.position.w,
+        state.momentum.x, state.momentum.y, state.momentum.z, state.momentum.w
+    ];
+}
+
+function arrayToPosition(state) {
+    return { x: state[0], y: state[1], z: state[2], w: state[3] };
+}
+
+function arrayToMomentum(state) {
+    return { x: state[4], y: state[5], z: state[6], w: state[7] };
+}
+
+function addScaled(state, derivativeValues, scale) {
+    return state.map((value, index) => value + derivativeValues[index] * scale);
+}
+
+function requireField(field) {
+    if (!field || typeof field.sample !== 'function' ||
+        typeof field.cometricAt !== 'function' || typeof field.cometricGradientAt !== 'function') {
+        throw new TypeError('A compatible OpticalMetricField is required.');
+    }
+}
+
+function validateTraceOptions(options) {
+    validatePositive(options.maxPathLength, 'Maximum optical path length');
+    validatePositive(options.initialStepSize, 'Initial optical step size');
+    validatePositive(options.minStepSize, 'Minimum optical step size');
+    validatePositive(options.maxStepSize, 'Maximum optical step size');
+    validatePositive(options.absoluteTolerance, 'Optical absolute tolerance');
+    validatePositive(options.relativeTolerance, 'Optical relative tolerance');
+    validatePositive(options.gradientStep, 'Optical gradient step');
+    validatePositive(options.speedOfLight, 'Optical speed of light');
+    if (options.minStepSize > options.initialStepSize || options.initialStepSize > options.maxStepSize) {
+        throw new RangeError('Optical step sizes must satisfy min <= initial <= max.');
+    }
+    if (!Number.isSafeInteger(options.maxSteps) || options.maxSteps < 1) {
+        throw new RangeError('Optical maximum steps must be a positive safe integer.');
+    }
+    if (typeof options.includeSamples !== 'boolean') {
+        throw new TypeError('includeSamples must be boolean.');
+    }
+    if (options.segmentEvent !== null && typeof options.segmentEvent !== 'function') {
+        throw new TypeError('segmentEvent must be a function or null.');
+    }
+}
+
+function validatePositive(value, label) {
+    if (!Number.isFinite(value) || value <= 0) throw new RangeError(`${label} must be positive and finite.`);
+}
+
+function validateNonNegative(value, label) {
+    if (!Number.isFinite(value) || value < 0) throw new RangeError(`${label} must be non-negative and finite.`);
+}
+
+function copy4(value) {
+    return { x: value.x, y: value.y, z: value.z, w: value.w };
+}
+
+function clamp(value, minimum, maximum) {
+    return Math.min(maximum, Math.max(minimum, value));
+}
+
+export {
+    createOpticalRayState,
+    evaluateOpticalHamiltonian,
+    normalizeOpticalMomentum,
+    serializeOpticalRayResult,
+    traceOpticalRay
+};

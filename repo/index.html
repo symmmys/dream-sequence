@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Somnium</title>
+
+    <style>
+        html,
+        body {
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        #renderCanvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+    </style>
+
+    <!-- Keep Babylon core and loaders on the same tested release. -->
+    <script src="https://cdn.jsdelivr.net/npm/babylonjs@9.35.0/babylon.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/babylonjs-loaders@9.35.0/babylonjs.loaders.min.js"></script>
+    <script src="https://code.jquery.com/pep/0.4.3/pep.js"></script>
+
+</head>
+
+<body>
+
+    <canvas id="renderCanvas" touch-action="none"></canvas>
+
+    <!-- Application entry point -->
+    <script type="module" src="./src/main.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2"></script>
+
+</body>
+</html>
+

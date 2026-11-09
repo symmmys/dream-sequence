@@ -1,0 +1,300 @@
+        for (const cloud of record.clouds) {
+		this.windTime += deltaSeconds;
+
+for (const key of this.activeChunks) {
+    const record = this.records.get(key);
+    if (!record) continue;
+
+    for (const cloud of record.clouds) {
+        const wind = this.sampleWind(
+            cloud.position,
+            this.windTime
+        );
+
+        cloud.updateWind(wind, deltaSeconds);
+
+        this.updateCloudEnvironment(cloud, deltaSeconds);
+    }
+}
+this.renderDirty = true;
+
+            if (
+                cloud.isRaining &&
+                (
+                    !strongestRainCloud ||
+                    cloud.rainIntensity >
+                    strongestRainCloud.rainIntensity
+                )
+            ) {
+                strongestRainCloud = cloud;
+            }
+        }
+    }
+
+    this.rainingCloud = strongestRainCloud;
+
+    if (strongestRainCloud) {
+        const rainPosition =
+            strongestRainCloud.position.clone();
+
+        rainPosition.y -=
+            strongestRainCloud.isStormCloud
+                ? 300
+                : 10;
+
+        this.rainSystem.start(
+            rainPosition,
+            strongestRainCloud.rainIntensity
+        );
+    } else {
+        this.rainSystem.stop();
+    }
+}
+
+    // ------------------------------------------------
+    // CLOUD DIMENSIONS
+    // ------------------------------------------------
+
+getCloudRenderScale(cloud) {
+    const moisture = cloud.moistureRatio;
+
+    const expansion = 1.0 + moisture * 0.15;
+
+    const verticalExpansion =
+        cloud.isStormCloud
+            ? 1.0 + moisture * 0.40
+            : cloud.speciesName === "towering"
+                ? 1.0 + moisture * 0.30
+                : 1.0 + moisture * 0.10;
+
+    return {
+        horizontal: cloud.baseScale * expansion,
+        vertical:
+            cloud.baseScale *
+            expansion *
+            verticalExpansion
+    };
+}
+
+	    // ------------------------------------------------
+    // CLOUD RENDERING
+    // ------------------------------------------------
+
+    rebuildRendering() {
+        if (this.disposed) return;
+
+        this.renderer.clear();
+
+        let visibleCount = 0;
+
+        for (const key of this.activeChunks) {
+            const record = this.records.get(key);
+
+            if (!record) continue;
+
+            for (const cloud of record.clouds) {
+                const config =
+                    CloudSpecies[cloud.speciesName];
+
+                if (!config) continue;
+
+                // Generate persistent geometry once.
+                if (!cloud.baseGeometryMatrices) {
+                    const generator =
+                        new CloudGenerator(config);
+
+                    cloud.baseGeometryMatrices =
+                        generator.generate(
+                            cloud.position,
+                            cloud.baseScale,
+                            config.recursionDepth,
+                            cloud.geometrySeed
+                        );
+
+                    cloud.baseGeometryPosition =
+                        cloud.position.clone();
+                }
+
+                const dimensions =
+                    this.getCloudRenderScale(cloud);
+
+                const horizontalScale =
+                    dimensions.horizontal /
+                    cloud.baseScale;
+
+                const verticalScale =
+                    dimensions.vertical /
+                    cloud.baseScale;
+
+                const offset =
+                    cloud.position.subtract(
+                        cloud.baseGeometryPosition
+                    );
+
+                for (
+                    const matrix of cloud.baseGeometryMatrices
+                ) {
+                    const scaling =
+                        new BABYLON.Vector3();
+
+                    const rotation =
+                        new BABYLON.Quaternion();
+
+                    const translation =
+                        new BABYLON.Vector3();
+
+                    matrix.decompose(
+                        scaling,
+                        rotation,
+                        translation
+                    );
+
+                    scaling.x *= horizontalScale;
+                    scaling.z *= horizontalScale;
+                    scaling.y *= verticalScale;
+
+                    translation.addInPlace(offset);
+
+                    const adjustedMatrix =
+                        BABYLON.Matrix.Compose(
+                            scaling,
+                            rotation,
+                            translation
+                        );
+
+                    this.renderer.addMatrix(
+                        adjustedMatrix,
+                        cloud.speciesName,
+                        cloud.moistureRatio,
+                        cloud.position
+                    );
+                }
+
+                cloud.moistureAtLastRender =
+                    cloud.moistureRatio;
+
+                visibleCount++;
+            }
+        }
+
+        this.renderer.update();
+
+        this.visibleCloudCount = visibleCount;
+        this.renderDirty = false;
+    }
+
+    // ------------------------------------------------
+    // MAIN UPDATE
+    // ------------------------------------------------
+
+    update(cameraPosition, deltaSeconds) {
+        if (this.disposed || !cameraPosition) {
+            return;
+        }
+
+        const elapsed = Math.min(
+            Math.max(deltaSeconds, 0),
+            1
+        );
+
+        this.updateStreaming(cameraPosition);
+
+        this.simulationAccumulator += elapsed;
+
+        while (
+            this.simulationAccumulator >=
+            this.simulationInterval
+        ) {
+            this.updateSimulation(
+                this.simulationInterval
+            );
+
+            this.simulationAccumulator -=
+                this.simulationInterval;
+        }
+
+        this.renderAccumulator += elapsed;
+
+        if (
+            this.renderDirty ||
+            this.renderAccumulator >=
+            this.renderInterval
+        ) {
+            this.rebuildRendering();
+
+            this.renderAccumulator = 0;
+        }
+    }
+
+    // ------------------------------------------------
+    // DIAGNOSTICS
+    // ------------------------------------------------
+
+    getStats() {
+        let totalClouds = 0;
+        let rainingClouds = 0;
+        let stormClouds = 0;
+        let averageMoisture = 0;
+        let moistureSamples = 0;
+
+        for (const record of this.records.values()) {
+            for (const cloud of record.clouds) {
+                totalClouds++;
+
+                if (cloud.isRaining) {
+                    rainingClouds++;
+                }
+
+                if (cloud.isStormCloud) {
+                    stormClouds++;
+                }
+
+                averageMoisture +=
+                    cloud.moistureRatio;
+
+                moistureSamples++;
+            }
+        }
+
+        return {
+            generatedChunks: this.records.size,
+            activeChunks: this.activeChunks.size,
+
+            retainedChunks: this.records.size,
+
+            totalClouds,
+            visibleClouds: this.visibleCloudCount,
+
+            stormClouds,
+            totalGeneratedStorms:
+                this.totalGeneratedStorms,
+
+            rainingClouds,
+
+            averageMoisture:
+                moistureSamples > 0
+                    ? averageMoisture /
+                      moistureSamples
+                    : 0,
+
+            renderRadius: this.renderRadius,
+            chunkSize: this.chunkSize,
+
+            simulationInterval:
+                this.simulationInterval,
+
+            renderInterval:
+                this.renderInterval,
+
+            renderDirty: this.renderDirty
+        };
+    }
+
+    // ------------------------------------------------
+    // DISPOSAL
+    // ------------------------------------------------
+
+    dispose() {
+        if (this.disposed) return;
+
+        this.disposed = true;
