@@ -1,6 +1,6 @@
 
 import { HeightmapTerrain } from "../environment/heightmap-terrain.js";
-import { WorldManager } from "../world/world-manager.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2";
+import { WorldManager } from "../world/world-manager.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1";
 import { ChunkEcologySystem } from "../world/chunk-ecology-system.js";
 import { ChunkGeologySystem } from "../world/chunk-geology-system.js";
 import { AdaptiveGraphicsController } from "../rendering/adaptive-graphics-controller.js";
@@ -9,28 +9,28 @@ import { Hydrology } from "../water/hydrology.js";
 import { RainSystem } from "../water/rain-system.js";
 import { ChunkCloudSystem } from "../world/chunk-cloud-system.js";
 
-import { SpatialTransform } from "../world/fields/geometry/spatial-transform.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2";
+import { SpatialTransform } from "../world/fields/geometry/spatial-transform.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1";
 import { GeometryRenderer } from "../world/fields/geometry/geometry-renderer.js";
 import { GeometryShaderManager } from "../world/fields/geometry/geometry-shader-manager.js";
-import { HyperbolicCameraController } from "../world/fields/geometry/hyperbolic-camera-controller.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2";
+import { HyperbolicCameraController } from "../world/fields/geometry/hyperbolic-camera-controller.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1";
 
 import { GameManager } from "../game/game-manager.js";
 import { PlayerCharacter } from "../game/player-character.js";
-import { PlayerController } from "../game/player-controller.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2";
-import { CharacterCameraController } from "../game/camera-controller.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2";
-import { MainMenu } from "../ui/main-menu.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2";
+import { PlayerController } from "../game/player-controller.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1";
+import { CharacterCameraController } from "../game/camera-controller.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1";
+import { MainMenu } from "../ui/main-menu.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1";
 import { CelestialSystem } from "../environment/celestial-system.js";
 import { WorldPersistence } from "../world/persistence/world-persistence.js";
 import { WorldSession } from "../world/persistence/world-session.js";
 import { WorldLibraryUI } from "../world/persistence/world-library-ui.js";
 import { BuildingSystem } from "../buildings/building-system.js";
-import { BuildingEditor } from "../editor/building-editor.js";
+import { BuildingEditor } from "../editor/building-editor.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1";
 import { DnDMode } from "../game/dnd-mode.js";
-import { createGeometryDemoWorld } from "../demo/geometry-demo-world.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2";
-import { OpticalSceneRegistry } from "../world/fields/geometry/optical-scene-registry.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2";
-import { OpticalDebugRenderer } from "../world/fields/geometry/optical-debug-renderer.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2";
-import { createSliceOpticalTracer } from "../world/fields/geometry/optical-slice-tracer.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2";
-import { createAnomalyOpticalTracer as buildAnomalyOpticalTracer } from "../world/fields/geometry/optical-anomaly-tracer.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2";
+import { createGeometryDemoWorld } from "../demo/geometry-demo-world.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1";
+import { OpticalSceneRegistry } from "../world/fields/geometry/optical-scene-registry.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1";
+import { OpticalDebugRenderer } from "../world/fields/geometry/optical-debug-renderer.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1";
+import { createSliceOpticalTracer } from "../world/fields/geometry/optical-slice-tracer.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1";
+import { createAnomalyOpticalTracer as buildAnomalyOpticalTracer } from "../world/fields/geometry/optical-anomaly-tracer.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1";
 
 async function createScene(engine, canvas) {
     console.log("[Scene] Initializing Somnium...");
@@ -292,6 +292,20 @@ scene.metadata = {
         chunkSize: CHUNK_SIZE,
         opticalScene
     });
+    scene.metadata = {
+        ...(scene.metadata || {}),
+        planeAnomalyPersistence: geometryDemo.planeAnomalyPersistence,
+        planeAnomalyBootstrap: geometryDemo.planeAnomalyBootstrap,
+        geometryDemo
+    };
+    // Load Plane records into the shared object renderer before the user can
+    // enter the geometry demo; this avoids a first-frame gap for migrated room
+    // primitives while IndexedDB is still being read.
+    await buildingEditor.setGeometryDemo(geometryDemo);
+    await buildingEditor.setAnomalyPersistence(
+        geometryDemo.planeAnomalyPersistence
+    );
+
     gameManager.registerMode('geometryDemo', {
         camera: geometryDemo.camera,
         playerController: geometryDemo.playerController,
@@ -300,6 +314,12 @@ scene.metadata = {
 
     function updateGeometryDemoVisibility(mode) {
         geometryDemo.setActive(mode === 'geometryDemo');
+        // The geometry-demo Plane owns its own backdrop. Other gameplay modes
+        // return to the ordinary world sky/background instead of inheriting
+        // whichever demo chamber was visited most recently.
+        if (mode !== 'geometryDemo' && mode !== 'editor') {
+            geometryDemo.restoreDefaultSceneBackground?.();
+        }
     }
 
     const removeGeometryModeListener = gameManager.onModeChanged(updateGeometryDemoVisibility);
@@ -328,6 +348,18 @@ scene.metadata = {
         return geometryDemo.toggleCameraMode();
     }
 
+    function toggleGeometryDemoSpotlightEditor() {
+        return geometryDemo.toggleSpotlightEditor();
+    }
+
+    function toggleGeometryDemoTestRay() {
+        return geometryDemo.toggleSpotlightTestRay();
+    }
+
+    function toggleGeometryWMovement() {
+        return geometryDemo.cameraController.toggleWMovementEnabled();
+    }
+
     let mainMenu = null;
     geometryDemo.cameraController.onModeChanged = function updateGeometryCameraHud(mode) {
         mainMenu?.setGeometryCameraMode(mode);
@@ -337,14 +369,30 @@ scene.metadata = {
         startDnDMode,
         startGeometryDemoMode,
         toggleGeometryDemoGrid,
-        toggleGeometryDemoCamera
+        toggleGeometryDemoCamera,
+        toggleGeometryDemoSpotlightEditor,
+        toggleGeometryDemoTestRay,
+        toggleGeometryWMovement
     );
-    geometryDemo.onViewChanged = function updateGeometryViewLabel(sliceId) {
-        const label = sliceId === geometryDemo.hypercubeSlice.id
-            ? '4D HYPERCUBE CHAMBER · LIVE 3D W-SLICE'
-            : sliceId === geometryDemo.sourceSlice.id
-                ? 'POINCARE CHAMBER · CONNECTED ANOMALIES'
-                : 'SOMNIUM MAIN WORLD';
+    geometryDemo.onWDimensionStateChanged = (state) => {
+        mainMenu?.setGeometryWState(state);
+        mainMenu?.setGeometryWMovementEnabled(state.movementEnabled);
+    };
+    mainMenu.setGeometryWMovementEnabled(geometryDemo.cameraController.wMovementEnabled);
+    geometryDemo.onSpotlightEditorStateChanged = (active) => mainMenu?.setSpotlightEditorState(active);
+    geometryDemo.onSpotlightTestRayStateChanged = (enabled) => mainMenu?.setSpotlightTestRayState(enabled);
+    mainMenu.setSpotlightEditorState(geometryDemo.spotlightEditorActive);
+    mainMenu.setSpotlightTestRayState(geometryDemo.spotlightTestRayEnabled);
+    geometryDemo.onViewChanged = function updateGeometryViewLabel(sliceId, inspection = null) {
+        const label = inspection?.editorInspection && !inspection.hasIntersectingPlane
+            ? `EMPTY UNIVERSE W-SLICE · W=${Number(inspection.coordinate).toFixed(2)}`
+            : sliceId === geometryDemo.hypercubeSlice.id
+                ? '4D HYPERCUBE CHAMBER · LIVE 3D W-SLICE'
+                : sliceId === geometryDemo.sourceSlice.id
+                    ? 'POINCARE CHAMBER · CONNECTED ANOMALIES'
+                    : sliceId === geometryDemo.destination.slice.id
+                        ? 'SOMNIUM MAIN WORLD'
+                        : 'UNIVERSE W-SLICE INSPECTION';
         mainMenu.setGeometryViewLabel(label);
     };
     geometryDemo.onSliceInfoChanged = function updateGeometrySliceLabel(label) {

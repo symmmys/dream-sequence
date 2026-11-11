@@ -1,6 +1,6 @@
 SOMNIUM — AI DEVELOPMENT ENTRYPOINT
 
-Version: 1.0 Last updated: November 6, 2026
+Version: 1.2 Last updated: November 9, 2026
 
 1. Purpose
 
@@ -18,6 +18,7 @@ docs/PROJECT-STATE.txt
 docs/STYLE-GUIDE.txt
 docs/STYLE-CONFORMANCE.md
 docs/DEPENDENCY-GRAPH.md
+docs/IMPLEMENTATION-PLANNING.md
 The relevant subsystem's SUMMARY.txt
 
 The project state describes what currently exists and what remains unfinished.
@@ -29,6 +30,8 @@ whenever a source file is inspected.
 The dependency graph describes statically identifiable relationships between source modules.
 
 Subsystem summaries identify module responsibilities and source relationships.
+
+Implementation plans must follow docs/IMPLEMENTATION-PLANNING.md: use a lightweight work breakdown, optimistic/most-likely/pessimistic estimates, weighted PERT calculations, historical analogues where timing data is meaningful, and a bounded vertical slice for explicit timeboxes. Clearly distinguish artifact-to-artifact elapsed time from measured active work.
 
 3. Documentation Architecture
 
@@ -205,18 +208,7 @@ The source tree remains the authoritative implementation.
 
 8. Current Development Priorities
 
-The active tactical-system work includes:
-
-Repairing D&D character rendering.
-Repairing movement previews.
-Supporting independently configurable rectangular battlefield dimensions.
-Increasing the maximum grid dimensions to 300 × 300.
-Consolidating grid configuration and persistence.
-Introducing centralized logging with configurable verbosity.
-Investigating world-worker failures.
-Reducing unnecessary chunk-system diagnostic output.
-
-These priorities should be checked against the latest PROJECT-STATE documentation before implementation.
+Always use docs/PROJECT-STATE.txt to identify the active milestone and its current acceptance criteria. Historical priorities elsewhere in this entrypoint may be stale. The current baseline is Geometry Phase 17G: spherical anomaly preview mouths and stable tapered-cylinder aperture continuity. The next work should begin by validating the in-browser spherical mouth, nonlinear slice projection, and destination approach; do not reintroduce an independent aperture scale animation for tapered cylinders.
 
 9. Final Principle
 

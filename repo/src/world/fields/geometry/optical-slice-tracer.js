@@ -1,8 +1,8 @@
 /** Slice-native ray tracing: Hamiltonian integration plus authoritative surface events. */
 
-import { ambientToSlice, assertVector4, dot4, sliceToAmbient } from './spatial-4d.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
-import { createOpticalMetricField, spatialTransformMetricProvider } from './optical-metric.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
-import { traceOpticalRay } from './optical-ray-integrator.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+import { ambientToSlice, assertVector4, dot4, sliceToAmbient } from './spatial-4d.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
+import { createOpticalMetricField, spatialTransformMetricProvider } from './optical-metric.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
+import { traceOpticalRay } from './optical-ray-integrator.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
 
 const DEFAULT_SLICE_TOLERANCE = 1e-7;
 

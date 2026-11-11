@@ -1,11 +1,11 @@
 /** Switches between player-following and independent 3D/4D inspection views. */
 
-import { CharacterCameraController } from '../game/camera-controller.js?v=somnium-20261108-phase16c-anomaly-optics-2';
-import { add4, ambientToSlice, dot4, scale4, sliceToAmbient } from '../world/fields/geometry/spatial-4d.js?v=somnium-20261108-phase16c-anomaly-optics-2';
-import { SLICE_TRANSITION_ANOMALY } from '../world/fields/geometry/spatial-anomaly.js?v=somnium-20261108-phase16c-anomaly-optics-2';
-import { evaluateAnomalyInfluence, resolveAnomalyInfluence } from '../world/fields/geometry/anomaly-influence-field.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { CharacterCameraController } from '../game/camera-controller.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
+import { add4, ambientToSlice, dot4, scale4, sliceToAmbient } from '../world/fields/geometry/spatial-4d.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
+import { SLICE_TRANSITION_ANOMALY } from '../world/fields/geometry/spatial-anomaly.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
+import { evaluateAnomalyInfluence, resolveAnomalyInfluence } from '../world/fields/geometry/anomaly-influence-field.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 
-const CAMERA_BUILD = '2026-11-08-phase15-main-world-reentry-metric-grid-1';
+const CAMERA_BUILD = '2026-11-09-phase17i-bidirectional-spherical-passage-1';
 const MOVEMENT_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyR', 'KeyF', 'KeyE', 'KeyQ', 'ShiftLeft'];
 
 class GeometryDemoCameraController extends CharacterCameraController {
@@ -262,18 +262,19 @@ class GeometryDemoCameraController extends CharacterCameraController {
         const world = this.traversal.worlds.get(this.freeSliceId);
         const worldPosition = this.renderFreePositionToWorld(world);
         if (!world || !worldPosition) return false;
-        const base = sliceToAmbient(world.slice.frame, worldPosition);
-        const current = add4(base, scale4(world.slice.frame.normal, this.freeW));
         const routes = this.traversal.getRoutesForSlice?.(this.freeSliceId) ?? this.getLegacyRoute();
         const candidates = routes.map((route) => {
+            const physicalPosition = route.controller?.getPhysicalEndpointLocalPosition?.(world, worldPosition) ?? worldPosition;
+            const base = sliceToAmbient(world.slice.frame, physicalPosition);
+            const current = add4(base, scale4(world.slice.frame.normal, this.freeW));
             const info = route.controller?.getInfluenceMovementInfo?.(current, input.crossSectionW, this.freeSliceId);
-            return info ? { route, info } : null;
+            return info ? { route, info, current } : null;
         }).filter(Boolean).sort((left, right) =>
             right.info.movementScale - left.info.movementScale
         );
         if (!candidates.length) return false;
 
-        const { route, info } = candidates[0];
+        const { route, info, current } = candidates[0];
         const amount = Math.sign(input.crossSectionW) * speed * delta * info.movementScale;
         if (Math.abs(amount) <= 1e-10) return false;
         const normal = world.slice.frame.normal;
@@ -296,5 +297,4 @@ class GeometryDemoCameraController extends CharacterCameraController {
                     position4D: candidate, corridorId: info.anomalyId
                 }) : { reachable: true };
             if (reachability.reachable) {
-                this.completeFreeInfluenceHandoff(info.targetWorld, candidate);
-                return true;
+                this.completeFreeInfluenceHandoff(info.targetWorld, candidate, route, world);

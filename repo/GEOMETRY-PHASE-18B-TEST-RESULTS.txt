@@ -1,0 +1,21 @@
+Somnium Geometry — Phase 18B Test Results
+
+Full command:
+  node --experimental-default-type=module --test tests/*.test.mjs
+
+Result:
+  331 tests passed
+  0 tests failed
+
+Additional Phase 18B checks:
+  - Building editor JavaScript syntax check: passed
+  - Scene integration JavaScript syntax check: passed
+  - Buildings and Anomalies tab structure assertions: passed
+  - Existing building controls remain in Buildings panel: passed
+  - Anomaly CRUD and enabled-state controls present: passed
+  - Separate Plane/anomaly persistence injected into editor: passed
+
+Browser caveat:
+  No live browser/WebGL session was available during this build. The user should
+  validate IndexedDB creation, first-run bootstrap, anomaly CRUD persistence,
+  and editor behavior after downloading and running the archive.

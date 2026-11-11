@@ -1,0 +1,18 @@
+SOMNIUM — GEOMETRY PHASE 18G3 INSTALLATION
+
+1. Extract the complete Phase 18G3 ZIP into a clean project directory.
+2. Open a terminal in the directory containing index.html.
+3. Start the local server:
+
+   python3 -m http.server 8081
+
+4. Open http://127.0.0.1:8081/ and hard-refresh after replacing an older build.
+5. Open BUILD (B), select the Buildings tab, create/build a building from a floor plan, then select it in Building Selection.
+6. Try MOVE, ROTATE, and SCALE. Numeric position, rotation, and scale fields remain available.
+
+Run automated tests from the project root:
+
+   node --test tests/*.test.mjs
+
+See GEOMETRY-PHASE-18G3-SHARED-TRANSFORM-TOOLS.md and
+GEOMETRY-PHASE-18G3-TEST-RESULTS.txt for scope and verification.

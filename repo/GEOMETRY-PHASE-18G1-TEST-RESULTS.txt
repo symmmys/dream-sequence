@@ -1,0 +1,25 @@
+SOMNIUM GEOMETRY — PHASE 18G1 TEST RESULTS
+
+Full test command:
+  node --experimental-default-type=module --test tests/*.test.mjs
+
+Result:
+  359 tests passed
+  0 tests failed
+  0 skipped
+
+Additional checks:
+  All src/**/*.js files passed node --check.
+  All tests/**/*.mjs files passed node --check.
+  Relative static imports: 0 missing targets.
+
+Focused Plane schema coverage:
+  - Legacy Plane v1 -> Plane v2 normalization.
+  - Explicit ambient W coordinate and W/X/Y/Z container dimensions.
+  - Optional boundary visibility, color, and opacity.
+  - Background color and opacity.
+  - Serializable primitive transforms/materials.
+  - Procedural hypercube4d object parameters.
+  - Invalid dimensions, unsupported object types, and unsupported future schema versions.
+
+Note: Automated tests do not replace a browser/WebGL smoke test. The Plane Editor UI and scene migration are not part of 18G1.

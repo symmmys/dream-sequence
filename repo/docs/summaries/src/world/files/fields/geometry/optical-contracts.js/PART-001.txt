@@ -1,4 +1,4 @@
-import { smootherstep } from './anomaly-influence-field.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { smootherstep } from './anomaly-influence-field.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 
 /** Versioned, engine-independent optical configuration contracts. */
 

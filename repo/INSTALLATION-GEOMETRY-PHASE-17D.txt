@@ -1,0 +1,39 @@
+SOMNIUM — GEOMETRY PHASE 17D INSTALLATION
+
+1. Extract the complete Phase 17D ZIP into a clean project directory.
+2. Open a terminal in the directory that contains index.html.
+3. Start the local server:
+
+   python3 -m http.server 8081
+
+4. Open:
+
+   http://127.0.0.1:8081/
+
+5. Hard-refresh the browser once after replacing a prior build.
+
+GEOMETRY HUD
+- FREE CAMERA (C): switch between follow and free camera.
+- EDIT LIGHT (L): click to enter/exit spotlight editing; L is the matching hotkey.
+- TEST RAY: ON/OFF (P): click to enable/disable the spotlight test source and diagnostic ray; P is the matching hotkey.
+- METRIC GRID (G): toggle the metric grid.
+- PAUSE (ESC): pause the demo.
+
+SPOTLIGHT EDIT MODE
+- WASD or arrow keys: move X/Z.
+- R/F: move Y.
+- U/O: yaw.
+- I/K: pitch.
+- Mouse drag over the canvas: aim the spotlight.
+- Shift: larger movement/rotation increments.
+- L or Escape: exit editing.
+
+ANOMALY INTERIOR BOUNDARIES
+The demo renders the six side-cell intersections of an open 4D hypercube on W-aligned 3D slices. The two W-facing end caps are omitted. These panels are visual-only and do not affect traversal or collision.
+
+TESTS
+From the extracted project directory run:
+
+   node --test tests/*.test.mjs
+
+Phase 17D verification recorded 299 passing tests and zero failures. Automated tests do not replace live browser/WebGL visual verification.

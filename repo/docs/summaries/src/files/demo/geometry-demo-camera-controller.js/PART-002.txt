@@ -1,3 +1,4 @@
+                return true;
             }
             candidate = add4(candidate, scale4(normal, -info.direction * 1e-7));
         }
@@ -6,8 +7,10 @@
         return true;
     }
 
-    completeFreeInfluenceHandoff(world, position4D) {
-        const local = ambientToSlice(world.slice.frame, position4D).position;
+    completeFreeInfluenceHandoff(world, position4D, route = null, fromWorld = null) {
+        const local = route?.controller?.createArrivalPosition
+            ? route.controller.createArrivalPosition(world, position4D, fromWorld)
+            : ambientToSlice(world.slice.frame, position4D).position;
         const arrival = world.transform?.constrainWorldPosition?.(local) ?? local;
         this.freeSliceId = world.slice.id;
         this.freeW = 0;
@@ -24,8 +27,13 @@
         const world = this.traversal?.worlds.get(this.freeSliceId);
         const position = this.renderFreePositionToWorld(world);
         if (!world || !position) return null;
+        const routes = this.traversal.getRoutesForSlice?.(this.freeSliceId) ?? this.getLegacyRoute();
+        const nearby = routes.find((route) =>
+            route.controller?.isNearPresentationPortal?.(this.freeSliceId, position)
+        );
+        const physicalPosition = nearby?.controller?.getPhysicalEndpointLocalPosition?.(world, position) ?? position;
         return add4(
-            sliceToAmbient(world.slice.frame, position),
+            sliceToAmbient(world.slice.frame, physicalPosition),
             scale4(world.slice.frame.normal, this.freeW)
         );
     }
@@ -48,13 +56,15 @@
             const endpoint = fromSource ? corridor.source : corridor.destination;
             const world = this.traversal.worlds.get(this.freeSliceId);
             const renderer = route.renderer ?? route.controller?.renderers?.get(this.freeSliceId);
+            const presentationEndpoint = route.controller?.getPresentationEndpoint?.(this.freeSliceId);
+            const mouthLocal = presentationEndpoint ?? endpoint.position;
             const mouth = renderer?.getDisplaySample(fromSource ? 0 : 1).position ??
-                world?.transform?.worldToRender(endpoint.position);
+                world?.transform?.worldToRender(mouthLocal);
             if (!mouth) continue;
             const delta = subtract3(mouth, this.freePosition);
             const distance = length3(delta);
             const entryDistance = corridor.type === SLICE_TRANSITION_ANOMALY
-                ? (corridor.entryRadius ?? this.freeEntryDistance)
+                ? (route.controller?.getEntryTriggerDistance?.(this.freeSliceId) ?? corridor.entryRadius ?? this.freeEntryDistance)
                 : this.freeEntryDistance;
             if (distance > entryDistance) continue;
             const facing = distance < 1e-6 ? 1 :
@@ -68,7 +78,8 @@
             if (corridor.type === SLICE_TRANSITION_ANOMALY) {
                 const position3 = this.renderFreePositionToWorld(startWorld);
                 if (!position3) continue;
-                const basePosition4D = sliceToAmbient(startWorld.slice.frame, position3);
+                const physicalPosition3 = route.controller?.getPhysicalEndpointLocalPosition?.(startWorld, position3) ?? position3;
+                const basePosition4D = sliceToAmbient(startWorld.slice.frame, physicalPosition3);
                 const position4D = add4(basePosition4D, scale4(startWorld.slice.frame.normal, this.freeW));
                 const resolvedAnomaly = corridor.influence?.center ? corridor : resolveAnomalyInfluence(
                     corridor,
@@ -191,16 +202,11 @@
 
     completeFreeAnomaly(world, transit) {
         const ambient = transit.position4D;
-        const local = ambientToSlice(world.slice.frame, ambient).position;
-        const terrain = world.terrain;
-        const x = clamp(local.x, terrain.min.x, terrain.max.x);
-        const z = clamp(local.z, terrain.min.z, terrain.max.z);
-        const sample = terrain.sampleAt(x, z);
-        const fallback = world.slice.id === transit.corridor.destination.sliceId
-            ? transit.corridor.destination.position : transit.corridor.source.position;
-        const arrival = sample && Number.isFinite(sample.y)
-            ? { x, y: sample.y + 4, z }
-            : { x: fallback.x, y: fallback.y + 4, z: fallback.z };
+        const controller = transit.controller;
+        const baseArrival = controller?.createArrivalPosition
+            ? controller.createArrivalPosition(world, ambient, transit.startWorld)
+            : ambientToSlice(world.slice.frame, ambient).position;
+        const arrival = { ...baseArrival, y: baseArrival.y + 4 };
         this.freeSliceId = world.slice.id;
         this.freeEntryLock = { sliceId: world.slice.id, position: { x: arrival.x, y: arrival.y, z: arrival.z } };
         const chartSafeArrival = world.transform.constrainWorldPosition?.(arrival) ?? arrival;
@@ -292,9 +298,3 @@
     }
 
     getAmbientPosition(transit) {
-        return applyAmbientOffsets(this.getFreeCorridorSample(transit), transit);
-    }
-
-    getForwardVector() {
-        const horizontal = Math.cos(this.freePitch);
-        return {

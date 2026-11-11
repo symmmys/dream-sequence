@@ -1,0 +1,18 @@
+SOMNIUM GEOMETRY — PHASE 18B INSTALLATION
+
+1. Extract the ZIP archive.
+2. Serve the project from the directory containing index.html (the project root):
+
+   python3 -m http.server 8000
+
+3. Open http://localhost:8000 in a modern browser.
+4. Open BUILD / Level Builder.
+5. Confirm the Buildings tab still exposes the existing building tools.
+6. Open Anomalies and confirm the three seeded anomaly connections appear.
+7. Select an existing anomaly, rename it, and reload the page to confirm the change persists.
+8. Create a new anomaly draft. It should be disabled and marked unplaced. Rename it, reload, duplicate it, and delete the test records as desired.
+
+Plane and anomaly records are stored in the separate IndexedDB database named
+"somnium-planes". They are not saved into the Worlds database.
+
+Phase 18B does not yet include cross-Plane mouth placement. That is Phase 18C.

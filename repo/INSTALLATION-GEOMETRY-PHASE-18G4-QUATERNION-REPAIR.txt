@@ -1,0 +1,39 @@
+SOMNIUM — PHASE 18G4 QUATERNION / MATRIX API REPAIR
+INSTALLATION NOTES
+
+RECOMMENDED: FULL PROJECT ARCHIVE
+
+1. Stop the local Python HTTP server.
+2. Back up the current Somnium project directory if you have made local edits
+   since installing the previous Phase 18G4 archive.
+3. Extract the full repair ZIP into your Somnium project directory. The
+   directory should contain index.html directly; do not serve an outer wrapper
+   directory that only contains the project root.
+4. Start the local HTTP server from the directory containing index.html.
+5. Open the application and perform a hard refresh (Ctrl+Shift+R).
+
+INCREMENTAL PATCH
+
+The patch ZIP contains only the files changed by this corrective update. It is
+intended to be extracted over the existing Phase 18G4 Plane Object Editing
+project, with matching files overwritten.
+
+DATA SAFETY
+
+Do not clear browser storage or IndexedDB. This repair does not change the data
+schema and does not require a migration reset. Existing Plane, Anomaly, World,
+and user-authored object data should remain in place.
+
+BROWSER CHECK
+
+1. Confirm the application initializes without the Matrix.FromQuaternion error.
+2. Confirm the geometry demo and 4D tesseract load.
+3. Open the Planes tab and select a Plane containing objects.
+4. Select a box, sphere, cylinder, torus, label, or hypercube object; confirm
+   it renders and the transform controls appear.
+5. Rotate and scale a rotated object, then save/reload the Plane and verify its
+   transform persists.
+
+If the startup error remains, confirm the server is serving the corrected
+src/demo/hypercube-4d-renderer.js and that the page URL imports the new cache
+identifier `somnium-20261110-phase18g4-quaternion-matrix-api-fix-1`.

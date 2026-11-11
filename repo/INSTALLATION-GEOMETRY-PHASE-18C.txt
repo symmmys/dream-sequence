@@ -1,0 +1,26 @@
+SOMNIUM — GEOMETRY PHASE 18C
+CROSS-PLANE ANOMALY PLACEMENT
+
+1. Extract the complete ZIP archive.
+2. Serve the project root (the directory containing index.html) over HTTP. For example:
+
+   python3 -m http.server 8000
+
+3. Open http://localhost:8000 in a modern desktop browser.
+4. Open BUILD, then choose the Anomalies tab.
+5. Select or create an anomaly. Choose a Plane independently for Mouth A and Mouth B.
+6. Press PLACE MOUTH A or PLACE MOUTH B, then click a location in the scene. Repeat for the other mouth.
+7. Adjust each mouth's X/Y/Z and yaw/pitch/roll controls as desired. Use ALIGN MOUTH B TO MOUTH A for a one-time alignment.
+8. Enable the connection only after both mouths have been placed.
+
+The legacy drag-to-draw room tool has been removed. Use the Buildings tab's floor-plan import and BUILD FLOOR FROM PLAN workflow to construct buildings.
+
+Browser validation checklist:
+- Confirm the three Plane choices appear.
+- Place Mouth A in Poincaré Room, switch to Main World, and place Mouth B.
+- Switch back and confirm the first mouth's Plane, position, and orientation remain intact.
+- Reload the page and confirm anomaly records and placement status persist.
+- Confirm a new draft cannot be enabled until both mouths are placed.
+- Drag the mouse over the terrain in the Buildings tab and confirm no room/floor is created.
+
+Note: This phase persists editor-facing definitions. Newly saved anomaly definitions are not yet loaded into live traversal/render topology; that is Phase 18D.

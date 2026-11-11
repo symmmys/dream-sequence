@@ -1,0 +1,48 @@
+SOMNIUM GEOMETRY — PHASE 18I PATCH MANIFEST
+Plane-Contained Build & Anomaly Tools
+
+Base release: Phase 18G4 Editor Stability Repair (Phase 18H)
+Patch application: extract at the existing project root; overwrite included files.
+Database changes: none. Do not clear IndexedDB.
+
+Changed/new project files in this patch (40):
+  GEOMETRY-PHASE-18I-PLANE-CONTAINED-ANOMALY-TOOLS.md
+  GEOMETRY-PHASE-18I-TEST-RESULTS.txt
+  INSTALLATION-GEOMETRY-PHASE-18I.txt
+  PHASE-18I-FULL-TEST-OUTPUT.txt
+  index.html
+  src/demo/geometry-demo-camera-controller.js
+  src/demo/geometry-demo-topology.js
+  src/demo/geometry-demo-world.js
+  src/demo/hypercube-4d-renderer.js
+  src/editor/building-editor.js
+  src/editor/plane-editor.js
+  src/editor/plane-object-renderer.js
+  src/environment/celestial-system.js
+  src/game/game-manager.js
+  src/main.js
+  src/scene/create-scene.js
+  src/world/fields/geometry/anomaly-boundary-renderer.js
+  src/world/fields/geometry/anomaly-influence-field.js
+  src/world/fields/geometry/anomaly-view-transform.js
+  src/world/fields/geometry/hypercube-4d.js
+  src/world/fields/geometry/optical-anomaly-tracer.js
+  src/world/fields/geometry/optical-contracts.js
+  src/world/fields/geometry/optical-debug-renderer.js
+  src/world/fields/geometry/optical-light-source.js
+  src/world/fields/geometry/optical-metric.js
+  src/world/fields/geometry/optical-ray-integrator.js
+  src/world/fields/geometry/optical-scene-registry.js
+  src/world/fields/geometry/optical-slice-tracer.js
+  src/world/fields/geometry/slice-transition-traversal-controller.js
+  src/world/fields/geometry/spatial-anomaly.js
+  src/world/fields/geometry/spatial-corridor.js
+  src/world/fields/geometry/world-topology.js
+  src/world/spatial-chunk-graph.js
+  src/world/world-manager.js
+  tests/game-manager-build-hotkey.test.mjs
+  tests/geometry-demo-topology.test.mjs
+  tests/hypercube-4d-renderer.test.mjs
+  tests/phase18b-anomaly-editor-integration.test.mjs
+  tests/plane-object-editor.test.mjs
+  tests/world-manager-visibility.test.mjs

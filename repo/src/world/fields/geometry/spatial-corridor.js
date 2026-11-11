@@ -11,7 +11,7 @@ import {
     subtract4,
     transportPerpendicularFrame
 } from './spatial-4d.js';
-import { createAnomalyOptics } from './optical-contracts.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+import { createAnomalyOptics } from './optical-contracts.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
 
 const SPATIAL_CORRIDOR_SCHEMA_VERSION = 1;
 const MAX_CORRIDOR_SAMPLES = 4096;

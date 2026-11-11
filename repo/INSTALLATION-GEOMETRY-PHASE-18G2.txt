@@ -1,0 +1,20 @@
+SOMNIUM GEOMETRY — PHASE 18G2 INSTALLATION
+
+1. Extract the complete Phase 18G2 ZIP archive.
+2. Open a terminal in the directory containing index.html.
+3. Run: python3 -m http.server 8081
+4. Open: http://127.0.0.1:8081/
+5. Open BUILD (B), then select the Planes (3) tab.
+
+Use CREATE NEW PLANE to create a draft. Set its name, geometry, W/X/Y/Z center,
+and W/X/Y/Z dimensions. Use PLACE CENTER WITH MOUSE and click a terrain
+surface (or the editor's horizontal ground-plane fallback) to set XYZ. Configure
+the optional boundary and background appearance, then select SAVE PLANE.
+
+Existing Plane records can be selected from Registered Planes and edited.
+The editor-only wireframe guide is controlled independently from the saved
+boundary visibility checkbox.
+
+The Plane definitions persist in the separate somnium-planes IndexedDB database.
+This phase does not yet dynamically instantiate newly authored Planes as live
+worlds or move runtime anomaly endpoints when their Plane frame is edited.

@@ -3,16 +3,16 @@ SOMNIUM — INDIVIDUAL SOURCE FILE INDEX
 
 Source file: src/demo/geometry-demo-topology.js
 Source directory: src/
-Generated: 2026-11-09T03:15:29
-Total source lines: 275
+Generated: 2026-11-09T22:26:24
+Total source lines: 295
 Maximum chunk size: 300 lines
 Number of parts: 1
 
 SOURCE PARTS
 ----------------------------------------------------------------
 Part: PART-001.txt
-Original lines: 1-275
-Lines in part: 275
+Original lines: 1-295
+Lines in part: 295
 
 READING INSTRUCTIONS
 ----------------------------------------------------------------

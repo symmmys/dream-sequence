@@ -1,0 +1,67 @@
+SOMNIUM — GEOMETRY PHASE 17A TEST RESULTS
+Date: November 9, 2026
+Build: somnium-20261109-phase17-spotlight-prototype-1
+Baseline: Phase 16D anomaly aperture views
+
+FULL AUTOMATED SUITE
+Command: node --test tests/*.test.mjs
+Result: 274 passed, 0 failed.
+
+FOCUSED SPOTLIGHT TESTS
+File: tests/optical-light-source.test.mjs
+- Spotlight source contract validates parameters and normalizes direction.
+- Movement and yaw/pitch rotation are immutable and deterministic.
+- The centre ray crosses the explicitly authorized direct 4D anomaly.
+- Successful transport returns the destination virtual emitter and outgoing direction.
+- Live Main World Poincare transform produces finite receiving-light state.
+- A spotlight pointed away from the anomaly produces no receiving-side light.
+- Shadow casters are restricted to nearby eligible Main World meshes and bounded by the configured limit.
+- Portal and non-Main-World layer meshes are excluded.
+- Original receiveShadows values are restored when caster membership is cleared.
+- Direct illumination remains available when a Babylon shadow generator is unavailable.
+
+TRACER REGRESSION
+- `stopAfterAnomalyExit` returns the outgoing slice state at the first successful aperture exit.
+- The option is opt-in; existing ray-tracer callers retain full destination-slice tracing by default.
+
+STATIC VERIFICATION
+- Source JavaScript syntax: 125/125 passed.
+- Test module syntax: 30/30 passed.
+- Relative JavaScript import references: 323 checked, 0 missing.
+- Application entry chain uses the single Phase 17A cache-busting build identifier.
+- Documentation summaries and dependency graph regenerated with `./write_summary.sh`.
+
+VISUAL VERIFICATION
+No live browser/WebGL session was available to inspect the rendered light cone, received illumination, or shadow-map quality. These must be checked in the user's browser after installation. Automated results above verify source state, transport, coordinate conversion, filtering, and lifecycle behavior; they do not establish visual rendering quality.
+
+KNOWN LIMITATIONS
+- One spotlight and one deterministic centre ray only.
+- The destination Babylon spotlight is a virtual-source approximation derived from the outgoing aperture state.
+- The receiving-side shadow map is limited to 18 nearby eligible Main World meshes.
+- This is not a full per-surface 4D optical shadow-ray solution.
+- Point lights, multi-source support, beam sampling, soft shadows, and arbitrary W-axis source movement are deferred.
+
+
+STARTUP HOTFIX (November 9, 2026)
+- Fixed Babylon.js 9.35.0 Light.includedOnlyMeshes initialization and cleanup: use [] rather than null.
+- Added a regression test with a strict array-hooking Light setter; spotlight test file: 8/8 passed.
+- First 15 test files: 134/134 passed in an isolated serial batch.
+- optical-intersections.test.mjs: 25/25 passed.
+- optical-demo-transport.test.mjs: all 5/5 passed in an isolated run before hotfix; no production transport code changed.
+- A repeat of the entire multi-file Node test invocation stalled in this runner after partial output; it is not reported as a fresh full-suite pass. The remaining verification is covered by focused hotfix tests, syntax checks, import checks, and the unchanged Phase 17A baseline results above.
+- Live browser/WebGL startup should be confirmed after installation; the reported exception path is covered by the strict setter regression.
+
+
+PHASE 17A STARTUP HOTFIX — FINAL VERIFICATION
+Build: somnium-20261109-phase17a-startup-fix-1
+- Regression coverage: 276/276 tests passed across all 30 test modules. The longer transport integration cases were also run individually by test-name filter; each case passed.
+- Spotlight-focused tests: 9/9 passed, including both the strict Babylon-compatible constructor test and cleanup test.
+- Optical anomaly tracing + optical debug renderer: 19/19 passed.
+- Optical demo transport: 5/5 cases passed.
+- Optical foundation: 20/20 passed.
+- Optical intersections: 25/25 passed.
+- All test files: syntax checks passed (30/30).
+- All source JavaScript files: syntax checks passed (125/125).
+- Dependency/documentation regeneration completed; no missing relative imports were reported.
+- The single all-files `node --test tests/*.test.mjs` invocation was intermittently terminated by this execution environment's timeout. Verification was therefore completed in smaller groups/isolated cases; this is not recorded as an uninterrupted full-suite command pass.
+- Browser/WebGL startup still requires confirmation in the user's browser. The exact `includedOnlyMeshes = null` failure path is reproduced and guarded by automated tests.

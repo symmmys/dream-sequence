@@ -1,4 +1,4 @@
-import { smootherstep } from './anomaly-influence-field.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+import { smootherstep } from './anomaly-influence-field.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
 
 /** Versioned, engine-independent optical configuration contracts. */
 

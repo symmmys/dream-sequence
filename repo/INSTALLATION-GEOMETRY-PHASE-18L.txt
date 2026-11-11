@@ -1,0 +1,40 @@
+SOMNIUM PHASE 18L — INSTALLATION
+
+Recommended: use the complete Phase 18L project ZIP.
+
+Incremental installation:
+1. Make a backup of your current Somnium project directory.
+2. Extract the Phase 18L patch ZIP over the Phase 18K project root.
+3. Allow files to be overwritten.
+4. Serve the directory containing index.html using your usual local HTTP server.
+5. Reload the application. A hard reload is recommended so the Phase 18L cache identifier is fetched.
+
+Do NOT clear browser storage. No IndexedDB migration is required, and existing somnium-planes data is preserved.
+
+Hotkeys:
+- G: Translate selected Plane object
+- R: Rotate selected Plane object
+- S: Scale selected Plane object
+- Alt+1: Plane Editor subtab
+- Alt+2: Anomalies subtab
+- B: Open/close build menu
+- V: Cycle camera wheel zoom 1x / 10x / 100x
+- Ctrl+S: Save selected Plane (Plane Editor subtab)
+- Ctrl+Enter: Commit selected anomaly (Anomalies subtab)
+
+W navigation:
+- In free inspection mode within a user-defined Plane, E moves toward +W and Q toward -W.
+- Movement is bounded by half the Plane's saved W thickness on either side of its frame origin.
+- Existing anomaly traversal W behavior is retained.
+
+Browser verification checklist:
+1. Create/save a Plane with W thickness 12; select it and verify editor camera retargeting.
+2. In free inspection mode, press E/Q and verify W movement stops at +/-6 relative to the Plane center.
+3. Repeat with another geometry and substantially different dimensions; verify the camera focuses on the new Plane.
+4. Place a new hypercube in the built-in 4D room and in a user-created Plane; verify both are visible in gameplay (not only in the editor).
+5. Confirm the original demo tesseract still animates and is not doubled.
+6. Select an object and test G/R/S; test Alt+1/Alt+2.
+7. Verify shortcuts do not fire while typing in editor fields.
+8. Confirm B, V, Ctrl+S, and Ctrl+Enter remain functional.
+
+Automated tests do not replace live browser/WebGL verification.

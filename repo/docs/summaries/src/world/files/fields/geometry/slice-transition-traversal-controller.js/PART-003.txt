@@ -1,3 +1,95 @@
+        }
+    }
+
+    getEntityTransitState(entity) {
+        const state = this.entityTransits.get(entity);
+        return state ? {
+            fromSliceId: state.fromSliceId,
+            toSliceId: state.target.slice.id,
+            progress: clamp(this.calculateEntityProgress(state.position4D, state.source, state.target), 0, 1),
+            direction: state.direction,
+            position4D: { ...state.position4D }
+        } : null;
+    }
+
+    getState() {
+        return {
+            state: this.state,
+            currentSliceId: this.currentSliceId,
+            startSliceId: this.startWorld?.slice.id ?? null,
+            destinationSliceId: this.target?.slice.id ?? null,
+            anomalyId: this.corridor.id,
+            anomalyType: this.corridor.type,
+            progress: this.progress,
+            direction: this.direction,
+            position4D: this.spatialPosition4D && { ...this.spatialPosition4D },
+            bounds: this.corridor.region,
+            influence: this.corridor.influence ? { ...this.corridor.influence, center: { ...this.corridor.influence.center } } : null,
+            entryDiagnostic: this.getEntryDiagnostic(),
+            corridorOccupants: this.corridorChunk?.occupants.size ?? this.entityTransits.size
+        };
+    }
+
+    validateOptions() {
+        const { triggerDistance, speed, sprintSpeed, entitySpeed, headingThreshold } = this.options;
+        if (![triggerDistance, speed, sprintSpeed, entitySpeed].every(Number.isFinite) ||
+            triggerDistance <= 0 || speed <= 0 || sprintSpeed < speed || entitySpeed <= 0) {
+            throw new RangeError('Slice-transition movement options must be positive and valid.');
+        }
+        if (!Number.isFinite(headingThreshold) || headingThreshold < -1 || headingThreshold > 1) {
+            throw new RangeError('Slice-transition headingThreshold must be between -1 and 1.');
+        }
+        for (const [sliceId, distance] of Object.entries(this.options.triggerDistanceBySlice ?? {})) {
+            if (!sliceId || !Number.isFinite(distance) || distance <= 0) {
+                throw new RangeError('Per-slice anomaly trigger distances must be positive and finite.');
+            }
+        }
+        for (const [sliceId, endpoint] of Object.entries(this.options.presentationEndpointsBySlice ?? {})) {
+            const position = endpoint?.position ?? endpoint;
+            if (!sliceId || !isFinitePosition3(position)) {
+                throw new TypeError('Presentation endpoints must contain finite positions for each slice.');
+            }
+        }
+    }
+
+    dispose() {
+        if (this.disposed) return;
+        this.disposed = true;
+        this.active = false;
+        if (this.state === 'transit') {
+            this.movement.setMovementSuspended(false);
+            this.corridorChunk?.leave(this.player);
+        }
+        for (const entity of this.entityTransits.keys()) this.corridorChunk?.leave(entity);
+        this.entityTransits.clear();
+        this.state = 'disposed';
+        this.target = null;
+        this.startWorld = null;
+    }
+}
+
+function constrainAmbientPositionToWorldChart(world, position4D) {
+    if (typeof world?.transform?.constrainWorldPosition !== 'function') return position4D;
+    const frame = world.slice.frame;
+    const local = ambientToSlice(frame, position4D);
+    const constrained = world.transform.constrainWorldPosition(local.position);
+    if (AXES.slice(0, 3).every((axis) => Math.abs(constrained[axis] - local.position[axis]) <= 1e-10)) {
+        return position4D;
+    }
+    return add4(
+        sliceToAmbient(frame, constrained),
+        scale4(frame.normal, local.normalOffset)
+    );
+}
+
+function clampToRegion(position, region) {
+    return {
+        x: clamp(position.x, region.min.x, region.max.x),
+        y: clamp(position.y, region.min.y, region.max.y),
+        z: clamp(position.z, region.min.z, region.max.z),
+        w: clamp(position.w, region.min.w, region.max.w)
+    };
+}
 
 function clampToTerrain(value, minimum, maximum) {
     return clamp(value, minimum, maximum);
@@ -10,6 +102,16 @@ function clamp(value, minimum, maximum) {
 function requireObject(value, label) {
     if (!value || typeof value !== 'object') throw new TypeError(`${label} is required.`);
     return value;
+}
+
+function endpointForSlice(anomaly, sliceId) {
+    if (anomaly?.source?.sliceId === sliceId) return anomaly.source;
+    if (anomaly?.destination?.sliceId === sliceId) return anomaly.destination;
+    return null;
+}
+
+function isFinitePosition3(position) {
+    return Boolean(position) && ['x', 'y', 'z'].every((axis) => Number.isFinite(position[axis]));
 }
 
 function noop() {}

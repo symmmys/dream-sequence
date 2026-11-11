@@ -1,0 +1,43 @@
+SOMNIUM — GEOMETRY PHASE 17A INSTALLATION
+
+1. Extract the complete Phase 17A archive into a clean project directory.
+2. Ensure the directory you serve contains index.html (the project root, not an outer ZIP wrapper directory).
+3. From that directory, start the server:
+
+   python3 -m http.server 8081
+
+4. Open:
+
+   http://127.0.0.1:8081/
+
+5. Hard-refresh the browser after replacing a prior build. The application uses the
+   phase17 spotlight-prototype cache-busting identifier.
+
+SPOTLIGHT CONTROLS
+
+- Enter the Geometry Demo and view the Hypercube chamber.
+- Press L to toggle spotlight editing.
+- W/S or Up/Down: move along local Z.
+- A/D or Left/Right: move along local X.
+- R/F: move along local Y.
+- U/O: rotate yaw.
+- I/K: rotate pitch.
+- Hold Shift for larger movement/rotation steps.
+- Escape exits edit mode.
+
+The source light is in the Hypercube slice and the receiving light is activated
+only when its central ray successfully crosses the explicitly authorized direct
+Hypercube-to-Main-World anomaly. The destination uses a virtual emitter and a
+bounded Babylon shadow map. This is a first visible-light prototype, not a full
+beam reconstruction or per-surface optical shadow tracer.
+
+Run the complete automated suite from the project directory:
+
+   node --test tests/*.test.mjs
+
+See GEOMETRY-PHASE-17A-ANOMALY-FED-SPOTLIGHT-PROTOTYPE.md and
+GEOMETRY-PHASE-17A-TEST-RESULTS.txt for architecture, scope, and verification.
+
+
+STARTUP HOTFIX
+This archive includes the Phase 17A startup hotfix (`somnium-20261109-phase17a-startup-fix-1`). After replacing an earlier Phase 17A build, hard-refresh the browser so the updated Babylon light initialization module is loaded.

@@ -1,0 +1,23 @@
+SOMNIUM — GEOMETRY PHASE 17G INSTALLATION
+
+1. Extract the complete Phase 17G archive into a clean project directory.
+2. Serve from the directory containing index.html (not the outer ZIP wrapper directory).
+3. Start the local server:
+
+   python3 -m http.server 8081
+
+4. Open:
+
+   http://127.0.0.1:8081/
+
+5. Hard-refresh the browser after replacing a previous Phase 17 build. The application entry chain uses this cache-busting identifier:
+
+   somnium-20261109-phase17g-spherical-mouth-continuity-2
+
+Phase 17G removes the secondary tapered-cylinder portal scaling curve, keeps the authored mouth size stable across transit and endpoint handoff, adds an optional concave spherical-cap preview surface (selected by the direct Hypercube-to-Main-World demo anomaly), and removes the legacy torus mouth rim by default. Set view.previewSurface='flat' to retain a flat disc. Set view.showRim=true only for anomalies that explicitly need the decorative torus.
+
+Run the complete automated suite from the extracted project directory:
+
+   node --test tests/*.test.mjs
+
+The current suite contains 312 tests. Automated tests do not replace visual browser/WebGL verification of the spherical surface and final portal composition.

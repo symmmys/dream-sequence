@@ -1,0 +1,29 @@
+INSTALLATION — PHASE 18G4 EDITOR STABILITY REPAIR
+
+Choose ONE installation method.
+
+METHOD A — FULL PROJECT (recommended)
+1. Make a backup of your current Somnium project directory.
+2. Extract Somnium_Geometry_Phase_18G4_Editor_Stability_Repair.zip.
+3. Serve the directory containing index.html from your local HTTP server, using your normal project-root setup.
+4. Open or hard-refresh the app in your browser.
+
+METHOD B — PATCH OVER THE PREVIOUS G4 REPAIR
+1. Make a backup of your existing Phase 18G4 Quaternion Matrix API Startup Repair project.
+2. Extract Somnium_Geometry_Phase_18G4_Editor_Stability_Repair_Patch.zip into that project root.
+3. Allow the patch files to overwrite matching files.
+4. Open or hard-refresh the app in your browser.
+
+DATA AND CACHE NOTES
+- Do NOT clear IndexedDB for this update.
+- Do NOT delete the `somnium-planes` database.
+- This repair does not change the IndexedDB schema or perform a data reset.
+- The new build identifier changes module URLs to avoid stale browser module cache entries. A hard refresh is recommended.
+
+NEW EDITOR CONTROL
+- In the Planes tab, use the Mouse-wheel zoom speed dropdown to select 1x, 10x, or 100x.
+- Press V in the Planes tab to cycle 1x -> 10x -> 100x -> 1x.
+- The V shortcut is intentionally inactive while editing text fields and outside the Planes tab.
+
+After startup, run through the five browser checks listed in
+GEOMETRY-PHASE-18G4-EDITOR-STABILITY-REPAIR.md.

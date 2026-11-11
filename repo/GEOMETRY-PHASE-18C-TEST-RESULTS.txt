@@ -1,0 +1,33 @@
+SOMNIUM — GEOMETRY PHASE 18C TEST RESULTS
+
+Automated suite
+---------------
+Command:
+  node --experimental-default-type=module --test tests/*.test.mjs
+
+Result:
+  337 tests passed
+  0 tests failed
+  0 skipped
+
+New coverage
+------------
+- Quaternion/Euler conversion uses Babylon yaw/pitch/roll convention and normalizes quaternions.
+- Mouth A and Mouth B preserve independent Plane IDs, positions, and orientations.
+- A draft remains unplaced after only one mouth is placed and becomes placed after both are placed.
+- Mouth B alignment is a one-time copy and retains its selected Plane.
+- Connection-level visibility, traversal, and bidirectionality settings remain independent.
+- Anomaly definition normalization retains placementStatus and per-endpoint placed flags.
+- Legacy drag-to-draw room UI and createRoomFromPoints entry point are absent.
+
+Static validation
+-----------------
+- JavaScript syntax checks: 169 files passed.
+- Relative import checks: 0 missing imports.
+- Stale Phase 17I / 18A / 18B cache identifiers: 0.
+- Current Phase 18C build identifier occurrences: 78.
+
+Not performed
+-------------
+- No live browser/WebGL session was available in this environment.
+- IndexedDB save/reload and visual click placement must be validated in the user's browser.

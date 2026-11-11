@@ -8,8 +8,8 @@ import {
     sliceToAmbient,
     subtract4
 } from './spatial-4d.js';
-import { SLICE_TRANSITION_ANOMALY } from './spatial-anomaly.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
-import { evaluateAnomalyInfluence } from './anomaly-influence-field.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+import { SLICE_TRANSITION_ANOMALY } from './spatial-anomaly.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
+import { evaluateAnomalyInfluence } from './anomaly-influence-field.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
 
 const AXES = ['x', 'y', 'z', 'w'];
 
@@ -45,6 +45,8 @@ class SliceTransitionTraversalController {
             speed: 8,
             sprintSpeed: 12,
             entitySpeed: 8,
+            triggerDistanceBySlice: {},
+            presentationEndpointsBySlice: {},
             ...options.traversal
         };
         this.validateOptions();
@@ -129,11 +131,13 @@ class SliceTransitionTraversalController {
         for (const neighbor of neighbors) {
             const fromSource = this.corridor.source.sliceId === this.currentSliceId;
             const endpoint = fromSource ? this.corridor.source : this.corridor.destination;
-            const dx = endpoint.position.x - position.x;
-            const dz = endpoint.position.z - position.z;
+            const presentationPosition = this.getPresentationEndpoint(this.currentSliceId) ?? endpoint.position;
+            const triggerDistance = this.getEntryTriggerDistance(this.currentSliceId);
+            const dx = presentationPosition.x - position.x;
+            const dz = presentationPosition.z - position.z;
             const distance = Math.hypot(dx, dz);
-            diagnostic = { ...diagnostic, distance, entryRadius: this.options.triggerDistance };
-            if (distance > this.options.triggerDistance) continue;
+            diagnostic = { ...diagnostic, distance, entryRadius: triggerDistance };
+            if (distance > triggerDistance) continue;
             const heading = distance < 1e-6 ? 1 : (forwardX * dx + forwardZ * dz) / distance;
             if (heading < this.options.headingThreshold) {
                 diagnostic = { ...diagnostic, reason: 'WRONG_HEADING', heading, headingThreshold: this.options.headingThreshold };
@@ -145,7 +149,8 @@ class SliceTransitionTraversalController {
                 diagnostic = { ...diagnostic, reason: 'OUTSIDE_ANOMALY_REGION', heading };
                 continue;
             }
-            if (!this.hasChunkConnection(this.currentSliceId, position)) {
+            const physicalPosition = this.getPhysicalEndpointLocalPosition(currentWorld, position);
+            if (!this.hasChunkConnection(this.currentSliceId, physicalPosition)) {
                 diagnostic = { ...diagnostic, reason: 'NO_CHUNK_CONNECTION', heading };
                 continue;
             }
@@ -163,9 +168,77 @@ class SliceTransitionTraversalController {
     getAmbientPlayerPosition() {
         const world = this.worlds.get(this.currentSliceId);
         if (!world) return null;
-        const base = sliceToAmbient(world.slice.frame, this.player.worldPosition);
+        const physicalPosition = this.getPhysicalEndpointLocalPosition(world, this.player.worldPosition);
+        const base = sliceToAmbient(world.slice.frame, physicalPosition);
         const prior = this.player.spatialPosition4D;
         const normalOffset = prior && this.player.sliceId === this.currentSliceId
+            ? ambientToSlice(world.slice.frame, prior).normalOffset : 0;
+        return add4(base, scale4(world.slice.frame.normal, normalOffset));
+    }
+
+    getPresentationEndpoint(sliceId) {
+        const configured = this.options.presentationEndpointsBySlice?.[sliceId];
+        if (!configured) return null;
+        const position = configured.position ?? configured;
+        return isFinitePosition3(position) ? { ...position } : null;
+    }
+
+    getEntryTriggerDistance(sliceId) {
+        const configured = this.options.triggerDistanceBySlice?.[sliceId];
+        return Number.isFinite(configured) && configured > 0 ? configured : this.options.triggerDistance;
+    }
+
+    isNearPresentationPortal(sliceId, position = null) {
+        const world = this.worlds.get(sliceId);
+        const local = position ?? (sliceId === this.currentSliceId ? this.player.worldPosition : null);
+        const presentation = this.getPresentationEndpoint(sliceId);
+        if (!world || !local || !presentation) return false;
+        return Math.hypot(local.x - presentation.x, local.z - presentation.z) <=
+            this.getEntryTriggerDistance(sliceId);
+    }
+
+    getPhysicalEndpointLocalPosition(world, localPosition) {
+        if (!world || !localPosition) return localPosition;
+        const endpoint = endpointForSlice(this.corridor, world.slice.id);
+        const presentation = this.getPresentationEndpoint(world.slice.id);
+        if (!endpoint || !presentation) return { ...localPosition };
+        const portalDistance = Math.hypot(
+            localPosition.x - presentation.x, localPosition.z - presentation.z
+        );
+        // A controller can own a slice without owning the player's currently
+        // nearby mouth. Only rebase coordinates inside this portal's approach
+        // envelope; elsewhere preserve the ordinary world coordinates.
+        if (portalDistance > this.getEntryTriggerDistance(world.slice.id)) return { ...localPosition };
+        const ground = world.terrain?.sampleAt?.(localPosition.x, localPosition.z);
+        const heightAboveGround = ground && Number.isFinite(ground.y)
+            ? localPosition.y - ground.y
+            : 0;
+        return {
+            x: endpoint.position.x + (localPosition.x - presentation.x),
+            y: endpoint.position.y + heightAboveGround,
+            z: endpoint.position.z + (localPosition.z - presentation.z)
+        };
+    }
+
+    getPresentationLocalPosition(world, physicalLocalPosition) {
+        if (!world || !physicalLocalPosition) return physicalLocalPosition;
+        const endpoint = endpointForSlice(this.corridor, world.slice.id);
+        const presentation = this.getPresentationEndpoint(world.slice.id);
+        if (!endpoint || !presentation) return { ...physicalLocalPosition };
+        return {
+            x: physicalLocalPosition.x + presentation.x - endpoint.position.x,
+            y: physicalLocalPosition.y,
+            z: physicalLocalPosition.z + presentation.z - endpoint.position.z
+        };
+    }
+
+    getPhysicalAmbientPosition(world, position4D = null) {
+        if (!world) return null;
+        if (position4D) return position4D;
+        const local = this.getPhysicalEndpointLocalPosition(world, this.player.worldPosition);
+        const base = sliceToAmbient(world.slice.frame, local);
+        const prior = this.player.spatialPosition4D;
+        const normalOffset = prior && this.player.sliceId === world.slice.id
             ? ambientToSlice(world.slice.frame, prior).normalOffset : 0;
         return add4(base, scale4(world.slice.frame.normal, normalOffset));
     }
@@ -177,7 +250,7 @@ class SliceTransitionTraversalController {
         return evaluateAnomalyInfluence(this.corridor, position4D, modifiers);
     }
 
-    getInfluenceMovementInfo(position4D, direction, sliceId = this.currentSliceId) {
+    getInfluenceMovementInfo(position4D, direction, sliceId = this.currentSliceId, options = {}) {
         if (!Number.isFinite(direction) || Math.abs(direction) < 1e-6 ||
             !this.active || this.disposed || this.state !== 'idle' || !this.corridor.traversable) return null;
         const neighbor = this.topology.getTraversableNeighbors(sliceId)
@@ -192,7 +265,8 @@ class SliceTransitionTraversalController {
         const remaining = targetPlane - currentPlane;
         const targetDirection = Math.sign(remaining);
         const influence = this.getAnomalyInfluence(position4D);
-        if (influence.freedom <= 0 || influence.wMovementScale <= 0) return null;
+        const ignoreFreedom = Boolean(options.ignoreFreedom);
+        if (!ignoreFreedom && (influence.freedom <= 0 || influence.wMovementScale <= 0)) return null;
         return {
             anomalyId: this.corridor.id,
             sourceWorld,
@@ -205,17 +279,18 @@ class SliceTransitionTraversalController {
             remainingWDistance: Math.abs(remaining),
             freedom: influence.freedom,
             wReach: influence.wReach,
-            movementScale: influence.wMovementScale,
-            influenceDistance: influence.distance
+            movementScale: ignoreFreedom ? 1 : influence.wMovementScale,
+            influenceDistance: influence.distance,
+            freedomOverride: ignoreFreedom
         };
     }
 
-    advanceAmbientInfluenceMovement(deltaSeconds) {
+    advanceAmbientInfluenceMovement(deltaSeconds, position4DOverride = null, options = {}) {
         const input = this.getMovementInput();
         if (!input.crossSectionW) return false;
-        const position4D = this.getAmbientPlayerPosition();
+        const position4D = position4DOverride ?? this.getAmbientPlayerPosition();
         if (!position4D) return false;
-        const info = this.getInfluenceMovementInfo(position4D, input.crossSectionW);
+        const info = this.getInfluenceMovementInfo(position4D, input.crossSectionW, this.currentSliceId, options);
         if (!info) return false;
         const speed = input.sprint ? this.options.sprintSpeed : this.options.speed;
         const frame = info.sourceWorld.slice.frame;
@@ -248,7 +323,7 @@ class SliceTransitionTraversalController {
                 this.target = info.targetWorld;
                 this.direction = info.direction;
                 this.spatialPosition4D = candidate;
-                this.completeTransit(info.targetWorld, candidate);
+                this.completeTransit(info.targetWorld, candidate, info.sourceWorld);
                 return true;
             }
         }
@@ -342,9 +417,10 @@ class SliceTransitionTraversalController {
             ),
             scale4(frame.axes[2], dz)
         );
-        const influence = this.getAnomalyInfluence(this.spatialPosition4D);
-        const wSpeedScale = influence.wMovementScale;
-        candidate = add4(candidate, scale4(frame.normal, crossSectionW * speed * deltaSeconds * wSpeedScale));
+        // Once the player has entered a corridor, W is the traversal axis,
+        // not an ambient freedom offset. Do not let a shrinking influence
+        // field stall the player inside the passage.
+        candidate = add4(candidate, scale4(frame.normal, crossSectionW * speed * deltaSeconds));
 
         const startPlane = this.getPlaneCoordinate(frame.origin, frame.normal);
         const destinationPlane = this.getPlaneCoordinate(this.target.slice.frame.origin, frame.normal);
@@ -399,11 +475,12 @@ class SliceTransitionTraversalController {
         );
     }
 
-    completeTransit(world, position4D = this.spatialPosition4D) {
-        const arrival = this.createArrivalPosition(world, position4D);
+    completeTransit(world, position4D = this.spatialPosition4D, fromWorld = this.startWorld) {
+        const arrival = this.createArrivalPosition(world, position4D, fromWorld);
         this.player.setSpatialContext?.(world.transform, world.slice.id, world.layerMask);
         this.player.spatialPosition4D = null;
         this.player.setWorldPosition(arrival);
+        this.applyEndpointOrientation(fromWorld, world);
         this.movement.setTerrain(world.terrain);
         if (world.movementProfile) this.movement.setMovementProfile?.(world.movementProfile);
         this.movement.setMovementSuspended(false);
@@ -428,10 +505,24 @@ class SliceTransitionTraversalController {
         return arrival;
     }
 
-    createArrivalPosition(world, position4D) {
-        const local = ambientToSlice(world.slice.frame, position4D).position;
+    applyEndpointOrientation(fromWorld, targetWorld) {
+        const enteredFromSource = fromWorld?.slice?.id === this.corridor.source.sliceId;
+        const entry = enteredFromSource ? this.corridor.source : this.corridor.destination;
+        const exit = enteredFromSource ? this.corridor.destination : this.corridor.source;
+        const entryYaw = quaternionYaw(entry.orientation);
+        const exitYaw = quaternionYaw(exit.orientation);
+        this.player.yaw = normalizeAngle(this.player.yaw + exitYaw - entryYaw);
+        return this.player.yaw;
+    }
+
+    createArrivalPosition(world, position4D, fromWorld = this.startWorld) {
+        let local = ambientToSlice(world.slice.frame, position4D).position;
         const fallback = world.slice.id === this.corridor.destination.sliceId
             ? this.corridor.destination.position : this.corridor.source.position;
+        // A presentation portal may be deliberately far from the compact
+        // canonical anomaly endpoint. Preserve the physical anomaly geometry,
+        // then place the arriving player at the matching visual mouth.
+        local = this.getPresentationLocalPosition(world, local);
         const terrain = world.terrain;
         const x = clampToTerrain(local.x, terrain.min.x, terrain.max.x);
         const z = clampToTerrain(local.z, terrain.min.z, terrain.max.z);
@@ -458,10 +549,12 @@ class SliceTransitionTraversalController {
             if (neighbor.corridorId !== this.corridor.id) continue;
             const fromSource = this.corridor.source.sliceId === fromSliceId;
             const endpoint = fromSource ? this.corridor.source : this.corridor.destination;
-            const dx = endpoint.position.x - entity.worldPosition.x;
-            const dz = endpoint.position.z - entity.worldPosition.z;
+            const presentation = this.getPresentationEndpoint(fromSliceId) ?? endpoint.position;
+            const triggerDistance = this.getEntryTriggerDistance(fromSliceId);
+            const dx = presentation.x - entity.worldPosition.x;
+            const dz = presentation.z - entity.worldPosition.z;
             const distance = Math.hypot(dx, dz);
-            if (distance <= 1e-6 || distance > this.options.triggerDistance) continue;
+            if (distance <= 1e-6 || distance > triggerDistance) continue;
             const heading = (inputForward.x * dx + inputForward.z * dz) / distance;
             if (heading >= this.options.headingThreshold) return this.beginEntityTransit(entity, fromSliceId);
         }
@@ -476,8 +569,10 @@ class SliceTransitionTraversalController {
         if (!neighbor) return false;
         const source = this.worlds.get(fromSliceId);
         const target = this.worlds.get(neighbor.sliceId);
-        if (!source || !target || !this.hasChunkConnection(fromSliceId, entity.worldPosition)) return false;
-        const position4D = sliceToAmbient(source.slice.frame, entity.worldPosition);
+        if (!source || !target) return false;
+        const physicalPosition = this.getPhysicalEndpointLocalPosition(source, entity.worldPosition);
+        if (!this.hasChunkConnection(fromSliceId, physicalPosition)) return false;
+        const position4D = sliceToAmbient(source.slice.frame, physicalPosition);
         if (!this.isInsideRegion(position4D)) return false;
         this.entityTransits.set(entity, {
             entity, source, target, fromSliceId,
@@ -509,7 +604,7 @@ class SliceTransitionTraversalController {
             const progress = clamp(this.calculateEntityProgress(candidate, state.source, state.target), 0, 1);
             this.corridorChunk?.updateOccupant(entity, progress, candidate);
             if (progress >= 1 - 1e-8) {
-                const arrival = this.createArrivalPosition(state.target, candidate);
+                const arrival = this.createArrivalPosition(state.target, candidate, state.source);
                 entity.setSpatialContext?.(state.target.transform, state.target.slice.id, state.target.layerMask);
                 entity.setWorldPosition?.(arrival);
                 if (!entity.setWorldPosition) entity.worldPosition = arrival;
@@ -557,6 +652,17 @@ class SliceTransitionTraversalController {
         }
         if (!Number.isFinite(headingThreshold) || headingThreshold < -1 || headingThreshold > 1) {
             throw new RangeError('Slice-transition headingThreshold must be between -1 and 1.');
+        }
+        for (const [sliceId, distance] of Object.entries(this.options.triggerDistanceBySlice ?? {})) {
+            if (!sliceId || !Number.isFinite(distance) || distance <= 0) {
+                throw new RangeError('Per-slice anomaly trigger distances must be positive and finite.');
+            }
+        }
+        for (const [sliceId, endpoint] of Object.entries(this.options.presentationEndpointsBySlice ?? {})) {
+            const position = endpoint?.position ?? endpoint;
+            if (!sliceId || !isFinitePosition3(position)) {
+                throw new TypeError('Presentation endpoints must contain finite positions for each slice.');
+            }
         }
     }
 
@@ -612,6 +718,31 @@ function requireObject(value, label) {
     return value;
 }
 
+function endpointForSlice(anomaly, sliceId) {
+    if (anomaly?.source?.sliceId === sliceId) return anomaly.source;
+    if (anomaly?.destination?.sliceId === sliceId) return anomaly.destination;
+    return null;
+}
+
+function isFinitePosition3(position) {
+    return Boolean(position) && ['x', 'y', 'z'].every((axis) => Number.isFinite(position[axis]));
+}
+
 function noop() {}
+
+function quaternionYaw(q) {
+    if (!q) return 0;
+    return Math.atan2(
+        2 * (q.w * q.y + q.z * q.x),
+        1 - 2 * (q.x * q.x + q.y * q.y)
+    );
+}
+
+function normalizeAngle(value) {
+    let angle = value;
+    while (angle > Math.PI) angle -= Math.PI * 2;
+    while (angle < -Math.PI) angle += Math.PI * 2;
+    return angle;
+}
 
 export { SliceTransitionTraversalController };

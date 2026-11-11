@@ -1,0 +1,40 @@
+SOMNIUM — GEOMETRY PHASE 17B INSTALLATION
+
+1. Extract the complete Phase 17B archive into a clean project directory.
+2. Ensure you are serving the directory that contains index.html (the project root, not an outer ZIP wrapper directory).
+3. From that directory, start the local server:
+
+   python3 -m http.server 8081
+
+4. Open:
+
+   http://127.0.0.1:8081/
+
+5. Hard-refresh the browser after replacing the Phase 17A build. The application uses the Phase 17B cache-busting identifier:
+
+   somnium-20261109-phase17b-mainworld-exit-1
+
+SPOTLIGHT CONTROLS
+
+- Press L to toggle spotlight editing.
+- WASD / Arrow keys: move in X/Z.
+- R / F: move vertically.
+- U / O: rotate yaw.
+- I / K: rotate pitch.
+- Shift: larger movement increments.
+- Escape: exit editing.
+
+PHASE 17B CHANGES
+
+- A transmitted spotlight now has a receiving-side Main World ray diagnostic.
+- The ray is included in both live Main World portal preview render lists.
+- The default demo spotlight aims for an above-terrain destination exit.
+- Main World-side preview apertures are larger and spaced farther apart.
+- Physical anomaly endpoints and topology are unchanged.
+
+Run automated tests from the extracted project directory:
+
+   node --test tests/*.test.mjs
+
+See GEOMETRY-PHASE-17B-MAIN-WORLD-OPTICAL-RAY-AND-PORTAL-READABILITY.md and
+GEOMETRY-PHASE-17B-TEST-RESULTS.txt for implementation details and verification.

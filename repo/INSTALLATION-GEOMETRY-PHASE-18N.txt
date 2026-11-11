@@ -1,0 +1,41 @@
+SOMNIUM PHASE 18N — INSTALLATION
+
+RECOMMENDED: install the full project ZIP if you are not applying patches regularly.
+
+Full archive:
+  Somnium_Geometry_Phase_18N_Universe_W_Slice_Navigation.zip
+
+Incremental patch:
+  Somnium_Geometry_Phase_18N_Universe_W_Slice_Navigation_Patch.zip
+
+The incremental patch is based on the Phase 18M full project archive:
+  Somnium_Geometry_Phase_18M_W_Slice_Inspection_Playtest_and_Traversal_Repair.zip
+
+Patch installation:
+1. Stop the local Python HTTP server.
+2. Make a backup of the current project directory.
+3. Extract the Phase 18M patch ZIP into the project root, allowing files to be overwritten.
+4. Restart the local Python HTTP server from the directory containing index.html.
+5. Perform a hard reload in the browser so the Phase 18N module cache identifier is used.
+
+Full installation:
+1. Extract the full Phase 18N ZIP into a new directory.
+2. Confirm index.html is at the project root served by the local HTTP server.
+3. Start the server from that directory and open the application.
+
+W-slice browser checklist:
+- Open Build > Planes > Plane Editor.
+- Check that the slider range includes the built-in ambient-W locations: W=0, W=75, and W=80. With only built-in content the expected range is -10 to 90.
+- Move the slider between W=0, W=75, and W=80. Confirm the W readout updates immediately and objects/Plane guides are shown for every Plane intersecting that slice.
+- Enter a decimal W value such as 75.25 in the numeric field. Confirm the slider rounds visually to an integer while the numeric field/readout retains the decimal selection.
+- Create or save a Plane centered at W=140 with thickness 20. Confirm the slider range expands to include its full extent (upper end 160 with the current margin rule).
+- Move to W=140.25, create a new Plane, and confirm its initial W center is 140.25.
+- Confirm that changing the inspection W coordinate does not modify the selected Plane's saved center or W thickness.
+
+Compatibility:
+- No IndexedDB schema migration is included.
+- Do not clear browser storage.
+- Existing saved Plane and anomaly data should be preserved.
+
+Testing note:
+The Node regression suite and static checks passed during packaging. A live browser/WebGL session was not available; the checklist above is for visual and interaction confirmation.

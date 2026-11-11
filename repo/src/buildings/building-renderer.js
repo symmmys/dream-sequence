@@ -140,6 +140,7 @@ class BuildingRenderer {
             return false;
         }
 
+        const buildingScale = building.scale ?? { x: 1, y: 1, z: 1 };
         const values = [
             component.position.x,
             component.position.y,
@@ -147,6 +148,7 @@ class BuildingRenderer {
             component.dimensions.x,
             component.dimensions.y,
             component.dimensions.z,
+            buildingScale.x, buildingScale.y, buildingScale.z,
             building.position.x,
             building.position.y,
             building.position.z
@@ -171,11 +173,16 @@ class BuildingRenderer {
         const sin = Math.sin(angle);
 
         const local = component.position;
+        const scaledLocal = {
+            x: local.x * buildingScale.x,
+            y: local.y * buildingScale.y,
+            z: local.z * buildingScale.z
+        };
 
         const rotated = {
-            x: local.x * cos - local.z * sin,
-            y: local.y,
-            z: local.x * sin + local.z * cos
+            x: scaledLocal.x * cos - scaledLocal.z * sin,
+            y: scaledLocal.y,
+            z: scaledLocal.x * sin + scaledLocal.z * cos
         };
 
         // Authoritative world coordinates.
@@ -194,9 +201,9 @@ class BuildingRenderer {
         // Dimensions remain in authoritative units.
         // GeometryRenderer applies the spatial projection.
         const scale = new BABYLON.Vector3(
-            component.dimensions.x,
-            component.dimensions.y,
-            component.dimensions.z
+            component.dimensions.x * buildingScale.x,
+            component.dimensions.y * buildingScale.y,
+            component.dimensions.z * buildingScale.z
         );
 
         const matrix = BABYLON.Matrix.Compose(

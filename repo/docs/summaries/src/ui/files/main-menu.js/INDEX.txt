@@ -3,16 +3,16 @@ SOMNIUM — INDIVIDUAL SOURCE FILE INDEX
 
 Source file: src/ui/main-menu.js
 Source directory: src/ui/
-Generated: 2026-11-09T03:15:29
-Total source lines: 146
+Generated: 2026-11-09T22:26:25
+Total source lines: 193
 Maximum chunk size: 300 lines
 Number of parts: 1
 
 SOURCE PARTS
 ----------------------------------------------------------------
 Part: PART-001.txt
-Original lines: 1-146
-Lines in part: 146
+Original lines: 1-193
+Lines in part: 193
 
 READING INSTRUCTIONS
 ----------------------------------------------------------------

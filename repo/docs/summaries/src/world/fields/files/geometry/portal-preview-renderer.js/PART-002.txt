@@ -1,0 +1,54 @@
+
+function normalizeRenderTargetSize(resolution, aspectRatio) {
+    if (!Number.isFinite(aspectRatio) || aspectRatio <= 0) {
+        throw new RangeError('Portal aspect ratio must be positive and finite.');
+    }
+    if (typeof resolution === 'number') {
+        if (!Number.isSafeInteger(resolution) || resolution < 16) {
+            throw new RangeError('Portal render resolution must be an integer of at least 16 pixels.');
+        }
+        return {
+            width: resolution,
+            height: Math.max(16, Math.round(resolution / aspectRatio))
+        };
+    }
+    if (!resolution || !Number.isSafeInteger(resolution.width) ||
+        !Number.isSafeInteger(resolution.height) || resolution.width < 16 || resolution.height < 16) {
+        throw new RangeError('Portal render resolution requires integer width and height of at least 16 pixels.');
+    }
+    return { width: resolution.width, height: resolution.height };
+}
+
+function isRenderableMesh(mesh) {
+    return Boolean(mesh && !mesh.isDisposed());
+}
+
+function capturePose(surface, rim) {
+    return {
+        surfacePosition: cloneVector(surface.position),
+        surfaceRotation: cloneVector(surface.rotation),
+        rimPosition: rim ? cloneVector(rim.position) : null,
+        rimRotation: rim ? cloneVector(rim.rotation) : null
+    };
+}
+
+function restorePose(renderer, pose) {
+    renderer.surface.position.set(pose.surfacePosition.x, pose.surfacePosition.y, pose.surfacePosition.z);
+    renderer.surface.rotation.set(pose.surfaceRotation.x, pose.surfaceRotation.y, pose.surfaceRotation.z);
+    if (renderer.rim && pose.rimPosition) {
+        renderer.rim.position.set(pose.rimPosition.x, pose.rimPosition.y, pose.rimPosition.z);
+        renderer.rim.rotation.set(pose.rimRotation.x, pose.rimRotation.y, pose.rimRotation.z);
+    }
+}
+
+function cloneVector(value) {
+    return { x: value.x, y: value.y, z: value.z };
+}
+
+function sameMeshes(left, right) {
+    return left.length === right.length && left.every(function sameMesh(mesh, index) {
+        return mesh === right[index];
+    });
+}
+
+export { PortalPreviewRenderer, applySphericalCapGeometry, applySphericalProjectionUvs };

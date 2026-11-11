@@ -1,0 +1,42 @@
+SOMNIUM — GEOMETRY PHASE 18D INSTALLATION
+
+1. Extract the complete Phase 18D archive into a clean project directory.
+2. Ensure the directory being served contains index.html (not an outer ZIP wrapper).
+3. Start the local server from that directory:
+
+   python3 -m http.server 8081
+
+4. Open:
+
+   http://127.0.0.1:8081/
+
+5. Hard-refresh the browser after replacing a previous build. Phase 18D uses:
+
+   somnium-20261109-phase18d-runtime-anomaly-integration-1
+
+RECOMMENDED BROWSER SMOKE TEST
+
+1. Launch the 4D Geometry Demo and open BUILD → Anomalies.
+2. Select each of the three built-in anomalies. Both Plane selectors should offer:
+   - Poincaré Room
+   - 4D Room
+   - Main World
+3. Change Mouth A's or Mouth B's X/Y/Z values and commit the field. The corresponding portal should move immediately in the rendered Plane.
+4. Change yaw, pitch, and roll. The portal surface should rotate to match the saved endpoint orientation.
+5. Change an endpoint's Plane. It should become unplaced/disabled until you place that mouth again in its new Plane.
+6. Place both mouths, enable the anomaly, and test forward traversal.
+7. Test reverse traversal and confirm the destination mouth orientation is respected.
+8. Reload the browser. Confirm the saved endpoint positions, orientations, Plane IDs, enabled state, and connection settings remain.
+9. Confirm disabled/unplaced anomalies do not render as active portals or permit traversal.
+10. Open the Buildings tab and drag the mouse over terrain. The retired legacy room-drawing interaction should remain disabled; the floor-plan building workflow should still work.
+
+AUTOMATED TESTS
+
+From the extracted project root:
+
+   node --experimental-default-type=module --test tests/*.test.mjs
+
+Phase 18D result: 343 passed, 0 failed.
+
+SCOPE NOTE
+The three built-in anomaly IDs are connected to live runtime portal/traversal resources. New arbitrary anomaly records can be saved and edited, but automatic dynamic runtime creation of new portal/controller pairs is not included yet.

@@ -1,0 +1,20 @@
+SOMNIUM — PHASE 18G4 QUATERNION / MATRIX API STARTUP REPAIR
+PATCH MANIFEST
+
+BASELINE
+  Apply this patch on top of the Phase 18G4 Plane Object Editing full project
+  archive. The full corrected project archive is also provided and is the
+  recommended installation route.
+
+INSTALL
+  Extract the patch ZIP into the project root (the directory containing
+  index.html) and allow included files to overwrite matching files. Then
+  hard-refresh the browser.
+
+CONTENTS
+  This patch includes all modified source modules, regression tests, and
+  cache-busting references, together with repair notes and installation docs.
+
+DATA SAFETY
+  No application database, IndexedDB data, Plane records, Anomaly records, or
+  World files are removed or migrated by this corrective update.

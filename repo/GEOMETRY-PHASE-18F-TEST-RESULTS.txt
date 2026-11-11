@@ -1,0 +1,30 @@
+SOMNIUM GEOMETRY PHASE 18F — TEST RESULTS
+=========================================
+
+Automated suite:
+  356 tests passed
+  0 tests failed
+  0 cancelled
+  0 skipped
+
+Coverage added in this phase:
+  - Dynamic traversal-controller attach/remove lifecycle
+  - Duplicate controller rejection
+  - Slice-change callback binding for newly attached controllers
+  - Actual custom slice-transition anomaly route registration in the live topology,
+    chunk graph, and traversal network
+  - B hotkey enters/exits editor and ignores text entry
+  - 1/2 and numpad tab navigation
+  - Build launcher visual treatment and keyboard hints
+  - Startup loading of saved custom anomaly definitions
+
+Static validation:
+  - All src/**/*.js files passed node --check
+  - All tests/**/*.mjs files passed node --check
+  - Application import chain uses one Phase 18F cache identifier
+  - Relative import resolution checked during packaging
+
+Browser/WebGL:
+  Not automated in this environment. Project owner should verify new anomaly
+  placement, live portal creation, traversal in both directions, disable/delete,
+  and reload persistence in the browser.

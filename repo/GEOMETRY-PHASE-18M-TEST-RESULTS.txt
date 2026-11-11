@@ -1,0 +1,39 @@
+SOMNIUM PHASE 18M — TEST RESULTS
+
+Automated test command:
+  node --test tests/*.test.mjs
+
+Result:
+  Tests:       421
+  Passed:      421
+  Failed:      0
+  Cancelled:   0
+  Skipped:     0
+  Todo:        0
+
+Static syntax checks:
+  JavaScript source and test files inspected: 182
+  node --check failures: 0
+
+Relative import audit:
+  JavaScript source/test files inspected: 182
+  Relative imports checked: 373
+  Missing relative imports: 0
+
+Build/cache identifier:
+  somnium-20261110-phase18m-w-slice-playtest-and-traversal-repair-1
+  Previous Phase 18L identifier occurrences in index.html/src/tests: 0
+
+Focused coverage added or updated:
+- integer-step W-slice slider and decimal absolute W coordinate input
+- W-slice changes update Plane-owned 4D hypercube cross-sections
+- E/Q override toggle in free camera, bounded by Plane W thickness
+- E/Q override ambient player movement in follow mode without an anomaly route
+- H visibility toggle and W coordinate/freedom HUD readout
+- in-passage HUD control hint
+- spherical chart mouse-pick clamp safely inside antipodal limit
+- Plane-frame transform forwards render-space chart constraints
+- once inside a slice-transition anomaly, E/Q W traversal ignores ambient freedom falloff
+- four movement axes remain independent
+
+Live browser/WebGL testing was not performed during this packaging pass.

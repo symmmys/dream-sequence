@@ -1,0 +1,33 @@
+SOMNIUM — GEOMETRY PHASE 17F TEST RESULTS
+Build: somnium-20261109-phase17f-destination-approach-1
+Baseline: Phase 17E
+
+FULL AUTOMATED SUITE
+Command: node --test tests/*.test.mjs
+Result: 308 passed, 0 failed.
+
+FOCUSED VIEW / BOUNDARY TESTS
+- tests/anomaly-view-transform.test.mjs
+- tests/anomaly-boundary-renderer.test.mjs
+Result: 27 passed, 0 failed.
+
+STATIC VERIFICATION
+- JavaScript source and test modules: 158 syntax checks passed.
+- Relative import references: 329 checked, 0 missing.
+- Old Phase 17E cache ID in index.html/src/tests: 0 occurrences.
+- Application entry chain cache-busting consistency: passed (covered by full suite).
+
+NEW PHASE 17F COVERAGE
+- Remote camera mapping remains unchanged at approach progress 0.
+- Remote camera tangent/forward offset progressively converges toward destination endpoint.
+- Camera screen-up clearance is preserved during convergence.
+- Destination aperture scale progresses monotonically from narrow-mouth ratio to 1.
+- Tapered-cylinder aperture remains full-size after destination handoff; no legacy 4D-ball endpoint shrink.
+- Reverse traversal uses the same continuous aperture-approach curve.
+- Runtime integration targets only the matching active anomaly and remote destination slice.
+- Approach progress and resulting camera/aperture state are exposed in diagnostics.
+- Existing Euclidean 4D spherical aperture behavior remains unchanged.
+
+VISUAL VERIFICATION
+No live browser/WebGL session was available. Please inspect the destination image's growth/parallax during traversal, the apparent size of the Main World exit mouth at handoff, and the transition from portal preview to the live Main World camera.
+- Freshly extracted delivery ZIP: full suite repeated, 308 passed, 0 failed.

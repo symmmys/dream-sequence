@@ -3,7 +3,7 @@ SOMNIUM — INDIVIDUAL SOURCE FILE INDEX
 
 Source file: src/geology/rock-generator.js
 Source directory: src/geology/
-Generated: 2026-11-09T03:15:29
+Generated: 2026-11-09T22:26:25
 Total source lines: 142
 Maximum chunk size: 300 lines
 Number of parts: 1

@@ -1,0 +1,40 @@
+SOMNIUM PHASE 18O — TEST RESULTS
+
+Automated test command:
+  node --test tests/*.test.mjs
+
+Result:
+  Tests:       433
+  Passed:      433
+  Failed:      0
+  Cancelled:   0
+  Skipped:     0
+  Todo:        0
+
+Static syntax checks:
+  JavaScript source and test files inspected: 184
+  node --check failures: 0
+
+Relative import audit:
+  JavaScript source/test files inspected: 184
+  Relative imports checked: 400
+  Missing relative imports: 0
+
+Build/cache identifier:
+  somnium-20261110-phase18o-active-w-slice-navigation-1
+  Previous Phase 18N identifier occurrences in index.html/src/tests: 0
+
+Regression coverage includes:
+- built-in W=0, W=75, and W=80 runtime view resolution
+- inclusion of custom Planes intersecting the selected ambient W slice
+- exclusion of unrelated built-in room layers
+- empty W-slice behavior and retained custom authoring layer
+- immediate runtime presentation updates when W changes
+- editor camera target updates on runtime slice changes
+- preservation of camera orbit/zoom when moving within the same runtime slice
+- Main World focus using the live terrain anchor
+- custom Plane camera context for empty slices
+- publishing W-view state while the geometry demo is inactive
+- restoration of gameplay presentation after W inspection is cleared
+
+Live browser/WebGL testing was not performed during this packaging pass.

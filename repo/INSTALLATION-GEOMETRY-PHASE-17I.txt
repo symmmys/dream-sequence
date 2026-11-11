@@ -1,0 +1,25 @@
+SOMNIUM — GEOMETRY PHASE 17I INSTALLATION
+
+1. Extract the complete Phase 17I archive into a clean project directory.
+2. Serve from the directory containing index.html (not the outer ZIP wrapper directory).
+3. Start the local server:
+
+   python3 -m http.server 8081
+
+4. Open:
+
+   http://127.0.0.1:8081/
+
+5. Hard-refresh the browser after replacing a previous Phase 17 build. The application entry chain uses this cache-busting identifier:
+
+   somnium-20261109-phase17i-bidirectional-spherical-passage-1
+
+Phase 17I adds two independent complete spherical mouth renderers for eligible open-4D-cylinder slice-transition anomalies. During transit, the entrance displays the starting world and sits behind the player; the exit displays the destination world and sits ahead. Both are separated along a configurable 3D presentation axis, with perspective producing the opposing apparent angular-size progression. The transitional scene is black outside the two spheres. Camera orbit and translation remain available; the display frame is stable after passage activation.
+
+The demo defaults are mouthSeparation=80 and cameraInset=8. They are presentation-space values only and do not alter 4D anomaly geometry or W traversal. In follow mode, the depth axis follows the player travel heading; in free-camera mode it captures the travel-aligned direction at entry. Camera orbit and translation can then inspect the fixed passage frame independently.
+
+Run the complete automated suite from the extracted project directory:
+
+   node --test tests/*.test.mjs
+
+The Phase 17I suite contains 322 tests. Automated tests and static checks do not replace live browser/WebGL inspection. In particular, inspect the passage in both directions, turn around to find the entrance, orbit around both spherical mouths, and verify the destination-world handoff.

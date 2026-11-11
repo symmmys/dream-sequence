@@ -1,0 +1,32 @@
+SOMNIUM — GEOMETRY PHASE 17D TEST RESULTS
+Build: somnium-20261109-phase17d-open-hypercube-boundaries-1
+Baseline: Phase 17C
+
+FULL AUTOMATED SUITE
+Command: node --test tests/*.test.mjs
+Result: 299 passed, 0 failed.
+Duration: 22.67 seconds.
+
+STATIC VERIFICATION
+- Source JavaScript syntax: 126/126 passed.
+- Test module syntax: 32/32 passed.
+- Relative imports checked across src and tests: 329.
+- Missing relative imports: 0.
+- Runtime ESM import smoke: anomaly-boundary-renderer, geometry-demo-world, and main-menu loaded successfully.
+- Application entry chain cache-busting identifier consistency: passed.
+
+NEW PHASE 17D COVERAGE
+- Open 4D hypercube boundary produces six side panels.
+- Two W-facing end caps are omitted.
+- W-slice sampling and out-of-region clipping.
+- Presentation endpoint offset is applied without changing canonical anomaly geometry.
+- Non-W-aligned frames return an explicit unsupported result without crashing.
+- Babylon boundary mesh and line-system update, visibility and disposal lifecycle.
+- Anomaly view contract accepts open-4d-hypercube and rejects unknown boundary types.
+- All three demo slice-transition anomalies opt into the open hypercube boundary.
+- Geometry HUD contains clickable EDIT LIGHT (L) and TEST RAY (P) controls.
+- HUD labels and aria-pressed state follow both button and keyboard state changes.
+- Spotlight editing help panel visibility follows edit state.
+
+VISUAL VERIFICATION
+No live browser/WebGL session was available. The 3D panels, line visibility, transparency sorting, portal composition and overall visual comfort still require in-browser inspection.

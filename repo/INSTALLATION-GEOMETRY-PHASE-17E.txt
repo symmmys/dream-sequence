@@ -1,0 +1,23 @@
+SOMNIUM — GEOMETRY PHASE 17E INSTALLATION
+
+1. Extract the complete Phase 17E archive into a clean project directory.
+2. Ensure the directory being served contains index.html (not an outer ZIP wrapper).
+3. Start the local server from that directory:
+
+   python3 -m http.server 8081
+
+4. Open:
+
+   http://127.0.0.1:8081/
+
+5. Hard-refresh the browser after replacing a previous build. Phase 17E uses a new application cache-busting identifier:
+
+   somnium-20261109-phase17e-tapered-4d-cylinder-1
+
+The demo anomaly interiors now render tapered open 4D cylinders. In the direct Hypercube-to-Main-World anomaly, the cross-section radius smoothly increases from 2.8 at the Hypercube endpoint to 7.0 at the Main World endpoint as ambient W progresses from 75 to 80.
+
+Run the complete automated test suite from the extracted project directory:
+
+   node --test tests/*.test.mjs
+
+See GEOMETRY-PHASE-17E-TAPERED-4D-CYLINDER-ANOMALY-BOUNDARIES.md for the geometry model, endpoint radius configuration, support limits, and verification details.

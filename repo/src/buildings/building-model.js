@@ -22,6 +22,11 @@ class BuildingModel {
         };
 
         this.rotation = options.rotation ?? 0;
+        this.scale = {
+            x: options.scale?.x ?? 1,
+            y: options.scale?.y ?? 1,
+            z: options.scale?.z ?? 1
+        };
 
         this.rooms = clone(options.rooms ?? []);
         this.furniture = clone(options.furniture ?? []);
@@ -120,6 +125,11 @@ class BuildingModel {
         if (!this.id || !Array.isArray(this.rooms)) {
             throw new Error("Invalid building.");
         }
+        if (!this.scale || !['x', 'y', 'z'].every(axis =>
+            Number.isFinite(this.scale[axis]) && this.scale[axis] > 0
+        )) {
+            throw new Error('Building scale must contain positive finite X/Y/Z values.');
+        }
 
         for (const room of this.rooms) {
             const b = room.bounds;
@@ -170,6 +180,7 @@ class BuildingModel {
             buildingType: this.type,
             position: clone(this.position),
             rotation: this.rotation,
+            scale: clone(this.scale),
             rooms: clone(this.rooms),
             furniture: clone(this.furniture),
             fixtures: clone(this.fixtures),
@@ -190,6 +201,7 @@ class BuildingModel {
             type: data.buildingType,
             position: data.position,
             rotation: data.rotation,
+            scale: data.scale,
             rooms: data.rooms,
             furniture: data.furniture,
             fixtures: data.fixtures,

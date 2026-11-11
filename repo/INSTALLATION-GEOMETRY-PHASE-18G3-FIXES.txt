@@ -1,0 +1,22 @@
+SOMNIUM — PHASE 18G3 GIZMO FIXES
+
+1. Extract the complete ZIP into a clean project directory.
+2. Start the server from the directory containing index.html:
+
+   python3 -m http.server 8081
+
+3. Open http://127.0.0.1:8081/ and hard-refresh once.
+4. Press B to open LEVEL BUILDER, then open Buildings.
+5. Click ADD BOX BUILDING. Select MOVE, ROTATE, or SCALE and drag the
+   corresponding viewport gizmo. Numeric X/Y/Z scale fields should update.
+6. Try rotation after applying non-uniform scale; the Babylon warning about
+   rotation gizmos matching a non-uniformly scaled mesh should no longer occur.
+7. Click PLACE BUILDING & START NEXT to commit the box.
+
+The box is 2 x 2 x 2 and does not require a floor-plan image.
+
+Run tests from the extracted project root:
+
+   node --experimental-default-type=module --test tests/*.test.mjs
+
+Automated tests do not replace live Babylon/WebGL interaction testing.

@@ -1,5 +1,7 @@
 /** Coordinates several single-corridor controllers as one connected world graph. */
 
+import { ambientToSlice } from '../world/fields/geometry/spatial-4d.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
+
 class CorridorTraversalNetwork {
     constructor(options = {}) {
         this.topology = requireObject(options.topology, 'topology');
@@ -15,11 +17,33 @@ class CorridorTraversalNetwork {
     }
 
     bindControllers() {
-        for (const controller of this.controllers) {
-            const notify = controller.onSliceChanged;
-            controller.currentSliceId = this.currentSliceId;
-            controller.onSliceChanged = this.handleSliceChanged.bind(this, controller, notify);
+        for (const controller of this.controllers) this.bindController(controller);
+    }
+
+    bindController(controller) {
+        const notify = controller.onSliceChanged;
+        controller.currentSliceId = this.currentSliceId;
+        controller.onSliceChanged = this.handleSliceChanged.bind(this, controller, notify);
+        controller.setActive?.(this.active);
+    }
+
+    addController(controller) {
+        if (!controller || !controller.corridor?.id) throw new TypeError('A traversal controller with a corridor ID is required.');
+        if (this.controllers.some(entry => entry.corridor.id === controller.corridor.id)) {
+            throw new Error(`Traversal controller already exists: ${controller.corridor.id}`);
         }
+        this.controllers.push(controller);
+        this.bindController(controller);
+        return controller;
+    }
+
+    removeController(corridorId) {
+        const index = this.controllers.findIndex(entry => entry.corridor.id === corridorId);
+        if (index < 0) return false;
+        const [controller] = this.controllers.splice(index, 1);
+        if (this.activeController === controller) this.activeController = null;
+        controller.dispose?.();
+        return true;
     }
 
     handleSliceChanged(controller, notify, sliceId, state) {
@@ -69,6 +93,7 @@ class CorridorTraversalNetwork {
         // that actually connect from the current slice.
         const position4D = this.getAmbientPlayerPosition();
         if (!position4D) return false;
+        const forceWMovement = Boolean(this.controllers[0]?.camera?.wMovementEnabled);
         const candidates = this.controllers.filter((controller) =>
             controller.ownsSlice?.(this.currentSliceId) ??
                 (controller.worlds instanceof Map
@@ -76,14 +101,41 @@ class CorridorTraversalNetwork {
                     : controller.currentSliceId === this.currentSliceId)
         ).map((controller) => {
             const influence = controller.getInfluenceMovementInfo?.(
-                position4D, direction, this.currentSliceId
+                position4D, direction, this.currentSliceId, { ignoreFreedom: forceWMovement }
             );
             return influence ? { controller, influence } : null;
         }).filter(Boolean).sort((left, right) =>
             right.influence.movementScale - left.influence.movementScale
         );
-        if (!candidates.length) return false;
-        return candidates[0].controller.advanceAmbientInfluenceMovement(deltaSeconds);
+        if (!candidates.length) {
+            if (!forceWMovement) return false;
+            const owner = this.controllers.find((controller) => controller.worlds?.has?.(this.currentSliceId));
+            const world = owner?.worlds?.get?.(this.currentSliceId);
+            if (!world?.slice?.frame || !owner?.player) return false;
+            const frame = world.slice.frame;
+            const local = ambientToSlice(frame, position4D);
+            const bounds = world.wBounds ?? { min: -12, max: 12 };
+            let minimum = Number.isFinite(bounds.min) ? bounds.min : -12;
+            let maximum = Number.isFinite(bounds.max) ? bounds.max : 12;
+            // A zero-thickness legacy demo slice is still useful for W-axis
+            // playtesting; give it a modest inspection interval without
+            // modifying the saved/runtime Plane boundary.
+            if (maximum - minimum < 1e-6) { minimum = -12; maximum = 12; }
+            const speed = input.sprint ? (owner.options?.sprintSpeed ?? 12) : (owner.options?.speed ?? 8);
+            const nextOffset = Math.max(minimum, Math.min(maximum,
+                local.normalOffset + direction * speed * Math.min(Math.max(deltaSeconds, 0), 0.1)));
+            if (Math.abs(nextOffset - local.normalOffset) < 1e-10) return false;
+            const candidate = { ...position4D };
+            const deltaW = nextOffset - local.normalOffset;
+            candidate.x += frame.normal.x * deltaW;
+            candidate.y += frame.normal.y * deltaW;
+            candidate.z += frame.normal.z * deltaW;
+            candidate.w += frame.normal.w * deltaW;
+            owner.player.spatialPosition4D = candidate;
+            owner.player.setWorldPosition?.(local.position);
+            return true;
+        }
+        return candidates[0].controller.advanceAmbientInfluenceMovement(deltaSeconds, position4D, { ignoreFreedom: forceWMovement });
     }
 
     getAmbientPlayerPosition() {
@@ -94,6 +146,11 @@ class CorridorTraversalNetwork {
         // Do not stop at the first synchronized controller: find the first
         // controller that owns a binding for this actual WorldSlice and can
         // resolve a finite ambient position.
+        let fallback = null;
+        // Multiple anomalies can have separate presentation mouths in one
+        // slice. Prefer the controller whose visible portal approach contains
+        // the player; otherwise an unrelated route can rebase coordinates
+        // against its own canonical endpoint and keep the correct W field off.
         for (const controller of this.controllers) {
             const ownsSlice = typeof controller.ownsSlice === 'function'
                 ? controller.ownsSlice(this.currentSliceId)
@@ -102,9 +159,11 @@ class CorridorTraversalNetwork {
                     : controller.currentSliceId === this.currentSliceId;
             if (!ownsSlice || typeof controller.getAmbientPlayerPosition !== 'function') continue;
             const position = controller.getAmbientPlayerPosition();
-            if (isFinitePosition4(position)) return { ...position };
+            if (!isFinitePosition4(position)) continue;
+            if (controller.isNearPresentationPortal?.(this.currentSliceId)) return { ...position };
+            if (!fallback) fallback = { ...position };
         }
-        return null;
+        return fallback;
     }
 
     getEntryDiagnostics() {

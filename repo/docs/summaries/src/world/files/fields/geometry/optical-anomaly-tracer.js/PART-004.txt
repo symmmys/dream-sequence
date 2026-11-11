@@ -1,3 +1,17 @@
+}
+
+function resolveEndpoint(anomaly, sliceId) {
+    if (anomaly.source.sliceId === sliceId) return anomaly.source;
+    if (anomaly.destination.sliceId === sliceId) return anomaly.destination;
+    throw new Error(`Slice ${sliceId} is not an endpoint of anomaly ${anomaly.id}.`);
+}
+
+function validateAnomaly(anomaly, { requireEnabled = true } = {}) {
+    if (!anomaly || anomaly.type !== SLICE_TRANSITION_ANOMALY) {
+        throw new TypeError('Phase 16C optical transport currently requires a slice-transition anomaly.');
+    }
+    if (requireEnabled && !anomaly.optics?.enabled) {
+        throw new RangeError(`Anomaly ${anomaly.id} is not optically enabled.`);
     }
     if (!anomaly.influence?.center || !Number.isFinite(anomaly.influence.horizonRadius) ||
         !Number.isFinite(anomaly.influence.innerRadius)) {

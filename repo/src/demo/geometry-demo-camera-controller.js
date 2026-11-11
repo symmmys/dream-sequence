@@ -1,11 +1,11 @@
 /** Switches between player-following and independent 3D/4D inspection views. */
 
-import { CharacterCameraController } from '../game/camera-controller.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
-import { add4, ambientToSlice, dot4, scale4, sliceToAmbient } from '../world/fields/geometry/spatial-4d.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
-import { SLICE_TRANSITION_ANOMALY } from '../world/fields/geometry/spatial-anomaly.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
-import { evaluateAnomalyInfluence, resolveAnomalyInfluence } from '../world/fields/geometry/anomaly-influence-field.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+import { CharacterCameraController } from '../game/camera-controller.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
+import { add4, ambientToSlice, dot4, scale4, sliceToAmbient } from '../world/fields/geometry/spatial-4d.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
+import { SLICE_TRANSITION_ANOMALY } from '../world/fields/geometry/spatial-anomaly.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
+import { resolveAnomalyInfluence } from '../world/fields/geometry/anomaly-influence-field.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
 
-const CAMERA_BUILD = '2026-11-08-phase15-main-world-reentry-metric-grid-1';
+const CAMERA_BUILD = '2026-11-10-phase18o-active-w-slice-navigation-1';
 const MOVEMENT_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyR', 'KeyF', 'KeyE', 'KeyQ', 'ShiftLeft'];
 
 class GeometryDemoCameraController extends CharacterCameraController {
@@ -18,6 +18,7 @@ class GeometryDemoCameraController extends CharacterCameraController {
         this.freePosition = null;
         this.freeSliceId = null;
         this.freeW = 0;
+        this.wMovementEnabled = false;
         this.freeEntryLock = null;
         this.freeTransit = null;
         this.freeYaw = 0;
@@ -49,6 +50,18 @@ class GeometryDemoCameraController extends CharacterCameraController {
 
     setTraversalController(controller) {
         this.traversal = controller;
+    }
+
+    setWMovementEnabled(enabled) {
+        this.wMovementEnabled = Boolean(enabled);
+        this.freeKeys.delete('KeyE');
+        this.freeKeys.delete('KeyQ');
+        this.onWMovementChanged?.(this.wMovementEnabled);
+        return this.wMovementEnabled;
+    }
+
+    toggleWMovementEnabled() {
+        return this.setWMovementEnabled(!this.wMovementEnabled);
     }
 
     setEnabled(enabled) {
@@ -89,8 +102,11 @@ class GeometryDemoCameraController extends CharacterCameraController {
         this.freeSliceId = traversal?.state === 'transit'
             ? traversal.startWorld.slice.id
             : traversal?.currentSliceId ?? this.character.sliceId;
-        this.constrainFreePosition(traversal?.worlds.get(this.freeSliceId));
-        this.freeW = this.freeW || 0;
+        const initialWorld = traversal?.worlds.get(this.freeSliceId);
+        this.constrainFreePosition(initialWorld);
+        const initialMinW = Number.isFinite(initialWorld?.wBounds?.min) ? initialWorld.wBounds.min : -12;
+        const initialMaxW = Number.isFinite(initialWorld?.wBounds?.max) ? initialWorld.wBounds.max : 12;
+        this.freeW = clamp(Number.isFinite(this.freeW) ? this.freeW : 0, initialMinW, initialMaxW);
         const world = traversal?.worlds.get(this.freeSliceId);
         if (world) this.setSpatialContext(world.transform, world.layerMask);
         this.freeTransit = traversal?.state === 'transit'
@@ -111,7 +127,10 @@ class GeometryDemoCameraController extends CharacterCameraController {
 
     setFreeView(position, target, sliceId, w = 0) {
         this.freeSliceId = sliceId;
-        this.freeW = Number.isFinite(w) ? w : 0;
+        const targetWorld = this.traversal?.worlds.get(sliceId);
+        const minW = Number.isFinite(targetWorld?.wBounds?.min) ? targetWorld.wBounds.min : -12;
+        const maxW = Number.isFinite(targetWorld?.wBounds?.max) ? targetWorld.wBounds.max : 12;
+        this.freeW = clamp(Number.isFinite(w) ? w : 0, minW, maxW);
         this.freePosition = copyVector(position);
         const direction = normalize3(subtract3(target, position));
         this.freeYaw = Math.atan2(direction.x, direction.z);
@@ -253,7 +272,18 @@ class GeometryDemoCameraController extends CharacterCameraController {
                 this.traversal?.worlds.get(this.freeSliceId), candidate
             );
         }
-        this.advanceFreeInfluenceMovement(delta, input, speed);
+        const movedAlongAnomaly = this.advanceFreeInfluenceMovement(delta, input, speed);
+        // With the playtest override enabled, E/Q move the inspection cross-section
+        // through the Plane's actual W thickness even when no anomaly is nearby.
+        // W is centered on the Plane frame origin and bounded by its container.
+        const activeWorld = this.traversal?.worlds.get(this.freeSliceId);
+        if (input.crossSectionW && !movedAlongAnomaly && this.wMovementEnabled) {
+            const bounds = activeWorld?.wBounds;
+            let minW = Number.isFinite(bounds?.min) ? bounds.min : -12;
+            let maxW = Number.isFinite(bounds?.max) ? bounds.max : 12;
+            if (this.wMovementEnabled && maxW - minW < 1e-6) { minW = -12; maxW = 12; }
+            this.freeW = clamp(this.freeW + input.crossSectionW * speed * delta, minW, maxW);
+        }
         this.applyFreePose();
     }
 
@@ -262,18 +292,21 @@ class GeometryDemoCameraController extends CharacterCameraController {
         const world = this.traversal.worlds.get(this.freeSliceId);
         const worldPosition = this.renderFreePositionToWorld(world);
         if (!world || !worldPosition) return false;
-        const base = sliceToAmbient(world.slice.frame, worldPosition);
-        const current = add4(base, scale4(world.slice.frame.normal, this.freeW));
         const routes = this.traversal.getRoutesForSlice?.(this.freeSliceId) ?? this.getLegacyRoute();
         const candidates = routes.map((route) => {
-            const info = route.controller?.getInfluenceMovementInfo?.(current, input.crossSectionW, this.freeSliceId);
-            return info ? { route, info } : null;
+            const physicalPosition = route.controller?.getPhysicalEndpointLocalPosition?.(world, worldPosition) ?? worldPosition;
+            const base = sliceToAmbient(world.slice.frame, physicalPosition);
+            const current = add4(base, scale4(world.slice.frame.normal, this.freeW));
+            const info = route.controller?.getInfluenceMovementInfo?.(
+                current, input.crossSectionW, this.freeSliceId, { ignoreFreedom: this.wMovementEnabled }
+            );
+            return info ? { route, info, current } : null;
         }).filter(Boolean).sort((left, right) =>
             right.info.movementScale - left.info.movementScale
         );
         if (!candidates.length) return false;
 
-        const { route, info } = candidates[0];
+        const { route, info, current } = candidates[0];
         const amount = Math.sign(input.crossSectionW) * speed * delta * info.movementScale;
         if (Math.abs(amount) <= 1e-10) return false;
         const normal = world.slice.frame.normal;
@@ -296,7 +329,7 @@ class GeometryDemoCameraController extends CharacterCameraController {
                     position4D: candidate, corridorId: info.anomalyId
                 }) : { reachable: true };
             if (reachability.reachable) {
-                this.completeFreeInfluenceHandoff(info.targetWorld, candidate);
+                this.completeFreeInfluenceHandoff(info.targetWorld, candidate, route, world);
                 return true;
             }
             candidate = add4(candidate, scale4(normal, -info.direction * 1e-7));
@@ -306,8 +339,10 @@ class GeometryDemoCameraController extends CharacterCameraController {
         return true;
     }
 
-    completeFreeInfluenceHandoff(world, position4D) {
-        const local = ambientToSlice(world.slice.frame, position4D).position;
+    completeFreeInfluenceHandoff(world, position4D, route = null, fromWorld = null) {
+        const local = route?.controller?.createArrivalPosition
+            ? route.controller.createArrivalPosition(world, position4D, fromWorld)
+            : ambientToSlice(world.slice.frame, position4D).position;
         const arrival = world.transform?.constrainWorldPosition?.(local) ?? local;
         this.freeSliceId = world.slice.id;
         this.freeW = 0;
@@ -324,8 +359,13 @@ class GeometryDemoCameraController extends CharacterCameraController {
         const world = this.traversal?.worlds.get(this.freeSliceId);
         const position = this.renderFreePositionToWorld(world);
         if (!world || !position) return null;
+        const routes = this.traversal.getRoutesForSlice?.(this.freeSliceId) ?? this.getLegacyRoute();
+        const nearby = routes.find((route) =>
+            route.controller?.isNearPresentationPortal?.(this.freeSliceId, position)
+        );
+        const physicalPosition = nearby?.controller?.getPhysicalEndpointLocalPosition?.(world, position) ?? position;
         return add4(
-            sliceToAmbient(world.slice.frame, position),
+            sliceToAmbient(world.slice.frame, physicalPosition),
             scale4(world.slice.frame.normal, this.freeW)
         );
     }
@@ -348,13 +388,15 @@ class GeometryDemoCameraController extends CharacterCameraController {
             const endpoint = fromSource ? corridor.source : corridor.destination;
             const world = this.traversal.worlds.get(this.freeSliceId);
             const renderer = route.renderer ?? route.controller?.renderers?.get(this.freeSliceId);
+            const presentationEndpoint = route.controller?.getPresentationEndpoint?.(this.freeSliceId);
+            const mouthLocal = presentationEndpoint ?? endpoint.position;
             const mouth = renderer?.getDisplaySample(fromSource ? 0 : 1).position ??
-                world?.transform?.worldToRender(endpoint.position);
+                world?.transform?.worldToRender(mouthLocal);
             if (!mouth) continue;
             const delta = subtract3(mouth, this.freePosition);
             const distance = length3(delta);
             const entryDistance = corridor.type === SLICE_TRANSITION_ANOMALY
-                ? (corridor.entryRadius ?? this.freeEntryDistance)
+                ? (route.controller?.getEntryTriggerDistance?.(this.freeSliceId) ?? corridor.entryRadius ?? this.freeEntryDistance)
                 : this.freeEntryDistance;
             if (distance > entryDistance) continue;
             const facing = distance < 1e-6 ? 1 :
@@ -368,7 +410,8 @@ class GeometryDemoCameraController extends CharacterCameraController {
             if (corridor.type === SLICE_TRANSITION_ANOMALY) {
                 const position3 = this.renderFreePositionToWorld(startWorld);
                 if (!position3) continue;
-                const basePosition4D = sliceToAmbient(startWorld.slice.frame, position3);
+                const physicalPosition3 = route.controller?.getPhysicalEndpointLocalPosition?.(startWorld, position3) ?? position3;
+                const basePosition4D = sliceToAmbient(startWorld.slice.frame, physicalPosition3);
                 const position4D = add4(basePosition4D, scale4(startWorld.slice.frame.normal, this.freeW));
                 const resolvedAnomaly = corridor.influence?.center ? corridor : resolveAnomalyInfluence(
                     corridor,
@@ -445,8 +488,8 @@ class GeometryDemoCameraController extends CharacterCameraController {
             raw.z += axis.z * component * distance;
             raw.w += axis.w * component * distance;
         }
-        const influence = evaluateAnomalyInfluence(transit.anomaly ?? transit.corridor, transit.position4D);
-        const wStep = input.crossSectionW * speed * delta * influence.wMovementScale;
+        // W remains an independent axis inside the anomaly passage.
+        const wStep = input.crossSectionW * speed * delta;
         raw.x += frame.normal.x * wStep;
         raw.y += frame.normal.y * wStep;
         raw.z += frame.normal.z * wStep;
@@ -491,16 +534,11 @@ class GeometryDemoCameraController extends CharacterCameraController {
 
     completeFreeAnomaly(world, transit) {
         const ambient = transit.position4D;
-        const local = ambientToSlice(world.slice.frame, ambient).position;
-        const terrain = world.terrain;
-        const x = clamp(local.x, terrain.min.x, terrain.max.x);
-        const z = clamp(local.z, terrain.min.z, terrain.max.z);
-        const sample = terrain.sampleAt(x, z);
-        const fallback = world.slice.id === transit.corridor.destination.sliceId
-            ? transit.corridor.destination.position : transit.corridor.source.position;
-        const arrival = sample && Number.isFinite(sample.y)
-            ? { x, y: sample.y + 4, z }
-            : { x: fallback.x, y: fallback.y + 4, z: fallback.z };
+        const controller = transit.controller;
+        const baseArrival = controller?.createArrivalPosition
+            ? controller.createArrivalPosition(world, ambient, transit.startWorld)
+            : ambientToSlice(world.slice.frame, ambient).position;
+        const arrival = { ...baseArrival, y: baseArrival.y + 4 };
         this.freeSliceId = world.slice.id;
         this.freeEntryLock = { sliceId: world.slice.id, position: { x: arrival.x, y: arrival.y, z: arrival.z } };
         const chartSafeArrival = world.transform.constrainWorldPosition?.(arrival) ?? arrival;
@@ -624,6 +662,7 @@ class GeometryDemoCameraController extends CharacterCameraController {
             corridorProgress: this.freeTransit?.progress ?? null,
             corridorPosition4D: this.freeTransit?.position4D ?? this.freeTransit?.spatialPosition4D ?? null,
             fourthCoordinate: this.freeW,
+            wMovementEnabled: this.wMovementEnabled,
             speed: this.freeSpeed
         };
     }

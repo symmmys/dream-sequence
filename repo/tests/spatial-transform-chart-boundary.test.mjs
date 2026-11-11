@@ -75,3 +75,16 @@ test('inverted-Poincare world positions use the same finite chart-domain constra
     assert.ok(constrained.y > -5 && constrained.z < 10);
     assert.doesNotThrow(() => transform.worldToRender(constrained));
 });
+
+
+test('spherical render-space picks clamp strictly inside the antipodal chart limit', function clampSphericalRenderPosition() {
+    const transform = new SpatialTransform({ geometry: 'spherical', renderScale: 24 });
+    const chartRadius = Math.PI * transform.projection.radius * transform.renderScale;
+    const outside = { x: chartRadius * 1.4, y: chartRadius * 0.2, z: 0 };
+    const constrained = transform.constrainRenderPosition(outside, { boundaryMargin: 1e-5 });
+    const distance = Math.hypot(constrained.x, constrained.y, constrained.z);
+    assert.ok(distance < chartRadius);
+    assert.ok(distance > chartRadius * 0.99);
+    assert.doesNotThrow(() => transform.renderToWorld(constrained));
+    assert.deepEqual(transform.constrainRenderPosition({ x: 1, y: 2, z: 3 }), { x: 1, y: 2, z: 3 });
+});

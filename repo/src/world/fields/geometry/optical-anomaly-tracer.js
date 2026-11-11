@@ -18,28 +18,28 @@ import {
     scale4,
     sliceToAmbient,
     subtract4
-} from './spatial-4d.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+} from './spatial-4d.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
 import {
     createOpticalMetricField,
     blendScaledPositiveDefiniteMetrics3,
     geometricMeanMetricScale3
-} from './optical-metric.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+} from './optical-metric.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
 import {
     createOpticalRayState,
     evaluateOpticalHamiltonian,
     traceOpticalRay
-} from './optical-ray-integrator.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+} from './optical-ray-integrator.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
 import {
     createSliceOpticalField,
     traceOpticalRayInSlice
-} from './optical-slice-tracer.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+} from './optical-slice-tracer.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
 import {
     evaluateOpticalAnomalyCoupling
-} from './optical-contracts.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+} from './optical-contracts.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
 import {
     containsAmbientPoint,
     SLICE_TRANSITION_ANOMALY
-} from './spatial-anomaly.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+} from './spatial-anomaly.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
 
 const AXES4 = ['x', 'y', 'z', 'w'];
 const EPSILON = 1e-8;
@@ -533,6 +533,20 @@ function createAnomalyOpticalTracer({
             activeAnomalyField = null;
             context = { kind: 'slice', sliceId: exit.sliceId };
             transitionCount++;
+            // Light emitters often need the exact outgoing state at an aperture,
+            // not an additional long destination-slice trace. This explicit
+            // opt-in keeps those consumers deterministic and avoids expensive
+            // Poincare integration beyond the handoff point.
+            if (options.stopAfterAnomalyExit === true) {
+                status = 'anomaly-exit';
+                terminalEvent = {
+                    kind: 'anomaly-exit',
+                    anomalyId: anomaly.id,
+                    sliceId: exit.sliceId,
+                    ambientPosition: { ...exit.ambientPosition }
+                };
+                break;
+            }
             if (transitionCount > maxTransitions) {
                 status = 'max-transitions';
                 terminalEvent = { kind: 'max-transitions', maxTransitions };

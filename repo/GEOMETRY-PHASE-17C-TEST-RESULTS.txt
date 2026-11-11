@@ -1,0 +1,38 @@
+SOMNIUM — GEOMETRY PHASE 17C TEST RESULTS
+Date: November 9, 2026
+Build: somnium-20261109-phase17c-mainworld-endpoint-rebase-2
+
+FULL AUTOMATED REGRESSION SUITE
+Command: node --test tests/*.test.mjs
+Result: 289 passed, 0 failed.
+
+FOCUSED INTEGRATION TESTS
+- tests/slice-transition-anomaly.test.mjs
+- tests/corridor-traversal-network.test.mjs
+- tests/geometry-demo-portal-preview.test.mjs
+- tests/geometry-demo-camera-controller.test.mjs
+- tests/anomaly-view-transform.test.mjs
+- tests/optical-light-source.test.mjs
+Focused result before the final strengthened re-entry assertion: 83 passed, 0 failed.
+The strengthened Main World `tryBeginTransit()` assertion was subsequently run with the slice-transition and camera-controller suites: 35 passed, 0 failed.
+
+NEW PHASE 17C COVERAGE
+- Presentation mouths map distant Main World coordinates to unchanged canonical anomaly endpoints.
+- Re-entry from the displayed Main World portal succeeds through the public transit-start path.
+- Destination arrival maps back to the presentation mouth.
+- Presentation mapping is local to the configured portal approach radius.
+- The traversal network prefers the route whose displayed portal contains the player.
+- Free-camera ambient position is rebased through the same endpoint mapping.
+- Active-side anomaly preview mapping uses the visible endpoint.
+- Receiving optical spotlight and diagnostic ray map to the display mouth while physical optical state remains canonical.
+- P toggles the optical test source/ray without changing edit mode.
+- Mouse drag rotates the test spotlight aim.
+
+STATIC VERIFICATION
+- Source JavaScript syntax: 125/125.
+- Test JavaScript syntax: 30/30.
+- Static relative imports checked: 323; missing: 0.
+- Full automated suite: 289 passed, 0 failed.
+
+VISUAL VERIFICATION
+No live browser/WebGL session was available in this environment. The Main World in-browser re-entry, W-slice activation, spotlight editing and visible shadow quality still require a live browser test.

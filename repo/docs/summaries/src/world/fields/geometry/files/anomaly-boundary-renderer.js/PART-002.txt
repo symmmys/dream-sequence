@@ -1,0 +1,260 @@
+            edgeAlpha: options.edgeAlpha ?? 0.78,
+            presentationEndpoint: options.presentationEndpoint ?? null,
+            sourceAmbient: options.sourceAmbient ?? null,
+            destinationAmbient: options.destinationAmbient ?? null,
+            layerMask: options.layerMask ?? 0x0FFFFFFF
+        };
+        validateRendererOptions(this.options);
+        this.visibleRequested = false;
+        this.sliceVisible = false;
+        this.disposed = false;
+        this.lastViewerW = null;
+        this.lastGeometry = null;
+        this.material = createSurfaceMaterial(scene, anomaly.id, this.options.opacity);
+        this.mesh = new BABYLON.Mesh(`anomalyBoundary_${anomaly.id}_${slice.id}`, scene);
+        this.mesh.material = this.material;
+        this.mesh.layerMask = this.options.layerMask;
+        this.mesh.isPickable = false;
+        this.mesh.alwaysSelectAsActiveMesh = true;
+        this.mesh.metadata = {
+            ...(this.mesh.metadata || {}),
+            anomalyBoundary: true,
+            anomalyId: anomaly.id,
+            sliceId: slice.id,
+            boundaryCellCount: anomaly.view?.interiorBoundary === 'open-4d-cylinder' ? 0 : 6,
+            boundarySurfaceCount: anomaly.view?.interiorBoundary === 'open-4d-cylinder' ? 1 : 6,
+            boundaryType: anomaly.view?.interiorBoundary ?? 'open-4d-hypercube',
+            omittedEndCaps: 2,
+            renderOnly: true
+        };
+
+        this.edgeMesh = null;
+        const endpointW = resolveEndpointW(anomaly, slice);
+        this.update(endpointW, true);
+        if (this.edgeMesh) {
+            this.edgeMesh.metadata = {
+                ...(this.edgeMesh.metadata || {}),
+                anomalyBoundary: true,
+                anomalyId: anomaly.id,
+                sliceId: slice.id,
+                boundaryEdges: true,
+                renderOnly: true
+            };
+        }
+        this.setVisible(false);
+    }
+
+    update(viewerW, force = false) {
+        if (this.disposed) return false;
+        if (!Number.isFinite(viewerW)) throw new TypeError('Anomaly boundary viewer W must be finite.');
+        if (!force && this.lastViewerW !== null && Math.abs(viewerW - this.lastViewerW) < 1e-3) {
+            return this.sliceVisible;
+        }
+        const geometryBuilder = this.anomaly.view?.interiorBoundary === 'open-4d-cylinder'
+            ? buildAnomalyCylinderGeometry : buildAnomalyBoundaryGeometry;
+        const geometry = geometryBuilder({
+            anomaly: this.anomaly,
+            slice: this.slice,
+            spatialTransform: this.spatialTransform,
+            viewerW,
+            gridSegments: this.options.gridSegments,
+            presentationEndpoint: this.options.presentationEndpoint,
+            sourceAmbient: this.options.sourceAmbient,
+            destinationAmbient: this.options.destinationAmbient
+        });
+        this.lastViewerW = viewerW;
+        this.lastGeometry = geometry;
+        this.sliceVisible = Boolean(geometry.visible);
+        if (geometry.visible) this.applyGeometry(geometry);
+        this.applyVisibility();
+        return this.sliceVisible;
+    }
+
+    applyGeometry(geometry) {
+        if (!this.mesh.getVerticesData?.(BABYLON.VertexBuffer.PositionKind)) {
+            const vertexData = new BABYLON.VertexData();
+            vertexData.positions = geometry.positions;
+            vertexData.normals = geometry.normals;
+            vertexData.indices = geometry.indices;
+            vertexData.applyToMesh(this.mesh, true);
+        } else {
+            this.mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, geometry.positions, false, false);
+            this.mesh.updateVerticesData(BABYLON.VertexBuffer.NormalKind, geometry.normals, false, false);
+        }
+        const lines = geometry.lines.map(function toBabylonLine(line) {
+            return line.map((point) => new BABYLON.Vector3(point.x, point.y, point.z));
+        });
+        const edgeOptions = this.edgeMesh
+            ? { lines, instance: this.edgeMesh }
+            : { lines, updatable: true };
+        this.edgeMesh = BABYLON.MeshBuilder.CreateLineSystem(
+            `anomalyBoundaryEdges_${this.anomaly.id}_${this.slice.id}`,
+            edgeOptions,
+            this.scene
+        );
+        this.edgeMesh.color = new BABYLON.Color3(0.28, 0.78, 1);
+        this.edgeMesh.alpha = this.options.edgeAlpha;
+        this.edgeMesh.layerMask = this.options.layerMask;
+        this.edgeMesh.isPickable = false;
+        this.edgeMesh.alwaysSelectAsActiveMesh = true;
+    }
+
+    setVisible(visible) {
+        this.visibleRequested = Boolean(visible);
+        this.applyVisibility();
+    }
+
+    applyVisibility() {
+        if (!this.mesh || !this.edgeMesh) return;
+        const visible = !this.disposed && this.visibleRequested && this.sliceVisible;
+        this.mesh.isVisible = visible;
+        this.edgeMesh.isVisible = visible;
+    }
+
+    getInfo() {
+        return {
+            anomalyId: this.anomaly.id,
+            sliceId: this.slice.id,
+            visible: Boolean(this.mesh?.isVisible),
+            supported: this.lastGeometry?.supported ?? true,
+            reason: this.lastGeometry?.reason ?? null,
+            boundaryType: this.lastGeometry?.boundaryType ?? this.anomaly.view?.interiorBoundary ?? 'open-4d-hypercube',
+            boundaryCellCount: this.lastGeometry?.boundaryType === 'open-4d-cylinder' ? 0 :
+                (this.lastGeometry?.faces?.length ?? 0),
+            boundarySurfaceCount: this.lastGeometry?.faces?.length ?? 0,
+            omittedEndCaps: 2,
+            viewerW: this.lastViewerW,
+            sectionRadius: this.lastGeometry?.sectionRadius ?? null,
+            progress: this.lastGeometry?.progress ?? null
+        };
+    }
+
+    dispose() {
+        if (this.disposed) return;
+        this.disposed = true;
+        this.mesh?.dispose?.();
+        this.edgeMesh?.dispose?.();
+        this.material?.dispose?.();
+        this.mesh = null;
+        this.edgeMesh = null;
+        this.material = null;
+    }
+}
+
+function getPresentationOffset(anomaly, sliceId, presentationEndpoint) {
+    if (!presentationEndpoint) return { x: 0, y: 0, z: 0 };
+    const endpoint = anomaly.source.sliceId === sliceId
+        ? anomaly.source : anomaly.destination.sliceId === sliceId ? anomaly.destination : null;
+    if (!endpoint) throw new Error(`Anomaly ${anomaly.id} has no endpoint in slice ${sliceId}.`);
+    return {
+        x: presentationEndpoint.x - endpoint.position.x,
+        y: presentationEndpoint.y - endpoint.position.y,
+        z: presentationEndpoint.z - endpoint.position.z
+    };
+}
+
+function resolveEndpointW(anomaly, slice) {
+    const endpoint = anomaly.source.sliceId === slice.id
+        ? anomaly.source : anomaly.destination.sliceId === slice.id ? anomaly.destination : null;
+    if (!endpoint) throw new Error(`Anomaly ${anomaly.id} has no endpoint in slice ${slice.id}.`);
+    return slice.frame.origin.w + slice.frame.axes.reduce(
+        (sum, axis, index) => sum + axis.w * endpoint.position[['x', 'y', 'z'][index]], 0
+    );
+}
+
+function isWAlignedSlice(frame) {
+    if (!frame?.normal || !Array.isArray(frame.axes) || frame.axes.length !== 3) return false;
+    if (Math.abs(frame.normal.x) > EPSILON || Math.abs(frame.normal.y) > EPSILON ||
+        Math.abs(frame.normal.z) > EPSILON || Math.abs(Math.abs(frame.normal.w) - 1) > EPSILON) return false;
+    return frame.axes.every((axis) => Math.abs(axis.w) <= EPSILON);
+}
+
+function validateRegion(region) {
+    for (const axis of AXES) {
+        if (!Number.isFinite(region.min[axis]) || !Number.isFinite(region.max[axis]) ||
+            region.max[axis] <= region.min[axis]) {
+            throw new TypeError(`Anomaly boundary requires finite, ordered ${axis} bounds.`);
+        }
+    }
+}
+
+function validateRendererOptions(options) {
+    if (!Number.isSafeInteger(options.gridSegments) || options.gridSegments < 1 || options.gridSegments > 64 ||
+        !Number.isFinite(options.opacity) || options.opacity <= 0 || options.opacity >= 1 ||
+        !Number.isFinite(options.edgeAlpha) || options.edgeAlpha < 0 || options.edgeAlpha > 1) {
+        throw new RangeError('Invalid anomaly boundary renderer configuration.');
+    }
+}
+
+function createSurfaceMaterial(scene, anomalyId, opacity) {
+    const material = new BABYLON.StandardMaterial(`anomalyBoundaryMaterial_${anomalyId}`, scene);
+    material.diffuseColor = new BABYLON.Color3(0.08, 0.38, 0.58);
+    material.emissiveColor = new BABYLON.Color3(0.025, 0.16, 0.28);
+    material.alpha = opacity;
+    material.disableLighting = true;
+    material.disableDepthWrite = true;
+    material.backFaceCulling = false;
+    return material;
+}
+
+function appendGridIndices(vertexStart, segments, indices, rowSegments = segments) {
+    const stride = segments + 1;
+    for (let v = 0; v < rowSegments; v++) {
+        for (let u = 0; u < segments; u++) {
+            const a = vertexStart + v * stride + u;
+            const b = a + 1;
+            const c = a + stride + 1;
+            const d = a + stride;
+            indices.push(a, b, c, a, c, d);
+        }
+    }
+}
+
+function appendFaceNormals(grid, multiplier, normals) {
+    for (let v = 0; v < grid.length; v++) {
+        for (let u = 0; u < grid[v].length; u++) {
+            const beforeU = grid[v][Math.max(0, u - 1)];
+            const afterU = grid[v][Math.min(grid[v].length - 1, u + 1)];
+            const beforeV = grid[Math.max(0, v - 1)][u];
+            const afterV = grid[Math.min(grid.length - 1, v + 1)][u];
+            const du = subtract3(afterU, beforeU);
+            const dv = subtract3(afterV, beforeV);
+            let normal = cross3(du, dv);
+            const length = Math.hypot(normal.x, normal.y, normal.z) || 1;
+            normal = {
+                x: normal.x / length * multiplier,
+                y: normal.y / length * multiplier,
+                z: normal.z / length * multiplier
+            };
+            normals.push(normal.x, normal.y, normal.z);
+        }
+    }
+}
+
+function appendGridLines(grid, lines) {
+    for (const row of grid) lines.push(row.map(copyPoint3));
+    for (let column = 0; column < grid[0].length; column++) {
+        lines.push(grid.map((row) => copyPoint3(row[column])));
+    }
+}
+
+function subtract3(a, b) { return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }; }
+function cross3(a, b) {
+    return {
+        x: a.y * b.z - a.z * b.y,
+        y: a.z * b.x - a.x * b.z,
+        z: a.x * b.y - a.y * b.x
+    };
+}
+function copyPoint3(point) { return { x: point.x, y: point.y, z: point.z }; }
+function isFinitePoint3(point) { return Boolean(point) && [point.x, point.y, point.z].every(Number.isFinite); }
+function interpolate(a, b, t) { return a + (b - a) * t; }
+
+export {
+    AnomalyBoundaryRenderer,
+    BOUNDARY_FACE_DEFINITIONS,
+    buildAnomalyBoundaryGeometry,
+    buildAnomalyCylinderGeometry,
+    resolveAnomalyCylinderRadius,
+    isWAlignedSlice
+};

@@ -3,16 +3,16 @@ SOMNIUM — INDIVIDUAL SOURCE FILE INDEX
 
 Source file: src/world/fields/geometry/spatial-anomaly.js
 Source directory: src/world/fields/geometry/
-Generated: 2026-11-09T03:15:29
-Total source lines: 160
+Generated: 2026-11-09T22:26:25
+Total source lines: 226
 Maximum chunk size: 300 lines
 Number of parts: 1
 
 SOURCE PARTS
 ----------------------------------------------------------------
 Part: PART-001.txt
-Original lines: 1-160
-Lines in part: 160
+Original lines: 1-226
+Lines in part: 226
 
 READING INSTRUCTIONS
 ----------------------------------------------------------------

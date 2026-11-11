@@ -6,8 +6,8 @@
  * BVHs; streamed heightfields use analytic height sampling.
  */
 
-import { createOpticalMaterial } from './optical-contracts.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
-import { createSliceAddress, getSliceAddressKey } from './world-slice.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+import { createOpticalMaterial } from './optical-contracts.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
+import { createSliceAddress, getSliceAddressKey } from './world-slice.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
 
 const AXES = ['x', 'y', 'z'];
 const DEFAULT_LEAF_SIZE = 8;

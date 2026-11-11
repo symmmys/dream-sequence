@@ -1,0 +1,116 @@
+    // Keep the entrance behind the player and the exit ahead. The camera
+    // starts one inset beyond the entrance and advances toward the exit,
+    // finishing one inset before it. The axis is a display-space proxy for W.
+    const entryPosition = subtract3(anchor, scale3(axis, inset));
+    const exitPosition = add3(anchor, scale3(axis, separation - inset));
+    const cameraOffset = scale3(axis, progress * (separation - inset * 2));
+    const displayCameraPosition = add3(cameraPosition, cameraOffset);
+    const entryDistance = distance3(displayCameraPosition, entryPosition);
+    const exitDistance = distance3(displayCameraPosition, exitPosition);
+    const entryScale = lerp(entryStart, entryEnd, eased);
+    const exitScale = lerp(exitStart, exitEnd, eased);
+    return {
+        progress,
+        easedProgress: eased,
+        separation,
+        cameraOffset,
+        cameraPosition: displayCameraPosition,
+        entry: {
+            position: entryPosition,
+            scale: entryScale,
+            cameraDistance: entryDistance,
+            apparentAngularRadius: apparentAngularRadius(entryRadius * entryScale, entryDistance)
+        },
+        exit: {
+            position: exitPosition,
+            scale: exitScale,
+            cameraDistance: exitDistance,
+            apparentAngularRadius: apparentAngularRadius(exitRadius * exitScale, exitDistance)
+        }
+    };
+}
+
+function normalizeConfig(options = {}) {
+    const config = { ...DEFAULTS, ...options };
+    positiveFinite(config.mouthSeparation, 'mouthSeparation');
+    positiveFinite(config.cameraInset, 'cameraInset');
+    if (config.mouthSeparation <= config.cameraInset * 2) {
+        throw new RangeError('mouthSeparation must exceed twice cameraInset.');
+    }
+    if (config.resolution !== 256 && config.resolution !== 512 && config.resolution !== 1024 &&
+        config.resolution !== 2048) {
+        throw new RangeError('Passage render resolution must be 256, 512, 1024, or 2048.');
+    }
+    if (config.mouthSeparationAxis !== null) {
+        config.mouthSeparationAxis = normalize3(requireVector(config.mouthSeparationAxis, 'mouthSeparationAxis'));
+    }
+    // Validate optional curve and normalized scale endpoints eagerly.
+    calculateAnomalyPassageLayout({
+        anchor: { x: 0, y: 0, z: 0 }, axis: { x: 0, y: 0, z: 1 }, progress: 0,
+        mouthSeparation: config.mouthSeparation,
+        cameraInset: config.cameraInset,
+        mouthSeparationCurve: config.mouthSeparationCurve,
+        entryAngularScaleStart: config.entryAngularScaleStart,
+        entryAngularScaleEnd: config.entryAngularScaleEnd,
+        exitAngularScaleStart: config.exitAngularScaleStart,
+        exitAngularScaleEnd: config.exitAngularScaleEnd
+    });
+    return config;
+}
+
+function smootherstep(value) {
+    return value * value * value * (value * (value * 6 - 15) + 10);
+}
+function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+function clampFinite(value, min, max, name) {
+    if (!Number.isFinite(value)) throw new TypeError(`${name} must be finite.`);
+    return clamp(value, min, max);
+}
+function positiveFinite(value, name) {
+    if (!Number.isFinite(value) || value <= 0) throw new RangeError(`${name} must be positive and finite.`);
+    return value;
+}
+function scaleValue(value, name) {
+    if (!Number.isFinite(value) || value < 0 || value > 4) throw new RangeError(`${name} must be between 0 and 4.`);
+    return value;
+}
+function requireVector(value, name) {
+    const vector = Array.isArray(value) ? { x: value[0], y: value[1], z: value[2] } : value;
+    if (!vector || ![vector.x, vector.y, vector.z].every(Number.isFinite)) {
+        throw new TypeError(`${name} must contain three finite components.`);
+    }
+    return { x: vector.x, y: vector.y, z: vector.z };
+}
+function normalize3(value) {
+    const length = Math.hypot(value.x, value.y, value.z);
+    if (length <= 1e-9) throw new RangeError('Passage direction must have non-zero length.');
+    return { x: value.x / length, y: value.y / length, z: value.z / length };
+}
+function cameraForward(camera) {
+    const direction = camera.getForwardRay?.().direction ?? camera.forward ?? { x: 0, y: 0, z: 1 };
+    return normalize3(vector(direction));
+}
+function vector(value) { return { x: value.x, y: value.y, z: value.z }; }
+function add3(a, b) { return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }; }
+function subtract3(a, b) { return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }; }
+function scale3(value, scalar) { return { x: value.x * scalar, y: value.y * scalar, z: value.z * scalar }; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function distance3(a, b) { return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z); }
+function apparentAngularRadius(radius, distance) {
+    if (distance <= 1e-9) return Math.PI / 2;
+    return Math.asin(clamp(radius / distance, 0, 1));
+}
+function isSamePoint(point, expected) {
+    return Boolean(point && expected && distance3(point, expected) <= 1e-4);
+}
+function cloneColor(color) {
+    if (!color) return new BABYLON.Color4(0, 0, 0, 1);
+    return new BABYLON.Color4(color.r, color.g, color.b, color.a ?? 1);
+}
+
+export {
+    AnomalyPassagePresentation,
+    PASSAGE_RENDER_LAYER,
+    calculateAnomalyPassageLayout,
+    smootherstep
+};

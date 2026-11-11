@@ -1,0 +1,48 @@
+SOMNIUM PHASE 18O — PATCH MANIFEST
+Base archive: Somnium_Geometry_Phase_18N_Universe_W_Slice_Navigation.zip
+Target archive: Somnium_Geometry_Phase_18O_Active_Universe_W_Slice_Navigation.zip
+
+The Phase 18O patch contains the following changed and new files. Source files whose only change is the cache-busting identifier are included so the browser does not reuse Phase 18N modules.
+
+MODIFIED FILES (32)
+index.html
+tests/w-slice-range.test.mjs
+tests/geometry-demo-topology.test.mjs
+tests/world-manager-visibility.test.mjs
+src/main.js
+src/demo/geometry-demo-topology.js
+src/demo/hypercube-4d-renderer.js
+src/demo/geometry-demo-world.js
+src/demo/corridor-traversal-network.js
+src/demo/geometry-demo-camera-controller.js
+src/scene/create-scene.js
+src/world/world-manager.js
+src/world/spatial-chunk-graph.js
+src/editor/building-editor.js
+src/editor/plane-object-renderer.js
+src/editor/plane-editor.js
+src/world/fields/geometry/optical-anomaly-tracer.js
+src/world/fields/geometry/anomaly-boundary-renderer.js
+src/world/fields/geometry/optical-debug-renderer.js
+src/world/fields/geometry/spatial-anomaly.js
+src/world/fields/geometry/anomaly-view-transform.js
+src/world/fields/geometry/slice-transition-traversal-controller.js
+src/world/fields/geometry/hypercube-4d.js
+src/world/fields/geometry/spatial-corridor.js
+src/world/fields/geometry/optical-ray-integrator.js
+src/world/fields/geometry/anomaly-influence-field.js
+src/world/fields/geometry/optical-slice-tracer.js
+src/world/fields/geometry/optical-scene-registry.js
+src/world/fields/geometry/optical-contracts.js
+src/world/fields/geometry/world-topology.js
+src/world/fields/geometry/optical-metric.js
+src/world/fields/geometry/optical-light-source.js
+
+NEW FILES (5)
+GEOMETRY-PHASE-18O-ACTIVE-UNIVERSE-W-SLICE-NAVIGATION.md
+INSTALLATION-GEOMETRY-PHASE-18O.txt
+GEOMETRY-PHASE-18O-TEST-RESULTS.txt
+PHASE-18O-PATCH-MANIFEST.txt
+PHASE-18O-FULL-TEST-OUTPUT.txt
+
+No files were removed. No IndexedDB schema migration is included. Existing somnium-planes and Worlds records are preserved.

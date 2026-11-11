@@ -233,6 +233,20 @@
             activeAnomalyField = null;
             context = { kind: 'slice', sliceId: exit.sliceId };
             transitionCount++;
+            // Light emitters often need the exact outgoing state at an aperture,
+            // not an additional long destination-slice trace. This explicit
+            // opt-in keeps those consumers deterministic and avoids expensive
+            // Poincare integration beyond the handoff point.
+            if (options.stopAfterAnomalyExit === true) {
+                status = 'anomaly-exit';
+                terminalEvent = {
+                    kind: 'anomaly-exit',
+                    anomalyId: anomaly.id,
+                    sliceId: exit.sliceId,
+                    ambientPosition: { ...exit.ambientPosition }
+                };
+                break;
+            }
             if (transitionCount > maxTransitions) {
                 status = 'max-transitions';
                 terminalEvent = { kind: 'max-transitions', maxTransitions };
@@ -284,17 +298,3 @@
         },
         getOpticallyReachableChunkCandidates(sourceSliceId, position4, reachabilityOptions = {}) {
             if (!chunkGraph || typeof chunkGraph.getOpticallyReachableChunkCandidates !== 'function') {
-                throw new Error('Optically reachable chunk candidates require a SpatialChunkGraph.');
-            }
-            return chunkGraph.getOpticallyReachableChunkCandidates(sourceSliceId, position4, reachabilityOptions);
-        },
-        clearCache() {
-            sliceFieldCache.clear();
-            anomalyFieldCache.clear();
-        }
-    });
-}
-
-function findApertureEntry(segment, candidates, binding) {
-    const start = ambientToSlice(binding.slice.frame, segment.startPosition).position;
-    const end = ambientToSlice(binding.slice.frame, segment.endPosition).position;

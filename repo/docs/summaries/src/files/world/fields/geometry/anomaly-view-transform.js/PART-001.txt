@@ -1,0 +1,300 @@
+import { ambientToSlice } from './spatial-4d.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
+
+/**
+ * Maps a viewer pose through an anomaly's endpoint slice frames.
+ *
+ * This is a view transport, not a player handoff or an optical ray trace. The
+ * camera's eye offset and tangent basis are expressed in the viewer slice's
+ * authoritative coordinates, transferred to the remote aperture's matching
+ * tangent basis, then projected by the remote slice's own SpatialTransform.
+ * During transit, optional approach progress moves the virtual eye toward the
+ * remote mouth while preserving screen-up clearance. The remote view therefore
+ * responds to camera translation, orbit, chart geometry, and traversal progress.
+ */
+
+const VECTOR_EPSILON = 1e-9;
+const DEFAULT_DIRECTION_SAMPLE_RENDER_UNITS = 8;
+const DEFAULT_REMOTE_TARGET_DISTANCE = 12;
+const DEFAULT_APERTURE_RADIUS = 1;
+const DEFAULT_DESTINATION_SPHERE_START_SCALE = 0.08;
+const DEFAULT_DESTINATION_SPHERE_GROWTH_EXPONENT = 0.55;
+
+function mapAnomalyCameraPose(options = {}) {
+    const camera = options.camera;
+    const viewerWorld = options.viewerWorld;
+    const remoteWorld = options.remoteWorld;
+    const anomaly = options.anomaly;
+    if (!camera?.position || !viewerWorld?.slice?.frame || !remoteWorld?.slice?.frame ||
+        typeof viewerWorld.transform?.renderToWorld !== 'function' ||
+        typeof remoteWorld.transform?.worldToRender !== 'function') {
+        return null;
+    }
+
+    const physicalViewerEndpoint = endpointForSlice(anomaly, viewerWorld.slice.id);
+    const configuredViewerEndpoint = options.viewerEndpoint;
+    const viewerEndpoint = configuredViewerEndpoint?.sliceId === viewerWorld.slice.id &&
+        configuredViewerEndpoint.position
+        ? { ...physicalViewerEndpoint, position: readVector3(configuredViewerEndpoint.position, 'viewer presentation endpoint') }
+        : physicalViewerEndpoint;
+    const remoteEndpoint = endpointForSlice(anomaly, remoteWorld.slice.id);
+    if (!viewerEndpoint || !remoteEndpoint) return null;
+
+    const eyeRender = readVector3(camera.position, 'camera position');
+    const forwardRender = readForward(camera);
+    const upRender = readUp(camera);
+    const sampleDistance = positiveOption(
+        options.directionSampleRenderUnits,
+        DEFAULT_DIRECTION_SAMPLE_RENDER_UNITS
+    );
+    const targetDistance = positiveOption(
+        options.remoteTargetDistance,
+        DEFAULT_REMOTE_TARGET_DISTANCE
+    );
+
+    try {
+        const eyeLocal = viewerWorld.transform.renderToWorld(eyeRender);
+        const forwardSampleLocal = viewerWorld.transform.renderToWorld(
+            add3(eyeRender, scale3(forwardRender, sampleDistance))
+        );
+        const upSampleLocal = viewerWorld.transform.renderToWorld(
+            add3(eyeRender, scale3(upRender, sampleDistance))
+        );
+        const forwardLocal = normalize3(subtract3(forwardSampleLocal, eyeLocal));
+        let upLocal = normalize3(subtract3(upSampleLocal, eyeLocal));
+        upLocal = normalize3(subtract3(
+            upLocal,
+            scale3(forwardLocal, dot3(upLocal, forwardLocal))
+        ));
+
+        // The endpoint frames provide a natural 3D tangent-frame isometry:
+        // local x/y/z components at one mouth become x/y/z at the other mouth.
+        // This is deliberately independent of player traversal and ray optics.
+        const eyeOffset = subtract3(eyeLocal, viewerEndpoint.position);
+        const approachProgress = normalizeOptionalProgress(options.approachProgress);
+        const approachEase = approachProgress === null ? 0 : smootherstep(approachProgress);
+
+        // While traversing a tube, transport the virtual remote camera toward
+        // the destination mouth. Preserve its screen-up component so a camera
+        // above the terrain does not descend into the remote ground as the
+        // lateral/forward offset converges. At progress 0 this is exactly the
+        // legacy endpoint-frame mapping; at progress 1 the eye reaches the
+        // destination endpoint at the same vertical clearance.
+        let remoteEyeOffset = eyeOffset;
+        if (approachProgress !== null) {
+            const verticalOffset = scale3(upLocal, dot3(eyeOffset, upLocal));
+            const tangentOffset = subtract3(eyeOffset, verticalOffset);
+            remoteEyeOffset = add3(
+                verticalOffset,
+                scale3(tangentOffset, 1 - approachEase)
+            );
+        }
+        const remoteEyeLocal = add3(remoteEndpoint.position, remoteEyeOffset);
+        const remoteTargetLocal = add3(remoteEyeLocal, scale3(forwardLocal, targetDistance));
+        const remoteUpPointLocal = add3(remoteEyeLocal, upLocal);
+
+        const safeEye = constrainWorld(remoteWorld.transform, remoteEyeLocal);
+        const safeTarget = constrainWorld(remoteWorld.transform, remoteTargetLocal);
+        const safeUpPoint = constrainWorld(remoteWorld.transform, remoteUpPointLocal);
+        const remoteEyeRender = readVector3(
+            remoteWorld.transform.worldToRender(safeEye),
+            'mapped camera position'
+        );
+        const remoteTargetRender = readVector3(
+            remoteWorld.transform.worldToRender(safeTarget),
+            'mapped camera target'
+        );
+        const remoteUpRenderPoint = readVector3(
+            remoteWorld.transform.worldToRender(safeUpPoint),
+            'mapped camera up point'
+        );
+        const mappedUp = normalize3(subtract3(remoteUpRenderPoint, remoteEyeRender));
+
+        return {
+            position: remoteEyeRender,
+            target: remoteTargetRender,
+            up: mappedUp,
+            viewerLocalPosition: eyeLocal,
+            remoteLocalPosition: safeEye,
+            viewerEndpoint: { ...viewerEndpoint.position },
+            remoteEndpoint: { ...remoteEndpoint.position },
+            direction: forwardLocal,
+            approachProgress,
+            approachEase,
+            remoteEyeOffset: { ...remoteEyeOffset }
+        };
+    } catch (error) {
+        // A finite chart may not contain the virtual camera or its look target.
+        // This disables the preview for that frame without hiding unrelated
+        // projection failures or silently changing the authoritative geometry.
+        if (error instanceof RangeError) return null;
+        throw error;
+    }
+}
+
+/**
+ * Cross-section radius of a 4D Euclidean spherical aperture.
+ * A 3D hyperplane offset by d from a 4D sphere's centre intersects it in a
+ * 3D ball of radius sqrt(R²-d²); the visible boundary is rendered as a 2D disc.
+ */
+function resolveAnomalyViewCenterNormalOffset(anomaly, viewerWorld, configuredOffset = null) {
+    if (configuredOffset !== null && configuredOffset !== undefined) {
+        if (!Number.isFinite(configuredOffset)) {
+            throw new TypeError('Configured anomaly view centre offset must be finite.');
+        }
+        return configuredOffset;
+    }
+    const center = anomaly?.influence?.center;
+    if (!center) return 0;
+    const frame = viewerWorld?.slice?.frame;
+    if (!frame) throw new TypeError('A viewer slice frame is required to resolve the anomaly centre.');
+    return ambientToSlice(frame, center).normalOffset;
+}
+
+function calculateAnomalyApertureScale(options = {}) {
+    const anomaly = options.anomaly;
+    const viewerWorld = options.viewerWorld;
+    const viewConfig = options.viewConfig ?? anomaly?.view ?? {};
+
+    // The tapered cylinder remains the authoritative outer boundary. Its
+    // destination preview is a separate, complete sphere that begins small
+    // and grows into the available cross-section as transit advances. Because
+    // progress is normalized from the viewer's entry side, the same curve
+    // works in both directions and reaches exactly 1 at the endpoint, so the
+    // scale does not snap when the active slice changes.
+    if (viewConfig.interiorBoundary === 'open-4d-cylinder' ||
+        anomaly?.view?.interiorBoundary === 'open-4d-cylinder') {
+        if (viewConfig.previewSurface !== 'spherical' ||
+            options.approachProgress === null || options.approachProgress === undefined) {
+            return 1;
+        }
+        const progress = normalizeOptionalProgress(options.approachProgress);
+        const startScale = viewConfig.destinationSphereStartScale ??
+            DEFAULT_DESTINATION_SPHERE_START_SCALE;
+        const growthExponent = viewConfig.destinationSphereGrowthExponent ??
+            DEFAULT_DESTINATION_SPHERE_GROWTH_EXPONENT;
+        if (!Number.isFinite(startScale) || startScale <= 0 || startScale > 1 ||
+            !Number.isFinite(growthExponent) || growthExponent <= 0 || growthExponent > 1) {
+            throw new RangeError('Destination sphere growth settings must be within (0, 1].');
+        }
+        const radii = viewConfig.interiorBoundaryRadii ?? anomaly?.view?.interiorBoundaryRadii;
+        if (!radii || !Number.isFinite(radii.source) || radii.source <= 0 ||
+            !Number.isFinite(radii.destination) || radii.destination <= 0) {
+            throw new TypeError('A spherical cylinder preview requires positive source and destination radii.');
+        }
+        const viewingFromSource = options.viewingFromSource ??
+            (viewerWorld?.slice?.id === anomaly?.source?.sliceId);
+        const startRadius = viewingFromSource ? radii.source : radii.destination;
+        const endRadius = viewingFromSource ? radii.destination : radii.source;
+        const outerTubeProgress = smootherstep(progress);
+        const outerRadius = startRadius + (endRadius - startRadius) * outerTubeProgress;
+        const initialInnerRadius = startRadius * startScale;
+        const innerGrowth = Math.pow(outerTubeProgress, growthExponent);
+        const unconstrainedInnerRadius = initialInnerRadius +
+            (endRadius - initialInnerRadius) * innerGrowth;
+        // The destination sphere grows toward the far aperture even in reverse
+        // traversal, where the outer tapered tube itself narrows. It is capped
+        // by the current outer section, and reaches that section exactly at the
+        // endpoint. Relative to the entry mouth this multiplier may exceed 1.
+        const innerRadius = Math.min(outerRadius, unconstrainedInnerRadius);
+        return innerRadius / startRadius;
+    }
+
+    if (viewConfig.crossSection !== 'euclidean-4d-ball') return 1;
+    const radius = options.apertureRadius ?? anomaly?.optics?.apertureRadius ??
+        anomaly?.entryRadius ?? DEFAULT_APERTURE_RADIUS;
+    const viewerNormalOffset = options.viewerNormalOffset ?? 0;
+    if (!Number.isFinite(viewerNormalOffset)) {
+        throw new TypeError('Viewer anomaly-normal offset must be finite.');
+    }
+    const centerNormalOffset = resolveAnomalyViewCenterNormalOffset(
+        anomaly, viewerWorld, viewConfig.centerNormalOffset
+    );
+    const sectionRadius = euclidean4DApertureSectionRadius(
+        radius, viewerNormalOffset - centerNormalOffset
+    );
+    return sectionRadius / radius;
+}
+
+function normalizeOptionalProgress(progress) {
+    if (progress === null || progress === undefined) return null;
+    if (!Number.isFinite(progress)) {
+        throw new TypeError('Anomaly approach progress must be finite.');
+    }
+    return Math.max(0, Math.min(1, progress));
+}
+
+function smootherstep(value) {
+    return value * value * value * (value * (value * 6 - 15) + 10);
+}
+
+function euclidean4DApertureSectionRadius(radius, normalOffset) {
+    if (!Number.isFinite(radius) || radius <= 0) {
+        throw new RangeError('Aperture radius must be positive and finite.');
+    }
+    if (!Number.isFinite(normalOffset)) {
+        throw new TypeError('Aperture normal offset must be finite.');
+    }
+    const squared = radius * radius - normalOffset * normalOffset;
+    return squared <= 0 ? 0 : Math.sqrt(squared);
+}
+
+function endpointForSlice(anomaly, sliceId) {
+    if (anomaly?.source?.sliceId === sliceId) return anomaly.source;
+    if (anomaly?.destination?.sliceId === sliceId) return anomaly.destination;
+    return null;
+}
+
+function constrainWorld(transform, position) {
+    return transform.constrainWorldPosition?.(position) ?? position;
+}
+
+function readForward(camera) {
+    const ray = camera.getForwardRay?.(1);
+    if (ray?.direction) return normalize3(readVector3(ray.direction, 'camera forward'));
+    if (typeof camera.getDirection === 'function' && globalThis.BABYLON?.Axis?.Z) {
+        return normalize3(readVector3(camera.getDirection(globalThis.BABYLON.Axis.Z), 'camera forward'));
+    }
+    throw new TypeError('Anomaly view transport requires a camera forward direction.');
+}
+
+function readUp(camera) {
+    // upVector is usually the world-up reference supplied to lookAt(), not the
+    // camera's rolled/pitched screen-up axis. Prefer the current camera basis.
+    if (typeof camera.getDirection === 'function' && globalThis.BABYLON?.Axis?.Y) {
+        return normalize3(readVector3(camera.getDirection(globalThis.BABYLON.Axis.Y), 'camera up'));
+    }
+    if (camera.upVector) return normalize3(readVector3(camera.upVector, 'camera up'));
+    return { x: 0, y: 1, z: 0 };
+}
+
+function readVector3(value, label) {
+    if (!value || ![value.x, value.y, value.z].every(Number.isFinite)) {
+        throw new TypeError(`${label} must contain finite x/y/z components.`);
+    }
+    return { x: value.x, y: value.y, z: value.z };
+}
+
+function normalize3(value) {
+    const length = Math.hypot(value.x, value.y, value.z);
+    if (!Number.isFinite(length) || length <= VECTOR_EPSILON) {
+        throw new RangeError('Cannot normalize a zero-length anomaly view vector.');
+    }
+    return scale3(value, 1 / length);
+}
+
+function add3(left, right) {
+    return { x: left.x + right.x, y: left.y + right.y, z: left.z + right.z };
+}
+
+function subtract3(left, right) {
+    return { x: left.x - right.x, y: left.y - right.y, z: left.z - right.z };
+}
+
+function scale3(value, amount) {
+    return { x: value.x * amount, y: value.y * amount, z: value.z * amount };
+}
+
+function dot3(left, right) {
+    return left.x * right.x + left.y * right.y + left.z * right.z;
+}
+

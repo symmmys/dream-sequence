@@ -1,0 +1,41 @@
+SOMNIUM — PHASE 18G4 QUATERNION / MATRIX API STARTUP REPAIR
+AUTOMATED VERIFICATION REPORT
+
+Build identifier:
+  somnium-20261110-phase18g4-quaternion-matrix-api-fix-1
+
+Regression suite:
+  Command: node --experimental-default-type=module --test tests/*.test.mjs
+  Result: 383 tests passed, 0 failed, 0 skipped
+
+Focused regression coverage:
+  - Hypercube setObjectDefinition() applies a non-zero XYZ rotation using
+    Quaternion.toRotationMatrix(destinationMatrix).
+  - The Babylon test double intentionally omits Matrix.FromQuaternion,
+    reproducing the API surface that caused the browser startup failure.
+  - Plane object renderer contains no Matrix.FromQuaternion call sites.
+  - All four Plane-object quaternion conversions use toRotationMatrix().
+  - Existing plane-object rendering, data migration, persistence, gizmo,
+    anomaly, and application initialization tests pass.
+
+Syntax:
+  - All src/**/*.js files passed node --check.
+  - All tests/**/*.mjs files passed node --check.
+
+Relative imports:
+  - 376 source and test relative imports checked; 0 missing.
+
+Build/cache identifier:
+  - 84 occurrences of the new cache identifier across index.html, src/, tests/.
+  - 0 stale Phase 18G4 -3 identifiers remain in those files.
+  - 0 Matrix.FromQuaternion occurrences remain in the two renderer source files.
+
+Archive:
+  - Full project ZIP integrity check passed.
+  - Incremental repair ZIP integrity check passed.
+  - SHA-256 checksums generated for both archives.
+
+Browser/WebGL:
+  Not executed by the packager. Desktop-browser application startup and
+  visual interaction checks remain required; automated tests use Babylon
+  test doubles and do not constitute a live GPU/browser session.

@@ -106,6 +106,29 @@ test('Babylon renderer rebuilds a real slice surface and edge shell in place', a
     class Color3 {
         constructor(r, g, b) { Object.assign(this, { r, g, b }); }
         static White() { return new Color3(1, 1, 1); }
+        static FromHexString(hex) {
+            const value = String(hex).replace('#', '');
+            return new Color3(
+                parseInt(value.slice(0, 2), 16) / 255,
+                parseInt(value.slice(2, 4), 16) / 255,
+                parseInt(value.slice(4, 6), 16) / 255
+            );
+        }
+    }
+    class Vector3 {
+        constructor(x = 0, y = 0, z = 0) { Object.assign(this, { x, y, z }); }
+        static TransformCoordinates(value) { return new Vector3(value.x, value.y, value.z); }
+    }
+    class Quaternion {
+        static Identity() { return new Quaternion(); }
+        static FromEulerAngles(x, y, z) { return Object.assign(new Quaternion(), { x, y, z }); }
+        toRotationMatrix(result) {
+            result.rotation = this;
+            return result;
+        }
+    }
+    class Matrix {
+        static Identity() { return new Matrix(); }
     }
     class StandardMaterial {
         constructor(name) { this.name = name; }
@@ -118,7 +141,7 @@ test('Babylon renderer rebuilds a real slice surface and edge shell in place', a
             CreateSphere(name) { calls.push(`sphere-${name}`); return new FakeMesh(name); }
         },
         StandardMaterial,
-        Color3
+        Color3, Vector3, Quaternion, Matrix
     };
     try {
         const renderer = new Hypercube4DRenderer({ scene: true }, {
@@ -142,6 +165,24 @@ test('Babylon renderer rebuilds a real slice surface and edge shell in place', a
         assert.equal(renderer.getInfo().visibleMeshCount, 8);
         renderer.update(0.1, 9);
         assert.equal(renderer.getInfo().visibleMeshCount, 0);
+        const applied = renderer.setObjectDefinition({
+            id: 'test-tesseract', type: 'hypercube4d',
+            position: { x: 1, y: 2, z: 3 },
+            rotation: { x: 15, y: 25, z: 35 },
+            dimensions: { x: 8, y: 7, z: 6 },
+            material: { color: '#abcdef' }, visible: true
+        });
+        assert.equal(applied, true);
+        assert.ok(Math.abs(renderer.objectRotationMatrix.rotation.x - 15 * Math.PI / 180) < 1e-12);
+        assert.ok(Math.abs(renderer.objectRotationMatrix.rotation.y - 25 * Math.PI / 180) < 1e-12);
+        assert.ok(Math.abs(renderer.objectRotationMatrix.rotation.z - 35 * Math.PI / 180) < 1e-12);
+        assert.deepEqual(renderer.center, { x: 1, y: 2, z: 3 });
+        assert.ok(Math.abs(renderer.surfaceMaterial.diffuseColor.r - 0xab / 255) < 1e-12);
+        assert.ok(Math.abs(renderer.surfaceMaterial.diffuseColor.g - 0xcd / 255) < 1e-12);
+        assert.ok(Math.abs(renderer.surfaceMaterial.diffuseColor.b - 0xef / 255) < 1e-12);
+        assert.ok(Math.abs(renderer.edgeMaterial.emissiveColor.r - 0xab / 255) < 1e-12);
+        assert.ok(Math.abs(renderer.edgeMaterial.emissiveColor.g - 0xcd / 255) < 1e-12);
+        assert.ok(Math.abs(renderer.edgeMaterial.emissiveColor.b - 0xef / 255) < 1e-12);
         renderer.dispose();
         assert.equal(calls.filter(function disposedMesh(call) { return call.startsWith('dispose-'); }).length, 34);
         const disposedMaterials = calls.filter(function disposedMaterial(call) {

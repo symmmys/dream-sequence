@@ -1,4 +1,4 @@
-import { ambientToSlice } from './spatial-4d.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+import { ambientToSlice } from './spatial-4d.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
 
 /**
  * Maps a viewer pose through an anomaly's endpoint slice frames.
@@ -7,14 +7,17 @@ import { ambientToSlice } from './spatial-4d.js?v=somnium-20261108-phase16d-anom
  * camera's eye offset and tangent basis are expressed in the viewer slice's
  * authoritative coordinates, transferred to the remote aperture's matching
  * tangent basis, then projected by the remote slice's own SpatialTransform.
- * That makes the remote view respond to camera translation, orbit, and chart
- * geometry instead of remaining a fixed postcard.
+ * During transit, optional approach progress moves the virtual eye toward the
+ * remote mouth while preserving screen-up clearance. The remote view therefore
+ * responds to camera translation, orbit, chart geometry, and traversal progress.
  */
 
 const VECTOR_EPSILON = 1e-9;
 const DEFAULT_DIRECTION_SAMPLE_RENDER_UNITS = 8;
 const DEFAULT_REMOTE_TARGET_DISTANCE = 12;
 const DEFAULT_APERTURE_RADIUS = 1;
+const DEFAULT_DESTINATION_SPHERE_START_SCALE = 0.08;
+const DEFAULT_DESTINATION_SPHERE_GROWTH_EXPONENT = 0.55;
 
 function mapAnomalyCameraPose(options = {}) {
     const camera = options.camera;
@@ -27,7 +30,12 @@ function mapAnomalyCameraPose(options = {}) {
         return null;
     }
 
-    const viewerEndpoint = endpointForSlice(anomaly, viewerWorld.slice.id);
+    const physicalViewerEndpoint = endpointForSlice(anomaly, viewerWorld.slice.id);
+    const configuredViewerEndpoint = options.viewerEndpoint;
+    const viewerEndpoint = configuredViewerEndpoint?.sliceId === viewerWorld.slice.id &&
+        configuredViewerEndpoint.position
+        ? { ...physicalViewerEndpoint, position: readVector3(configuredViewerEndpoint.position, 'viewer presentation endpoint') }
+        : physicalViewerEndpoint;
     const remoteEndpoint = endpointForSlice(anomaly, remoteWorld.slice.id);
     if (!viewerEndpoint || !remoteEndpoint) return null;
 
@@ -62,7 +70,25 @@ function mapAnomalyCameraPose(options = {}) {
         // local x/y/z components at one mouth become x/y/z at the other mouth.
         // This is deliberately independent of player traversal and ray optics.
         const eyeOffset = subtract3(eyeLocal, viewerEndpoint.position);
-        const remoteEyeLocal = add3(remoteEndpoint.position, eyeOffset);
+        const approachProgress = normalizeOptionalProgress(options.approachProgress);
+        const approachEase = approachProgress === null ? 0 : smootherstep(approachProgress);
+
+        // While traversing a tube, transport the virtual remote camera toward
+        // the destination mouth. Preserve its screen-up component so a camera
+        // above the terrain does not descend into the remote ground as the
+        // lateral/forward offset converges. At progress 0 this is exactly the
+        // legacy endpoint-frame mapping; at progress 1 the eye reaches the
+        // destination endpoint at the same vertical clearance.
+        let remoteEyeOffset = eyeOffset;
+        if (approachProgress !== null) {
+            const verticalOffset = scale3(upLocal, dot3(eyeOffset, upLocal));
+            const tangentOffset = subtract3(eyeOffset, verticalOffset);
+            remoteEyeOffset = add3(
+                verticalOffset,
+                scale3(tangentOffset, 1 - approachEase)
+            );
+        }
+        const remoteEyeLocal = add3(remoteEndpoint.position, remoteEyeOffset);
         const remoteTargetLocal = add3(remoteEyeLocal, scale3(forwardLocal, targetDistance));
         const remoteUpPointLocal = add3(remoteEyeLocal, upLocal);
 
@@ -91,7 +117,10 @@ function mapAnomalyCameraPose(options = {}) {
             remoteLocalPosition: safeEye,
             viewerEndpoint: { ...viewerEndpoint.position },
             remoteEndpoint: { ...remoteEndpoint.position },
-            direction: forwardLocal
+            direction: forwardLocal,
+            approachProgress,
+            approachEase,
+            remoteEyeOffset: { ...remoteEyeOffset }
         };
     } catch (error) {
         // A finite chart may not contain the virtual camera or its look target.
@@ -125,6 +154,51 @@ function calculateAnomalyApertureScale(options = {}) {
     const anomaly = options.anomaly;
     const viewerWorld = options.viewerWorld;
     const viewConfig = options.viewConfig ?? anomaly?.view ?? {};
+
+    // The tapered cylinder remains the authoritative outer boundary. Its
+    // destination preview is a separate, complete sphere that begins small
+    // and grows into the available cross-section as transit advances. Because
+    // progress is normalized from the viewer's entry side, the same curve
+    // works in both directions and reaches exactly 1 at the endpoint, so the
+    // scale does not snap when the active slice changes.
+    if (viewConfig.interiorBoundary === 'open-4d-cylinder' ||
+        anomaly?.view?.interiorBoundary === 'open-4d-cylinder') {
+        if (viewConfig.previewSurface !== 'spherical' ||
+            options.approachProgress === null || options.approachProgress === undefined) {
+            return 1;
+        }
+        const progress = normalizeOptionalProgress(options.approachProgress);
+        const startScale = viewConfig.destinationSphereStartScale ??
+            DEFAULT_DESTINATION_SPHERE_START_SCALE;
+        const growthExponent = viewConfig.destinationSphereGrowthExponent ??
+            DEFAULT_DESTINATION_SPHERE_GROWTH_EXPONENT;
+        if (!Number.isFinite(startScale) || startScale <= 0 || startScale > 1 ||
+            !Number.isFinite(growthExponent) || growthExponent <= 0 || growthExponent > 1) {
+            throw new RangeError('Destination sphere growth settings must be within (0, 1].');
+        }
+        const radii = viewConfig.interiorBoundaryRadii ?? anomaly?.view?.interiorBoundaryRadii;
+        if (!radii || !Number.isFinite(radii.source) || radii.source <= 0 ||
+            !Number.isFinite(radii.destination) || radii.destination <= 0) {
+            throw new TypeError('A spherical cylinder preview requires positive source and destination radii.');
+        }
+        const viewingFromSource = options.viewingFromSource ??
+            (viewerWorld?.slice?.id === anomaly?.source?.sliceId);
+        const startRadius = viewingFromSource ? radii.source : radii.destination;
+        const endRadius = viewingFromSource ? radii.destination : radii.source;
+        const outerTubeProgress = smootherstep(progress);
+        const outerRadius = startRadius + (endRadius - startRadius) * outerTubeProgress;
+        const initialInnerRadius = startRadius * startScale;
+        const innerGrowth = Math.pow(outerTubeProgress, growthExponent);
+        const unconstrainedInnerRadius = initialInnerRadius +
+            (endRadius - initialInnerRadius) * innerGrowth;
+        // The destination sphere grows toward the far aperture even in reverse
+        // traversal, where the outer tapered tube itself narrows. It is capped
+        // by the current outer section, and reaches that section exactly at the
+        // endpoint. Relative to the entry mouth this multiplier may exceed 1.
+        const innerRadius = Math.min(outerRadius, unconstrainedInnerRadius);
+        return innerRadius / startRadius;
+    }
+
     if (viewConfig.crossSection !== 'euclidean-4d-ball') return 1;
     const radius = options.apertureRadius ?? anomaly?.optics?.apertureRadius ??
         anomaly?.entryRadius ?? DEFAULT_APERTURE_RADIUS;
@@ -139,6 +213,18 @@ function calculateAnomalyApertureScale(options = {}) {
         radius, viewerNormalOffset - centerNormalOffset
     );
     return sectionRadius / radius;
+}
+
+function normalizeOptionalProgress(progress) {
+    if (progress === null || progress === undefined) return null;
+    if (!Number.isFinite(progress)) {
+        throw new TypeError('Anomaly approach progress must be finite.');
+    }
+    return Math.max(0, Math.min(1, progress));
+}
+
+function smootherstep(value) {
+    return value * value * value * (value * (value * 6 - 15) + 10);
 }
 
 function euclidean4DApertureSectionRadius(radius, normalOffset) {

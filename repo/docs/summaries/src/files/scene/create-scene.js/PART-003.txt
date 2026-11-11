@@ -1,4 +1,18 @@
 
+    ecology.renderDirty = true;
+
+    console.log("[World] Loaded:", world.metadata.name, result);
+},
+
+onCapture: async world => {
+    worldSession.capture(world, simulationElapsed);
+    buildingSystem.captureWorld(world);
+}
+
+
+    }
+);
+
 scene.metadata = {
     ...(scene.metadata || {}),
     worldPersistence,

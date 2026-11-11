@@ -1,8 +1,8 @@
 
-import createScene from "./scene/create-scene.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2";
+import createScene from "./scene/create-scene.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1";
 
 async function main() {
-    console.info("[Main] Build: 2026-11-08-phase16d-anomaly-aperture-views-2");
+    console.info("[Main] Build: 2026-11-10-phase18g3-gizmo-attachment-box-preview-2");
     console.log("[Main] Initializing Somnium...");
 
     const canvas = document.getElementById("renderCanvas");

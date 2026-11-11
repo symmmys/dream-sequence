@@ -1,0 +1,38 @@
+SOMNIUM PHASE 18N — TEST RESULTS
+
+Automated command:
+  node --test tests/*.test.mjs
+
+Result:
+  Tests:       427
+  Passed:      427
+  Failed:      0
+  Cancelled:   0
+  Skipped:     0
+  Todo:        0
+
+Syntax checks:
+  Source JavaScript files: 137
+  Test MJS files:           47
+  node --check failures:     0
+
+Relative import audit:
+  Source/test files inspected: 184
+  Relative imports checked:     399
+  Missing import targets:         0
+
+Build/cache identifier:
+  somnium-20261110-phase18n-universe-w-slice-navigation-1
+  Prior Phase 18M identifier occurrences in index.html/src/tests: 0
+
+Regression coverage includes:
+- Plane ambient-W extent including nonzero W components in frame axes and normal
+- Universe W range covering built-in W locations, persisted custom Planes, drafts, and runtime slices
+- Integer slider and decimal input operating independently from selected Plane thickness
+- Ambient W selection published immediately to the W HUD while editor update loop is inactive
+- Newly created Plane drafts inheriting the currently inspected ambient W coordinate
+- Per-Plane hypercube normal offsets derived from global ambient W
+- Visibility of all Plane-owned objects whose container intersects the selected W slice
+- Existing Plane editor and world-manager regression behavior
+
+Live browser/WebGL interaction testing was not performed during this packaging pass.

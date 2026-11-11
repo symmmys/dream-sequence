@@ -1,6 +1,6 @@
 # Somnium — Source Style-Conformance Ledger
 
-Last updated: November 8, 2026 — Phase 14 W traversal and Poincare chart safety  
+Last updated: November 9, 2026 — Phase 17I bidirectional spherical anomaly passage  
 Maintained alongside source changes and reviews.
 
 ## Purpose
@@ -1843,3 +1843,103 @@ Phase 15 verification: **186/186 Node tests**, **116/116 source syntax checks**,
 - **P2:** implement 4D object acceleration/intersection only when anomaly interiors begin containing authoritative 4D scene geometry.
 
 **Verification:** `node --test tests/*.test.mjs` — **255 passed, 0 failed**. Static syntax/import checks and extracted-package verification are recorded in `GEOMETRY-PHASE-16C-TEST-RESULTS.txt`.
+
+
+### Phase 17A — Anomaly-fed movable spotlight prototype
+
+**Review date:** November 9, 2026  
+**Status:** Implemented; 274/274 project tests pass.
+
+**Qualitative source scores**
+
+| File | Score | Review note |
+|---|---:|---|
+| `src/world/fields/geometry/optical-light-source.js` | 4.5 / 5 | Pure validated source contract and transport adapter; no Babylon dependency. |
+| `src/world/fields/geometry/optical-anomaly-tracer.js` | 4.0 / 5 | Focused opt-in early-exit behavior; existing orchestration function remains substantial. |
+| `src/demo/geometry-demo-world.js` | 3.0 / 5 | Integration is localized, but the class still owns several rendering, camera, input, and lifecycle responsibilities. |
+
+**Files reviewed or updated:**
+
+- `src/world/fields/geometry/optical-light-source.js` (new)
+- `src/world/fields/geometry/optical-anomaly-tracer.js`
+- `src/demo/geometry-demo-world.js`
+- `tests/optical-light-source.test.mjs` (new)
+- `index.html` and the application module import chain
+
+**Strengths**
+
+- Keeps the spotlight definition, validation, movement, aiming, and ray-to-receiver derivation independent of Babylon.js.
+- Reuses the established optical anomaly tracer and explicit topology permissions rather than inventing a second cross-slice transport path.
+- Makes stopping at the first aperture exit an opt-in tracer feature, preserving default behavior for other callers.
+- Uses the destination tangent cometric to recover the outgoing slice velocity from canonical momentum, then applies the destination `SpatialTransform` for rendering.
+- Limits the receiver-side light to the Main World layer and bounds shadow casters to nearby eligible scene meshes. It also restores original mesh shadow-reception flags during set changes and disposal.
+- Adds focused deterministic tests for source validation, immutable movement/rotation, successful direct anomaly crossing, live Main World Poincare compatibility, and rejected aiming.
+
+**Remaining gaps**
+
+- `GeometryDemoWorld` continues to own input, orchestration, and Babylon presentation. If the feature grows to multiple light sources, move the editing controls and Babylon light adapter into focused collaborators.
+- The virtual receiver is derived from one central ray and is an approximation of a finite-width spotlight through curved optical geometry.
+- The bounded receiver-side shadow map is not a substitute for backward optical visibility rays from each receiving surface through the anomaly.
+- The actual browser/WebGL illumination and shadow appearance must be visually checked by the user; automated CPU tests cannot verify rendering quality.
+
+**Refactoring/performance priority**
+
+- **P1:** validate the spotlight source marker, received illumination, and shadow map in the browser, including both the Main World and portal preview.
+- **P1:** verify that the shadow caster selection includes the expected terrain/scene meshes and does not cause visible layer leakage.
+- **P2:** generalize the source contract to point lights and multiple sources only after the one-spotlight path is visually confirmed.
+- **P2:** investigate full per-surface optical shadow rays and multi-ray beam reconstruction as separate, testable increments.
+
+**Verification:** `node --test tests/*.test.mjs` — **274 passed, 0 failed**. Focused spotlight tests: 7 passed.
+
+
+### Phase 17I — Bidirectional spherical anomaly passage
+
+**Review date:** November 9, 2026  
+**Status:** Implemented; 322/322 project tests pass. Browser/WebGL visual validation remains outstanding.
+
+**Qualitative source scores**
+
+| File | Score | Review note |
+|---|---:|---|
+| `src/demo/anomaly-passage-presentation.js` | 4.0 / 5 | Focused presentation owner with pure layout math, two explicit renderer lifecycles, stable display frame, and camera-offset restoration. It remains intentionally Babylon-specific. |
+| `src/demo/geometry-demo-world.js` | 3.0 / 5 | Integration is localized to the demo composition root; the class remains large and owns many existing application/rendering responsibilities. |
+| `src/demo/geometry-demo-camera-controller.js` | 3.5 / 5 | Existing follow/free modes supply the two supported travel-heading sources; the controller's independent free-camera state is preserved. |
+| `src/world/fields/geometry/portal-preview-renderer.js` | 4.0 / 5 | Reused as the explicit owner of each mouth camera, render target, sphere, material, visibility registration, render list, and disposal. |
+
+**Files reviewed or updated:**
+
+- `src/demo/anomaly-passage-presentation.js` (new)
+- `src/demo/geometry-demo-world.js`
+- `src/demo/geometry-demo-camera-controller.js` (reviewed for free-camera transit behavior)
+- `src/demo/geometry-demo-topology.js`
+- `src/world/fields/geometry/portal-preview-renderer.js`
+- `tests/anomaly-passage-presentation.test.mjs` (new)
+- `tests/anomaly-view-transform.test.mjs`
+- `index.html` and the application module import chain
+
+**Strengths**
+
+- Keeps all mouth positions, rotations, scale multipliers, and display-camera progression in a dedicated 3D presentation layer. The canonical anomaly endpoints, W coordinate, topology, traversal metric, and collision geometry are not modified.
+- Reuses the existing `PortalPreviewRenderer` resource owner twice rather than duplicating sphere/texture/camera/material lifecycle code. Each renderer gets an independent render list and endpoint world layer.
+- Preserves endpoint-world ownership: render lists are borrowed from existing endpoint portals; mouth renderer disposal does not dispose streamed world meshes or chunk resources.
+- Follows player travel heading in follow mode and captures the travel-aligned free-camera forward direction at entry. The passage frame remains stable when the camera later orbits.
+- Removes the temporary display offset before the follow/free camera controller computes its next authoritative pose, preventing feedback drift. Repeated updates are idempotent when no controller tick occurs.
+- Explicitly restores the scene clear color and camera layer mask on deactivation and disposes both additional render targets, cameras, surfaces, and materials.
+- Adds deterministic layout, perspective, reverse-direction, render-list ownership, sphere orientation, camera-mapping, and controller-integration tests.
+
+**Remaining gaps**
+
+- Actual sphere UV projection, back-side visual appearance, transparency/depth sorting, render-target cost, and endpoint handoff have not been verified in a live WebGL session. A headless Chromium attempt could not initialize its graphics backend in this environment and is not counted as a visual test.
+- The entrance image still uses the live viewer camera orientation while looking back into the source world; visual inspection should confirm that off-axis orbit remains intuitive.
+- Two live render targets are created per eligible anomaly pair. Resolution scaling, render-target sharing, and GPU-memory pressure policies remain future performance work.
+- `GeometryDemoWorld` remains a large composition root; further separation should be considered only when another presentation mode needs to reuse the orchestration.
+- The new presentation module depends on Babylon globals through the existing renderer abstraction. A renderer-independent camera/presentation contract is a possible later extraction, not required for this bounded phase.
+
+**Refactoring/performance priority**
+
+- **P1:** inspect forward and reverse traversal in a real browser, including camera orbit/translation, both mouth images, black background, and endpoint handoff.
+- **P1:** measure frame time and GPU memory with all eligible anomaly passages initialized; assess render-target resolution and update cadence before optimizing.
+- **P2:** add a browser-driven regression for render-target cameras, off-axis sphere projection, and cleanup once the application has a repeatable browser harness.
+- **P3:** consider a reusable presentation-frame provider if future anomaly types need non-camera-derived display axes.
+
+**Verification:** `node --test tests/*.test.mjs` — **322 passed, 0 failed**. Static syntax checks: 128/128 source modules and 33/33 test modules passed. Relative module references: 333 checked, 0 missing. Extracted-archive verification is recorded in `GEOMETRY-PHASE-17I-TEST-RESULTS.txt`.

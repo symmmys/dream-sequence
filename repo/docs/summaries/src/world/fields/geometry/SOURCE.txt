@@ -2,11 +2,577 @@ SOMNIUM — DIRECTORY SOURCE DUMP
 ========================================================================
 
 Directory: src/world/fields/geometry/
-Generated: 2026-11-09T03:15:29
+Generated: 2026-11-09T22:26:25
 
 This file contains recursively collected UTF-8 text files.
 Binary files and excluded directories are omitted.
 File paths are relative to the project root.
+
+
+========================================================================
+FILE: src/world/fields/geometry/anomaly-boundary-renderer.js
+========================================================================
+
+/** Renders slice intersections of open 4D anomaly boundary surfaces. */
+
+import { ambientToSlice } from './spatial-4d.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
+
+const BOUNDARY_FACE_DEFINITIONS = Object.freeze([
+    { id: 'x-min', axis: 'x', side: -1, uAxis: 'y', vAxis: 'z', normalMultiplier: -1 },
+    { id: 'x-max', axis: 'x', side: 1, uAxis: 'y', vAxis: 'z', normalMultiplier: 1 },
+    { id: 'y-min', axis: 'y', side: -1, uAxis: 'x', vAxis: 'z', normalMultiplier: 1 },
+    { id: 'y-max', axis: 'y', side: 1, uAxis: 'x', vAxis: 'z', normalMultiplier: -1 },
+    { id: 'z-min', axis: 'z', side: -1, uAxis: 'x', vAxis: 'y', normalMultiplier: -1 },
+    { id: 'z-max', axis: 'z', side: 1, uAxis: 'x', vAxis: 'y', normalMultiplier: 1 }
+]);
+const AXES = Object.freeze(['x', 'y', 'z', 'w']);
+const EPSILON = 1e-7;
+
+/**
+ * Builds the active 3D-slice intersection of an open 4D box.
+ * The two W-facing end cells are intentionally omitted; the six remaining
+ * cubic 3D cells intersect a W-aligned 3D slice as six rectangular panels.
+ */
+function buildAnomalyBoundaryGeometry(options = {}) {
+    const anomaly = options.anomaly;
+    const slice = options.slice;
+    const transform = options.spatialTransform;
+    const viewerW = options.viewerW;
+    const gridSegments = options.gridSegments ?? 6;
+    if (!anomaly?.region?.min || !anomaly?.region?.max || !slice?.frame ||
+        typeof transform?.worldToRender !== 'function') {
+        throw new TypeError('Anomaly boundary geometry requires an anomaly, slice frame, and spatial transform.');
+    }
+    if (!Number.isFinite(viewerW)) throw new TypeError('Anomaly boundary viewer W must be finite.');
+    if (!Number.isSafeInteger(gridSegments) || gridSegments < 1 || gridSegments > 64) {
+        throw new RangeError('Anomaly boundary gridSegments must be an integer from 1 to 64.');
+    }
+    validateRegion(anomaly.region);
+
+    if (!isWAlignedSlice(slice.frame)) {
+        return { supported: false, visible: false, reason: 'slice-not-w-aligned', faces: [], lines: [] };
+    }
+    if (viewerW < anomaly.region.min.w - EPSILON || viewerW > anomaly.region.max.w + EPSILON) {
+        return { supported: true, visible: false, reason: 'outside-w-span', faces: [], lines: [] };
+    }
+
+    const presentationOffset = getPresentationOffset(anomaly, slice.id, options.presentationEndpoint);
+    const verticesPerFace = (gridSegments + 1) ** 2;
+    const positions = [];
+    const normals = [];
+    const indices = [];
+    const lines = [];
+    const faces = [];
+
+    for (const definition of BOUNDARY_FACE_DEFINITIONS) {
+        const vertexStart = positions.length / 3;
+        const faceGrid = [];
+        for (let vIndex = 0; vIndex <= gridSegments; vIndex++) {
+            const vAmount = vIndex / gridSegments;
+            const row = [];
+            for (let uIndex = 0; uIndex <= gridSegments; uIndex++) {
+                const uAmount = uIndex / gridSegments;
+                const ambient = {
+                    x: 0, y: 0, z: 0, w: viewerW,
+                    [definition.axis]: anomaly.region[definition.side < 0 ? 'min' : 'max'][definition.axis],
+                    [definition.uAxis]: interpolate(
+                        anomaly.region.min[definition.uAxis], anomaly.region.max[definition.uAxis], uAmount
+                    ),
+                    [definition.vAxis]: interpolate(
+                        anomaly.region.min[definition.vAxis], anomaly.region.max[definition.vAxis], vAmount
+                    )
+                };
+                const local = ambientToSlice(slice.frame, ambient).position;
+                local.x += presentationOffset.x;
+                local.y += presentationOffset.y;
+                local.z += presentationOffset.z;
+                if (typeof transform.containsMetricDomainPosition === 'function' &&
+                    !transform.containsMetricDomainPosition(local)) {
+                    return {
+                        supported: true, visible: false, reason: 'chart-domain-boundary',
+                        faces: [], lines: []
+                    };
+                }
+                const render = transform.worldToRender(local);
+                if (!isFinitePoint3(render)) {
+                    return {
+                        supported: true, visible: false, reason: 'invalid-render-position',
+                        faces: [], lines: []
+                    };
+                }
+                row.push({ x: render.x, y: render.y, z: render.z });
+                positions.push(render.x, render.y, render.z);
+            }
+            faceGrid.push(row);
+        }
+
+        appendGridIndices(vertexStart, gridSegments, indices);
+        appendFaceNormals(faceGrid, definition.normalMultiplier, normals);
+        appendGridLines(faceGrid, lines);
+        faces.push({
+            id: definition.id,
+            axis: definition.axis,
+            side: definition.side,
+            vertexStart,
+            vertexCount: verticesPerFace
+        });
+    }
+
+    return {
+        supported: true,
+        visible: true,
+        reason: null,
+        positions: new Float32Array(positions),
+        normals: new Float32Array(normals),
+        indices: new Uint16Array(indices),
+        lines,
+        faces
+    };
+}
+
+
+/**
+ * Builds a constant-W section of a tapered 4D cylinder.
+ *
+ * The tube axis must be parallel to ambient W for the current W-aligned
+ * renderer. Its transverse 3D section is a ball; the visible boundary in a
+ * 3D W-slice is therefore a sphere. The sphere radius is smoothly interpolated
+ * between the anomaly's source and destination endpoint radii.
+ */
+function buildAnomalyCylinderGeometry(options = {}) {
+    const anomaly = options.anomaly;
+    const slice = options.slice;
+    const transform = options.spatialTransform;
+    const viewerW = options.viewerW;
+    if (!anomaly?.region?.min || !anomaly.region.max || !slice?.frame ||
+        typeof transform?.worldToRender !== 'function') {
+        throw new TypeError('Anomaly cylinder geometry requires an anomaly, slice frame, and spatial transform.');
+    }
+    if (!Number.isFinite(viewerW)) throw new TypeError('Anomaly cylinder viewer W must be finite.');
+    validateRegion(anomaly.region);
+    if (!isWAlignedSlice(slice.frame)) {
+        return { supported: false, visible: false, reason: 'slice-not-w-aligned', faces: [], lines: [] };
+    }
+    if (viewerW < anomaly.region.min.w - EPSILON || viewerW > anomaly.region.max.w + EPSILON) {
+        return { supported: true, visible: false, reason: 'outside-w-span', faces: [], lines: [] };
+    }
+
+    const source = options.sourceAmbient;
+    const destination = options.destinationAmbient;
+    if (!isFinitePoint4(source) || !isFinitePoint4(destination)) {
+        throw new TypeError('A tapered anomaly cylinder requires finite ambient source and destination endpoints.');
+    }
+    const wSpan = destination.w - source.w;
+    if (Math.abs(wSpan) <= EPSILON) {
+        return { supported: false, visible: false, reason: 'zero-w-span', faces: [], lines: [] };
+    }
+    const spatialAxisLength = Math.hypot(
+        destination.x - source.x, destination.y - source.y, destination.z - source.z
+    );
+    if (spatialAxisLength > 1e-5) {
+        return { supported: false, visible: false, reason: 'cylinder-axis-not-w-aligned', faces: [], lines: [] };
+    }
+
+    const radii = anomaly.view?.interiorBoundaryRadii;
+    if (!radii || !Number.isFinite(radii.source) || radii.source <= 0 ||
+        !Number.isFinite(radii.destination) || radii.destination <= 0) {
+        throw new TypeError(`Anomaly ${anomaly.id} requires positive source and destination cylinder radii.`);
+    }
+    const rawProgress = clamp((viewerW - source.w) / wSpan, 0, 1);
+    const progress = smootherstep(rawProgress);
+    const radius = interpolate(radii.source, radii.destination, progress);
+    const center = {
+        x: interpolate(source.x, destination.x, rawProgress),
+        y: interpolate(source.y, destination.y, rawProgress),
+        z: interpolate(source.z, destination.z, rawProgress),
+        w: viewerW
+    };
+    const latitudeSegments = options.latitudeSegments ?? 10;
+    const longitudeSegments = options.longitudeSegments ?? 24;
+    if (!Number.isSafeInteger(latitudeSegments) || latitudeSegments < 4 || latitudeSegments > 64 ||
+        !Number.isSafeInteger(longitudeSegments) || longitudeSegments < 8 || longitudeSegments > 128) {
+        throw new RangeError('Anomaly cylinder segments are outside supported limits.');
+    }
+
+    const presentationOffset = getPresentationOffset(anomaly, slice.id, options.presentationEndpoint);
+    const grid = [];
+    const positions = [];
+    const normals = [];
+    const indices = [];
+    const lines = [];
+    for (let latitude = 0; latitude <= latitudeSegments; latitude++) {
+        const theta = Math.PI * latitude / latitudeSegments;
+        const sinTheta = Math.sin(theta);
+        const cosTheta = Math.cos(theta);
+        const row = [];
+        for (let longitude = 0; longitude <= longitudeSegments; longitude++) {
+            const phi = 2 * Math.PI * longitude / longitudeSegments;
+            const ambient = {
+                x: center.x + radius * sinTheta * Math.cos(phi),
+                y: center.y + radius * cosTheta,
+                z: center.z + radius * sinTheta * Math.sin(phi),
+                w: viewerW
+            };
+            const local = ambientToSlice(slice.frame, ambient).position;
+            local.x += presentationOffset.x;
+            local.y += presentationOffset.y;
+            local.z += presentationOffset.z;
+            if (typeof transform.containsMetricDomainPosition === 'function' &&
+                !transform.containsMetricDomainPosition(local)) {
+                return {
+                    supported: true, visible: false, reason: 'chart-domain-boundary',
+                    faces: [], lines: [], sectionRadius: radius, progress
+                };
+            }
+            const render = transform.worldToRender(local);
+            if (!isFinitePoint3(render)) {
+                return {
+                    supported: true, visible: false, reason: 'invalid-render-position',
+                    faces: [], lines: [], sectionRadius: radius, progress
+                };
+            }
+            const point = { x: render.x, y: render.y, z: render.z };
+            row.push(point);
+            positions.push(point.x, point.y, point.z);
+        }
+        grid.push(row);
+    }
+
+    appendGridIndices(0, longitudeSegments, indices, latitudeSegments);
+    appendFaceNormals(grid, 1, normals);
+    appendSphereGridLines(grid, lines);
+    return {
+        supported: true,
+        visible: true,
+        reason: null,
+        positions: new Float32Array(positions),
+        normals: new Float32Array(normals),
+        indices: new Uint16Array(indices),
+        lines,
+        faces: [{ id: 'tapered-cylinder-wall', axis: 'w', side: 0, vertexStart: 0,
+            vertexCount: (latitudeSegments + 1) * (longitudeSegments + 1) }],
+        boundaryType: 'open-4d-cylinder',
+        sectionRadius: radius,
+        progress,
+        centerAmbient: center,
+        latitudeSegments,
+        longitudeSegments
+    };
+}
+
+function resolveAnomalyCylinderRadius(anomaly, sourceAmbient, destinationAmbient, viewerW) {
+    if (!anomaly?.view?.interiorBoundaryRadii || !isFinitePoint4(sourceAmbient) ||
+        !isFinitePoint4(destinationAmbient) || !Number.isFinite(viewerW)) {
+        throw new TypeError('Cylinder radius resolution requires valid anomaly endpoints and viewer W.');
+    }
+    const span = destinationAmbient.w - sourceAmbient.w;
+    if (Math.abs(span) <= EPSILON) throw new RangeError('Cylinder endpoints must differ along W.');
+    const progress = smootherstep(clamp((viewerW - sourceAmbient.w) / span, 0, 1));
+    return {
+        progress,
+        radius: interpolate(
+            anomaly.view.interiorBoundaryRadii.source,
+            anomaly.view.interiorBoundaryRadii.destination,
+            progress
+        )
+    };
+}
+
+function appendSphereGridLines(grid, lines) {
+    // Latitude rings omit the degenerate pole rows; longitude curves meet at
+    // each pole and provide the recognizable longitudinal cylinder structure.
+    for (let row = 1; row < grid.length - 1; row++) {
+        lines.push(grid[row].map(copyPoint3));
+    }
+    for (let column = 0; column < grid[0].length - 1; column++) {
+        lines.push(grid.map((row) => copyPoint3(row[column])));
+    }
+}
+
+function isFinitePoint4(point) {
+    return Boolean(point) && ['x', 'y', 'z', 'w'].every((axis) => Number.isFinite(point[axis]));
+}
+
+function smootherstep(t) {
+    return t * t * t * (t * (t * 6 - 15) + 10);
+}
+
+function clamp(value, minimum, maximum) {
+    return Math.max(minimum, Math.min(maximum, value));
+}
+
+class AnomalyBoundaryRenderer {
+    constructor(scene, anomaly, slice, spatialTransform, options = {}) {
+        if (!scene || typeof BABYLON === 'undefined') {
+            throw new TypeError('AnomalyBoundaryRenderer requires a Babylon scene.');
+        }
+        this.scene = scene;
+        this.anomaly = anomaly;
+        this.slice = slice;
+        this.spatialTransform = spatialTransform;
+        this.options = {
+            gridSegments: options.gridSegments ?? 6,
+            opacity: options.opacity ?? 0.105,
+            edgeAlpha: options.edgeAlpha ?? 0.78,
+            presentationEndpoint: options.presentationEndpoint ?? null,
+            sourceAmbient: options.sourceAmbient ?? null,
+            destinationAmbient: options.destinationAmbient ?? null,
+            layerMask: options.layerMask ?? 0x0FFFFFFF
+        };
+        validateRendererOptions(this.options);
+        this.visibleRequested = false;
+        this.sliceVisible = false;
+        this.disposed = false;
+        this.lastViewerW = null;
+        this.lastGeometry = null;
+        this.material = createSurfaceMaterial(scene, anomaly.id, this.options.opacity);
+        this.mesh = new BABYLON.Mesh(`anomalyBoundary_${anomaly.id}_${slice.id}`, scene);
+        this.mesh.material = this.material;
+        this.mesh.layerMask = this.options.layerMask;
+        this.mesh.isPickable = false;
+        this.mesh.alwaysSelectAsActiveMesh = true;
+        this.mesh.metadata = {
+            ...(this.mesh.metadata || {}),
+            anomalyBoundary: true,
+            anomalyId: anomaly.id,
+            sliceId: slice.id,
+            boundaryCellCount: anomaly.view?.interiorBoundary === 'open-4d-cylinder' ? 0 : 6,
+            boundarySurfaceCount: anomaly.view?.interiorBoundary === 'open-4d-cylinder' ? 1 : 6,
+            boundaryType: anomaly.view?.interiorBoundary ?? 'open-4d-hypercube',
+            omittedEndCaps: 2,
+            renderOnly: true
+        };
+
+        this.edgeMesh = null;
+        const endpointW = resolveEndpointW(anomaly, slice);
+        this.update(endpointW, true);
+        if (this.edgeMesh) {
+            this.edgeMesh.metadata = {
+                ...(this.edgeMesh.metadata || {}),
+                anomalyBoundary: true,
+                anomalyId: anomaly.id,
+                sliceId: slice.id,
+                boundaryEdges: true,
+                renderOnly: true
+            };
+        }
+        this.setVisible(false);
+    }
+
+    update(viewerW, force = false) {
+        if (this.disposed) return false;
+        if (!Number.isFinite(viewerW)) throw new TypeError('Anomaly boundary viewer W must be finite.');
+        if (!force && this.lastViewerW !== null && Math.abs(viewerW - this.lastViewerW) < 1e-3) {
+            return this.sliceVisible;
+        }
+        const geometryBuilder = this.anomaly.view?.interiorBoundary === 'open-4d-cylinder'
+            ? buildAnomalyCylinderGeometry : buildAnomalyBoundaryGeometry;
+        const geometry = geometryBuilder({
+            anomaly: this.anomaly,
+            slice: this.slice,
+            spatialTransform: this.spatialTransform,
+            viewerW,
+            gridSegments: this.options.gridSegments,
+            presentationEndpoint: this.options.presentationEndpoint,
+            sourceAmbient: this.options.sourceAmbient,
+            destinationAmbient: this.options.destinationAmbient
+        });
+        this.lastViewerW = viewerW;
+        this.lastGeometry = geometry;
+        this.sliceVisible = Boolean(geometry.visible);
+        if (geometry.visible) this.applyGeometry(geometry);
+        this.applyVisibility();
+        return this.sliceVisible;
+    }
+
+    applyGeometry(geometry) {
+        if (!this.mesh.getVerticesData?.(BABYLON.VertexBuffer.PositionKind)) {
+            const vertexData = new BABYLON.VertexData();
+            vertexData.positions = geometry.positions;
+            vertexData.normals = geometry.normals;
+            vertexData.indices = geometry.indices;
+            vertexData.applyToMesh(this.mesh, true);
+        } else {
+            this.mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, geometry.positions, false, false);
+            this.mesh.updateVerticesData(BABYLON.VertexBuffer.NormalKind, geometry.normals, false, false);
+        }
+        const lines = geometry.lines.map(function toBabylonLine(line) {
+            return line.map((point) => new BABYLON.Vector3(point.x, point.y, point.z));
+        });
+        const edgeOptions = this.edgeMesh
+            ? { lines, instance: this.edgeMesh }
+            : { lines, updatable: true };
+        this.edgeMesh = BABYLON.MeshBuilder.CreateLineSystem(
+            `anomalyBoundaryEdges_${this.anomaly.id}_${this.slice.id}`,
+            edgeOptions,
+            this.scene
+        );
+        this.edgeMesh.color = new BABYLON.Color3(0.28, 0.78, 1);
+        this.edgeMesh.alpha = this.options.edgeAlpha;
+        this.edgeMesh.layerMask = this.options.layerMask;
+        this.edgeMesh.isPickable = false;
+        this.edgeMesh.alwaysSelectAsActiveMesh = true;
+    }
+
+    setVisible(visible) {
+        this.visibleRequested = Boolean(visible);
+        this.applyVisibility();
+    }
+
+    applyVisibility() {
+        if (!this.mesh || !this.edgeMesh) return;
+        const visible = !this.disposed && this.visibleRequested && this.sliceVisible;
+        this.mesh.isVisible = visible;
+        this.edgeMesh.isVisible = visible;
+    }
+
+    getInfo() {
+        return {
+            anomalyId: this.anomaly.id,
+            sliceId: this.slice.id,
+            visible: Boolean(this.mesh?.isVisible),
+            supported: this.lastGeometry?.supported ?? true,
+            reason: this.lastGeometry?.reason ?? null,
+            boundaryType: this.lastGeometry?.boundaryType ?? this.anomaly.view?.interiorBoundary ?? 'open-4d-hypercube',
+            boundaryCellCount: this.lastGeometry?.boundaryType === 'open-4d-cylinder' ? 0 :
+                (this.lastGeometry?.faces?.length ?? 0),
+            boundarySurfaceCount: this.lastGeometry?.faces?.length ?? 0,
+            omittedEndCaps: 2,
+            viewerW: this.lastViewerW,
+            sectionRadius: this.lastGeometry?.sectionRadius ?? null,
+            progress: this.lastGeometry?.progress ?? null
+        };
+    }
+
+    dispose() {
+        if (this.disposed) return;
+        this.disposed = true;
+        this.mesh?.dispose?.();
+        this.edgeMesh?.dispose?.();
+        this.material?.dispose?.();
+        this.mesh = null;
+        this.edgeMesh = null;
+        this.material = null;
+    }
+}
+
+function getPresentationOffset(anomaly, sliceId, presentationEndpoint) {
+    if (!presentationEndpoint) return { x: 0, y: 0, z: 0 };
+    const endpoint = anomaly.source.sliceId === sliceId
+        ? anomaly.source : anomaly.destination.sliceId === sliceId ? anomaly.destination : null;
+    if (!endpoint) throw new Error(`Anomaly ${anomaly.id} has no endpoint in slice ${sliceId}.`);
+    return {
+        x: presentationEndpoint.x - endpoint.position.x,
+        y: presentationEndpoint.y - endpoint.position.y,
+        z: presentationEndpoint.z - endpoint.position.z
+    };
+}
+
+function resolveEndpointW(anomaly, slice) {
+    const endpoint = anomaly.source.sliceId === slice.id
+        ? anomaly.source : anomaly.destination.sliceId === slice.id ? anomaly.destination : null;
+    if (!endpoint) throw new Error(`Anomaly ${anomaly.id} has no endpoint in slice ${slice.id}.`);
+    return slice.frame.origin.w + slice.frame.axes.reduce(
+        (sum, axis, index) => sum + axis.w * endpoint.position[['x', 'y', 'z'][index]], 0
+    );
+}
+
+function isWAlignedSlice(frame) {
+    if (!frame?.normal || !Array.isArray(frame.axes) || frame.axes.length !== 3) return false;
+    if (Math.abs(frame.normal.x) > EPSILON || Math.abs(frame.normal.y) > EPSILON ||
+        Math.abs(frame.normal.z) > EPSILON || Math.abs(Math.abs(frame.normal.w) - 1) > EPSILON) return false;
+    return frame.axes.every((axis) => Math.abs(axis.w) <= EPSILON);
+}
+
+function validateRegion(region) {
+    for (const axis of AXES) {
+        if (!Number.isFinite(region.min[axis]) || !Number.isFinite(region.max[axis]) ||
+            region.max[axis] <= region.min[axis]) {
+            throw new TypeError(`Anomaly boundary requires finite, ordered ${axis} bounds.`);
+        }
+    }
+}
+
+function validateRendererOptions(options) {
+    if (!Number.isSafeInteger(options.gridSegments) || options.gridSegments < 1 || options.gridSegments > 64 ||
+        !Number.isFinite(options.opacity) || options.opacity <= 0 || options.opacity >= 1 ||
+        !Number.isFinite(options.edgeAlpha) || options.edgeAlpha < 0 || options.edgeAlpha > 1) {
+        throw new RangeError('Invalid anomaly boundary renderer configuration.');
+    }
+}
+
+function createSurfaceMaterial(scene, anomalyId, opacity) {
+    const material = new BABYLON.StandardMaterial(`anomalyBoundaryMaterial_${anomalyId}`, scene);
+    material.diffuseColor = new BABYLON.Color3(0.08, 0.38, 0.58);
+    material.emissiveColor = new BABYLON.Color3(0.025, 0.16, 0.28);
+    material.alpha = opacity;
+    material.disableLighting = true;
+    material.disableDepthWrite = true;
+    material.backFaceCulling = false;
+    return material;
+}
+
+function appendGridIndices(vertexStart, segments, indices, rowSegments = segments) {
+    const stride = segments + 1;
+    for (let v = 0; v < rowSegments; v++) {
+        for (let u = 0; u < segments; u++) {
+            const a = vertexStart + v * stride + u;
+            const b = a + 1;
+            const c = a + stride + 1;
+            const d = a + stride;
+            indices.push(a, b, c, a, c, d);
+        }
+    }
+}
+
+function appendFaceNormals(grid, multiplier, normals) {
+    for (let v = 0; v < grid.length; v++) {
+        for (let u = 0; u < grid[v].length; u++) {
+            const beforeU = grid[v][Math.max(0, u - 1)];
+            const afterU = grid[v][Math.min(grid[v].length - 1, u + 1)];
+            const beforeV = grid[Math.max(0, v - 1)][u];
+            const afterV = grid[Math.min(grid.length - 1, v + 1)][u];
+            const du = subtract3(afterU, beforeU);
+            const dv = subtract3(afterV, beforeV);
+            let normal = cross3(du, dv);
+            const length = Math.hypot(normal.x, normal.y, normal.z) || 1;
+            normal = {
+                x: normal.x / length * multiplier,
+                y: normal.y / length * multiplier,
+                z: normal.z / length * multiplier
+            };
+            normals.push(normal.x, normal.y, normal.z);
+        }
+    }
+}
+
+function appendGridLines(grid, lines) {
+    for (const row of grid) lines.push(row.map(copyPoint3));
+    for (let column = 0; column < grid[0].length; column++) {
+        lines.push(grid.map((row) => copyPoint3(row[column])));
+    }
+}
+
+function subtract3(a, b) { return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }; }
+function cross3(a, b) {
+    return {
+        x: a.y * b.z - a.z * b.y,
+        y: a.z * b.x - a.x * b.z,
+        z: a.x * b.y - a.y * b.x
+    };
+}
+function copyPoint3(point) { return { x: point.x, y: point.y, z: point.z }; }
+function isFinitePoint3(point) { return Boolean(point) && [point.x, point.y, point.z].every(Number.isFinite); }
+function interpolate(a, b, t) { return a + (b - a) * t; }
+
+export {
+    AnomalyBoundaryRenderer,
+    BOUNDARY_FACE_DEFINITIONS,
+    buildAnomalyBoundaryGeometry,
+    buildAnomalyCylinderGeometry,
+    resolveAnomalyCylinderRadius,
+    isWAlignedSlice
+};
 
 
 ========================================================================
@@ -15,7 +581,7 @@ FILE: src/world/fields/geometry/anomaly-influence-field.js
 
 /** Shared continuous W-freedom field and generalized chunk reachability math. */
 
-import { norm4, subtract4 } from './spatial-4d.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { norm4, subtract4 } from './spatial-4d.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 
 const AXES = ['x', 'y', 'z', 'w'];
 const EPSILON = 1e-9;
@@ -190,6 +756,359 @@ export {
     evaluateChunkReachability,
     resolveAnomalyInfluence,
     smootherstep
+};
+
+
+========================================================================
+FILE: src/world/fields/geometry/anomaly-mouth-profile.js
+========================================================================
+
+/** Shared perspective-style growth profile for a remote anomaly mouth. */
+
+const DEFAULT_INITIAL_RADIUS_RATIO = 0.035;
+const DEFAULT_GROWTH_EXPONENT = 2.0;
+
+/**
+ * Returns the apparent radius fraction of the remote mouth.
+ *
+ * The quadratic (or configurable power) approach curve keeps a distant mouth
+ * small near entry and accelerates its apparent angular growth near the exit.
+ * This is a controllable perspective approximation rather than a claim that
+ * the W parameter is Euclidean camera depth.
+ */
+function calculatePerspectiveMouthGrowth(progress, options = {}) {
+    if (!Number.isFinite(progress)) {
+        throw new TypeError('Destination-mouth progress must be finite.');
+    }
+    const initialRadiusRatio = options.initialRadiusRatio ?? DEFAULT_INITIAL_RADIUS_RATIO;
+    const growthExponent = options.growthExponent ?? DEFAULT_GROWTH_EXPONENT;
+    if (!Number.isFinite(initialRadiusRatio) || initialRadiusRatio <= 0 || initialRadiusRatio > 0.5) {
+        throw new RangeError('Destination-mouth initial radius ratio must be greater than zero and no greater than 0.5.');
+    }
+    if (!Number.isFinite(growthExponent) || growthExponent <= 1 || growthExponent > 4) {
+        throw new RangeError('Destination-mouth growth exponent must be greater than one and no greater than four.');
+    }
+    const normalized = Math.max(0, Math.min(1, progress));
+    return initialRadiusRatio + (1 - initialRadiusRatio) * Math.pow(normalized, growthExponent);
+}
+
+export { calculatePerspectiveMouthGrowth, DEFAULT_INITIAL_RADIUS_RATIO, DEFAULT_GROWTH_EXPONENT };
+
+
+========================================================================
+FILE: src/world/fields/geometry/anomaly-view-transform.js
+========================================================================
+
+import { ambientToSlice } from './spatial-4d.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
+
+/**
+ * Maps a viewer pose through an anomaly's endpoint slice frames.
+ *
+ * This is a view transport, not a player handoff or an optical ray trace. The
+ * camera's eye offset and tangent basis are expressed in the viewer slice's
+ * authoritative coordinates, transferred to the remote aperture's matching
+ * tangent basis, then projected by the remote slice's own SpatialTransform.
+ * During transit, optional approach progress moves the virtual eye toward the
+ * remote mouth while preserving screen-up clearance. The remote view therefore
+ * responds to camera translation, orbit, chart geometry, and traversal progress.
+ */
+
+const VECTOR_EPSILON = 1e-9;
+const DEFAULT_DIRECTION_SAMPLE_RENDER_UNITS = 8;
+const DEFAULT_REMOTE_TARGET_DISTANCE = 12;
+const DEFAULT_APERTURE_RADIUS = 1;
+const DEFAULT_DESTINATION_SPHERE_START_SCALE = 0.08;
+const DEFAULT_DESTINATION_SPHERE_GROWTH_EXPONENT = 0.55;
+
+function mapAnomalyCameraPose(options = {}) {
+    const camera = options.camera;
+    const viewerWorld = options.viewerWorld;
+    const remoteWorld = options.remoteWorld;
+    const anomaly = options.anomaly;
+    if (!camera?.position || !viewerWorld?.slice?.frame || !remoteWorld?.slice?.frame ||
+        typeof viewerWorld.transform?.renderToWorld !== 'function' ||
+        typeof remoteWorld.transform?.worldToRender !== 'function') {
+        return null;
+    }
+
+    const physicalViewerEndpoint = endpointForSlice(anomaly, viewerWorld.slice.id);
+    const configuredViewerEndpoint = options.viewerEndpoint;
+    const viewerEndpoint = configuredViewerEndpoint?.sliceId === viewerWorld.slice.id &&
+        configuredViewerEndpoint.position
+        ? { ...physicalViewerEndpoint, position: readVector3(configuredViewerEndpoint.position, 'viewer presentation endpoint') }
+        : physicalViewerEndpoint;
+    const remoteEndpoint = endpointForSlice(anomaly, remoteWorld.slice.id);
+    if (!viewerEndpoint || !remoteEndpoint) return null;
+
+    const eyeRender = readVector3(camera.position, 'camera position');
+    const forwardRender = readForward(camera);
+    const upRender = readUp(camera);
+    const sampleDistance = positiveOption(
+        options.directionSampleRenderUnits,
+        DEFAULT_DIRECTION_SAMPLE_RENDER_UNITS
+    );
+    const targetDistance = positiveOption(
+        options.remoteTargetDistance,
+        DEFAULT_REMOTE_TARGET_DISTANCE
+    );
+
+    try {
+        const eyeLocal = viewerWorld.transform.renderToWorld(eyeRender);
+        const forwardSampleLocal = viewerWorld.transform.renderToWorld(
+            add3(eyeRender, scale3(forwardRender, sampleDistance))
+        );
+        const upSampleLocal = viewerWorld.transform.renderToWorld(
+            add3(eyeRender, scale3(upRender, sampleDistance))
+        );
+        const forwardLocal = normalize3(subtract3(forwardSampleLocal, eyeLocal));
+        let upLocal = normalize3(subtract3(upSampleLocal, eyeLocal));
+        upLocal = normalize3(subtract3(
+            upLocal,
+            scale3(forwardLocal, dot3(upLocal, forwardLocal))
+        ));
+
+        // The endpoint frames provide a natural 3D tangent-frame isometry:
+        // local x/y/z components at one mouth become x/y/z at the other mouth.
+        // This is deliberately independent of player traversal and ray optics.
+        const eyeOffset = subtract3(eyeLocal, viewerEndpoint.position);
+        const approachProgress = normalizeOptionalProgress(options.approachProgress);
+        const approachEase = approachProgress === null ? 0 : smootherstep(approachProgress);
+
+        // While traversing a tube, transport the virtual remote camera toward
+        // the destination mouth. Preserve its screen-up component so a camera
+        // above the terrain does not descend into the remote ground as the
+        // lateral/forward offset converges. At progress 0 this is exactly the
+        // legacy endpoint-frame mapping; at progress 1 the eye reaches the
+        // destination endpoint at the same vertical clearance.
+        let remoteEyeOffset = eyeOffset;
+        if (approachProgress !== null) {
+            const verticalOffset = scale3(upLocal, dot3(eyeOffset, upLocal));
+            const tangentOffset = subtract3(eyeOffset, verticalOffset);
+            remoteEyeOffset = add3(
+                verticalOffset,
+                scale3(tangentOffset, 1 - approachEase)
+            );
+        }
+        const remoteEyeLocal = add3(remoteEndpoint.position, remoteEyeOffset);
+        const remoteTargetLocal = add3(remoteEyeLocal, scale3(forwardLocal, targetDistance));
+        const remoteUpPointLocal = add3(remoteEyeLocal, upLocal);
+
+        const safeEye = constrainWorld(remoteWorld.transform, remoteEyeLocal);
+        const safeTarget = constrainWorld(remoteWorld.transform, remoteTargetLocal);
+        const safeUpPoint = constrainWorld(remoteWorld.transform, remoteUpPointLocal);
+        const remoteEyeRender = readVector3(
+            remoteWorld.transform.worldToRender(safeEye),
+            'mapped camera position'
+        );
+        const remoteTargetRender = readVector3(
+            remoteWorld.transform.worldToRender(safeTarget),
+            'mapped camera target'
+        );
+        const remoteUpRenderPoint = readVector3(
+            remoteWorld.transform.worldToRender(safeUpPoint),
+            'mapped camera up point'
+        );
+        const mappedUp = normalize3(subtract3(remoteUpRenderPoint, remoteEyeRender));
+
+        return {
+            position: remoteEyeRender,
+            target: remoteTargetRender,
+            up: mappedUp,
+            viewerLocalPosition: eyeLocal,
+            remoteLocalPosition: safeEye,
+            viewerEndpoint: { ...viewerEndpoint.position },
+            remoteEndpoint: { ...remoteEndpoint.position },
+            direction: forwardLocal,
+            approachProgress,
+            approachEase,
+            remoteEyeOffset: { ...remoteEyeOffset }
+        };
+    } catch (error) {
+        // A finite chart may not contain the virtual camera or its look target.
+        // This disables the preview for that frame without hiding unrelated
+        // projection failures or silently changing the authoritative geometry.
+        if (error instanceof RangeError) return null;
+        throw error;
+    }
+}
+
+/**
+ * Cross-section radius of a 4D Euclidean spherical aperture.
+ * A 3D hyperplane offset by d from a 4D sphere's centre intersects it in a
+ * 3D ball of radius sqrt(R²-d²); the visible boundary is rendered as a 2D disc.
+ */
+function resolveAnomalyViewCenterNormalOffset(anomaly, viewerWorld, configuredOffset = null) {
+    if (configuredOffset !== null && configuredOffset !== undefined) {
+        if (!Number.isFinite(configuredOffset)) {
+            throw new TypeError('Configured anomaly view centre offset must be finite.');
+        }
+        return configuredOffset;
+    }
+    const center = anomaly?.influence?.center;
+    if (!center) return 0;
+    const frame = viewerWorld?.slice?.frame;
+    if (!frame) throw new TypeError('A viewer slice frame is required to resolve the anomaly centre.');
+    return ambientToSlice(frame, center).normalOffset;
+}
+
+function calculateAnomalyApertureScale(options = {}) {
+    const anomaly = options.anomaly;
+    const viewerWorld = options.viewerWorld;
+    const viewConfig = options.viewConfig ?? anomaly?.view ?? {};
+
+    // The tapered cylinder remains the authoritative outer boundary. Its
+    // destination preview is a separate, complete sphere that begins small
+    // and grows into the available cross-section as transit advances. Because
+    // progress is normalized from the viewer's entry side, the same curve
+    // works in both directions and reaches exactly 1 at the endpoint, so the
+    // scale does not snap when the active slice changes.
+    if (viewConfig.interiorBoundary === 'open-4d-cylinder' ||
+        anomaly?.view?.interiorBoundary === 'open-4d-cylinder') {
+        if (viewConfig.previewSurface !== 'spherical' ||
+            options.approachProgress === null || options.approachProgress === undefined) {
+            return 1;
+        }
+        const progress = normalizeOptionalProgress(options.approachProgress);
+        const startScale = viewConfig.destinationSphereStartScale ??
+            DEFAULT_DESTINATION_SPHERE_START_SCALE;
+        const growthExponent = viewConfig.destinationSphereGrowthExponent ??
+            DEFAULT_DESTINATION_SPHERE_GROWTH_EXPONENT;
+        if (!Number.isFinite(startScale) || startScale <= 0 || startScale > 1 ||
+            !Number.isFinite(growthExponent) || growthExponent <= 0 || growthExponent > 1) {
+            throw new RangeError('Destination sphere growth settings must be within (0, 1].');
+        }
+        const radii = viewConfig.interiorBoundaryRadii ?? anomaly?.view?.interiorBoundaryRadii;
+        if (!radii || !Number.isFinite(radii.source) || radii.source <= 0 ||
+            !Number.isFinite(radii.destination) || radii.destination <= 0) {
+            throw new TypeError('A spherical cylinder preview requires positive source and destination radii.');
+        }
+        const viewingFromSource = options.viewingFromSource ??
+            (viewerWorld?.slice?.id === anomaly?.source?.sliceId);
+        const startRadius = viewingFromSource ? radii.source : radii.destination;
+        const endRadius = viewingFromSource ? radii.destination : radii.source;
+        const outerTubeProgress = smootherstep(progress);
+        const outerRadius = startRadius + (endRadius - startRadius) * outerTubeProgress;
+        const initialInnerRadius = startRadius * startScale;
+        const innerGrowth = Math.pow(outerTubeProgress, growthExponent);
+        const unconstrainedInnerRadius = initialInnerRadius +
+            (endRadius - initialInnerRadius) * innerGrowth;
+        // The destination sphere grows toward the far aperture even in reverse
+        // traversal, where the outer tapered tube itself narrows. It is capped
+        // by the current outer section, and reaches that section exactly at the
+        // endpoint. Relative to the entry mouth this multiplier may exceed 1.
+        const innerRadius = Math.min(outerRadius, unconstrainedInnerRadius);
+        return innerRadius / startRadius;
+    }
+
+    if (viewConfig.crossSection !== 'euclidean-4d-ball') return 1;
+    const radius = options.apertureRadius ?? anomaly?.optics?.apertureRadius ??
+        anomaly?.entryRadius ?? DEFAULT_APERTURE_RADIUS;
+    const viewerNormalOffset = options.viewerNormalOffset ?? 0;
+    if (!Number.isFinite(viewerNormalOffset)) {
+        throw new TypeError('Viewer anomaly-normal offset must be finite.');
+    }
+    const centerNormalOffset = resolveAnomalyViewCenterNormalOffset(
+        anomaly, viewerWorld, viewConfig.centerNormalOffset
+    );
+    const sectionRadius = euclidean4DApertureSectionRadius(
+        radius, viewerNormalOffset - centerNormalOffset
+    );
+    return sectionRadius / radius;
+}
+
+function normalizeOptionalProgress(progress) {
+    if (progress === null || progress === undefined) return null;
+    if (!Number.isFinite(progress)) {
+        throw new TypeError('Anomaly approach progress must be finite.');
+    }
+    return Math.max(0, Math.min(1, progress));
+}
+
+function smootherstep(value) {
+    return value * value * value * (value * (value * 6 - 15) + 10);
+}
+
+function euclidean4DApertureSectionRadius(radius, normalOffset) {
+    if (!Number.isFinite(radius) || radius <= 0) {
+        throw new RangeError('Aperture radius must be positive and finite.');
+    }
+    if (!Number.isFinite(normalOffset)) {
+        throw new TypeError('Aperture normal offset must be finite.');
+    }
+    const squared = radius * radius - normalOffset * normalOffset;
+    return squared <= 0 ? 0 : Math.sqrt(squared);
+}
+
+function endpointForSlice(anomaly, sliceId) {
+    if (anomaly?.source?.sliceId === sliceId) return anomaly.source;
+    if (anomaly?.destination?.sliceId === sliceId) return anomaly.destination;
+    return null;
+}
+
+function constrainWorld(transform, position) {
+    return transform.constrainWorldPosition?.(position) ?? position;
+}
+
+function readForward(camera) {
+    const ray = camera.getForwardRay?.(1);
+    if (ray?.direction) return normalize3(readVector3(ray.direction, 'camera forward'));
+    if (typeof camera.getDirection === 'function' && globalThis.BABYLON?.Axis?.Z) {
+        return normalize3(readVector3(camera.getDirection(globalThis.BABYLON.Axis.Z), 'camera forward'));
+    }
+    throw new TypeError('Anomaly view transport requires a camera forward direction.');
+}
+
+function readUp(camera) {
+    // upVector is usually the world-up reference supplied to lookAt(), not the
+    // camera's rolled/pitched screen-up axis. Prefer the current camera basis.
+    if (typeof camera.getDirection === 'function' && globalThis.BABYLON?.Axis?.Y) {
+        return normalize3(readVector3(camera.getDirection(globalThis.BABYLON.Axis.Y), 'camera up'));
+    }
+    if (camera.upVector) return normalize3(readVector3(camera.upVector, 'camera up'));
+    return { x: 0, y: 1, z: 0 };
+}
+
+function readVector3(value, label) {
+    if (!value || ![value.x, value.y, value.z].every(Number.isFinite)) {
+        throw new TypeError(`${label} must contain finite x/y/z components.`);
+    }
+    return { x: value.x, y: value.y, z: value.z };
+}
+
+function normalize3(value) {
+    const length = Math.hypot(value.x, value.y, value.z);
+    if (!Number.isFinite(length) || length <= VECTOR_EPSILON) {
+        throw new RangeError('Cannot normalize a zero-length anomaly view vector.');
+    }
+    return scale3(value, 1 / length);
+}
+
+function add3(left, right) {
+    return { x: left.x + right.x, y: left.y + right.y, z: left.z + right.z };
+}
+
+function subtract3(left, right) {
+    return { x: left.x - right.x, y: left.y - right.y, z: left.z - right.z };
+}
+
+function scale3(value, amount) {
+    return { x: value.x * amount, y: value.y * amount, z: value.z * amount };
+}
+
+function dot3(left, right) {
+    return left.x * right.x + left.y * right.y + left.z * right.z;
+}
+
+function positiveOption(value, fallback) {
+    return value === undefined ? fallback : Number.isFinite(value) && value > 0
+        ? value : (() => { throw new RangeError('Anomaly view distance must be positive and finite.'); })();
+}
+
+export {
+    calculateAnomalyApertureScale,
+    euclidean4DApertureSectionRadius,
+    mapAnomalyCameraPose,
+    resolveAnomalyViewCenterNormalOffset
 };
 
 
@@ -2704,7 +3623,7 @@ FILE: src/world/fields/geometry/hypercube-4d.js
 
 /** Provides tesseract topology and true 3D hyperplane sections. */
 
-import { rotate4 } from './spatial-4d.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { rotate4 } from './spatial-4d.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 
 const AXES = ['x', 'y', 'z', 'w'];
 const FACET_BITS = [1, 2, 4, 8];
@@ -2923,28 +3842,28 @@ import {
     scale4,
     sliceToAmbient,
     subtract4
-} from './spatial-4d.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+} from './spatial-4d.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 import {
     createOpticalMetricField,
     blendScaledPositiveDefiniteMetrics3,
     geometricMeanMetricScale3
-} from './optical-metric.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+} from './optical-metric.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 import {
     createOpticalRayState,
     evaluateOpticalHamiltonian,
     traceOpticalRay
-} from './optical-ray-integrator.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+} from './optical-ray-integrator.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 import {
     createSliceOpticalField,
     traceOpticalRayInSlice
-} from './optical-slice-tracer.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+} from './optical-slice-tracer.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 import {
     evaluateOpticalAnomalyCoupling
-} from './optical-contracts.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+} from './optical-contracts.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 import {
     containsAmbientPoint,
     SLICE_TRANSITION_ANOMALY
-} from './spatial-anomaly.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+} from './spatial-anomaly.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 
 const AXES4 = ['x', 'y', 'z', 'w'];
 const EPSILON = 1e-8;
@@ -3438,6 +4357,20 @@ function createAnomalyOpticalTracer({
             activeAnomalyField = null;
             context = { kind: 'slice', sliceId: exit.sliceId };
             transitionCount++;
+            // Light emitters often need the exact outgoing state at an aperture,
+            // not an additional long destination-slice trace. This explicit
+            // opt-in keeps those consumers deterministic and avoids expensive
+            // Poincare integration beyond the handoff point.
+            if (options.stopAfterAnomalyExit === true) {
+                status = 'anomaly-exit';
+                terminalEvent = {
+                    kind: 'anomaly-exit',
+                    anomalyId: anomaly.id,
+                    sliceId: exit.sliceId,
+                    ambientPosition: { ...exit.ambientPosition }
+                };
+                break;
+            }
             if (transitionCount > maxTransitions) {
                 status = 'max-transitions';
                 terminalEvent = { kind: 'max-transitions', maxTransitions };
@@ -4010,7 +4943,7 @@ export {
 FILE: src/world/fields/geometry/optical-contracts.js
 ========================================================================
 
-import { smootherstep } from './anomaly-influence-field.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { smootherstep } from './anomaly-influence-field.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 
 /** Versioned, engine-independent optical configuration contracts. */
 
@@ -4218,7 +5151,7 @@ FILE: src/world/fields/geometry/optical-debug-renderer.js
 
 /** Render-space-only visualization for authoritative slice optical paths. */
 
-import { ambientToSlice } from './spatial-4d.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { ambientToSlice } from './spatial-4d.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 
 class OpticalDebugRenderer {
     constructor(scene, options = {}) {
@@ -4324,6 +5257,313 @@ export { OpticalDebugRenderer };
 
 
 ========================================================================
+FILE: src/world/fields/geometry/optical-light-source.js
+========================================================================
+
+/** Engine-independent spotlight source state and anomaly-transport adapter. */
+
+import { ambientToSlice, dot4, sliceToAmbient } from './spatial-4d.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
+import { createOpticalRayState } from './optical-ray-integrator.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
+import { createSliceOpticalField } from './optical-slice-tracer.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
+
+const DEFAULTS = Object.freeze({
+    color: [1, 0.78, 0.48],
+    intensity: 1.8,
+    range: 64,
+    coneAngle: 0.52,
+    exponent: 3,
+    enabled: true,
+    castsShadows: true
+});
+
+function createOpticalSpotlightSource(options = {}) {
+    const id = requireString(options.id, 'Spotlight id');
+    const sliceId = requireString(options.sliceId, 'Spotlight sliceId');
+    const position = normalizePosition3(options.position);
+    const direction = normalizeDirection3(options.direction);
+    const color = normalizeColor(options.color ?? DEFAULTS.color);
+    const intensity = finitePositive(options.intensity ?? DEFAULTS.intensity, 'Spotlight intensity', true);
+    const range = finitePositive(options.range ?? DEFAULTS.range, 'Spotlight range');
+    const coneAngle = options.coneAngle ?? DEFAULTS.coneAngle;
+    if (!Number.isFinite(coneAngle) || coneAngle <= 0 || coneAngle >= Math.PI) {
+        throw new RangeError('Spotlight coneAngle must be between zero and PI radians.');
+    }
+    const exponent = options.exponent ?? DEFAULTS.exponent;
+    if (!Number.isFinite(exponent) || exponent < 0 || exponent > 128) {
+        throw new RangeError('Spotlight exponent must be between zero and 128.');
+    }
+    const enabled = options.enabled ?? DEFAULTS.enabled;
+    const castsShadows = options.castsShadows ?? DEFAULTS.castsShadows;
+    if (typeof enabled !== 'boolean' || typeof castsShadows !== 'boolean') {
+        throw new TypeError('Spotlight enabled and castsShadows flags must be boolean.');
+    }
+    return {
+        id, sliceId, position, direction, color,
+        intensity, range, coneAngle, exponent, enabled, castsShadows
+    };
+}
+
+function moveOpticalSpotlightSource(source, delta) {
+    const current = requireSource(source);
+    const offset = normalizePosition3(delta, 'Spotlight movement');
+    return createOpticalSpotlightSource({
+        ...current,
+        position: {
+            x: current.position.x + offset.x,
+            y: current.position.y + offset.y,
+            z: current.position.z + offset.z
+        }
+    });
+}
+
+function rotateOpticalSpotlightSource(source, yawDelta = 0, pitchDelta = 0) {
+    const current = requireSource(source);
+    if (!Number.isFinite(yawDelta) || !Number.isFinite(pitchDelta)) {
+        throw new TypeError('Spotlight yaw and pitch deltas must be finite.');
+    }
+    const yaw = Math.atan2(current.direction.x, current.direction.z) + yawDelta;
+    const pitch = clamp(
+        Math.asin(clamp(current.direction.y, -1, 1)) + pitchDelta,
+        -Math.PI * 0.48,
+        Math.PI * 0.48
+    );
+    const horizontal = Math.cos(pitch);
+    return createOpticalSpotlightSource({
+        ...current,
+        direction: {
+            x: Math.sin(yaw) * horizontal,
+            y: Math.sin(pitch),
+            z: Math.cos(yaw) * horizontal
+        }
+    });
+}
+
+function aimOpticalSpotlightSource(source, target) {
+    const current = requireSource(source);
+    const point = normalizePosition3(target, 'Spotlight target');
+    return createOpticalSpotlightSource({
+        ...current,
+        direction: {
+            x: point.x - current.position.x,
+            y: point.y - current.position.y,
+            z: point.z - current.position.z
+        }
+    });
+}
+
+/** Trace the deterministic centre ray and derive its destination-slice virtual source. */
+function traceOpticalSpotlightSource({
+    source,
+    sourceBinding,
+    destinationBinding,
+    tracer,
+    anomalyId,
+    virtualSourceDistance = 0.5,
+    traceOptions = {}
+} = {}) {
+    const validated = requireSource(source);
+    if (!sourceBinding?.slice?.frame || sourceBinding.slice.id !== validated.sliceId) {
+        throw new TypeError('Spotlight source binding must match its registered source slice.');
+    }
+    if (!destinationBinding?.slice?.frame || !destinationBinding.spatialTransform) {
+        throw new TypeError('Spotlight destination binding requires a slice and SpatialTransform.');
+    }
+    if (!tracer || typeof tracer.trace !== 'function') {
+        throw new TypeError('Spotlight transport requires an anomaly optical tracer.');
+    }
+    requireString(anomalyId, 'Spotlight anomalyId');
+    finitePositive(virtualSourceDistance, 'Virtual source distance');
+
+    const position4 = sliceToAmbient(sourceBinding.slice.frame, validated.position);
+    const momentum4 = liftDirection(sourceBinding.slice.frame, validated.direction);
+    const initialRay = createOpticalRayState({
+        position: position4,
+        momentum: momentum4,
+        intensity: 1
+    });
+    const result = tracer.trace(initialRay, {
+        sliceId: validated.sliceId,
+        maxTransitions: 1,
+        stopAfterAnomalyExit: true,
+        sliceTraceOptions: {
+            maxPathLength: validated.range,
+            initialStepSize: 0.025,
+            maxStepSize: 0.12,
+            maxSteps: 6000,
+            ...(traceOptions.sliceTraceOptions ?? {})
+        },
+        anomalyTraceOptions: {
+            maxPathLength: validated.range * 1.5,
+            initialStepSize: 0.025,
+            maxStepSize: 0.12,
+            maxSteps: 12000,
+            ...(traceOptions.anomalyTraceOptions ?? {})
+        },
+        ...(traceOptions.tracerOptions ?? {})
+    });
+
+    const anomalySegment = result.pathSegments.find((segment) =>
+        segment.kind === 'anomaly' && segment.anomalyId === anomalyId &&
+        segment.result.event?.kind === 'anomaly-exit' &&
+        segment.result.event.sliceId === destinationBinding.slice.id
+    );
+    const destinationSegment = result.pathSegments.find((segment) =>
+        segment.kind === 'slice' && segment.sliceId === destinationBinding.slice.id
+    );
+    const exitSample = destinationSegment?.result?.samples?.[0] ?? (
+        result.event?.kind === 'anomaly-exit' && result.event.sliceId === destinationBinding.slice.id
+            ? { position: result.finalState.position, momentum: result.finalState.momentum }
+            : null
+    );
+    if (!anomalySegment || !exitSample) {
+        return {
+            transmitted: false,
+            reason: result.event?.kind ?? result.status ?? 'no-authorized-anomaly-exit',
+            sourceId: validated.id,
+            anomalyId,
+            trace: result,
+            diagnostics: result.diagnostics
+        };
+    }
+
+    const exitPosition = exitSample.position;
+    const exitMomentum = exitSample.momentum;
+    const destinationFrame = destinationBinding.slice.frame;
+    const exitLocal = ambientToSlice(destinationFrame, exitPosition).position;
+    const localCovector = destinationFrame.axes.map((axis) => dot4(axis, exitMomentum));
+    const metricField = createSliceOpticalField(
+        destinationBinding.slice,
+        destinationBinding.spatialTransform
+    );
+    const cometric = metricField.sample(exitPosition).tangentCometric;
+    const velocity = multiplyMatrix3Vector(cometric, localCovector);
+    const direction = normalizeDirection3({ x: velocity[0], y: velocity[1], z: velocity[2] });
+    const virtualPosition = {
+        x: exitLocal.x - direction.x * virtualSourceDistance,
+        y: exitLocal.y - direction.y * virtualSourceDistance,
+        z: exitLocal.z - direction.z * virtualSourceDistance
+    };
+    const energy = clamp(result.finalState.intensity, 0, 1);
+
+    return {
+        transmitted: energy > 1e-6,
+        reason: energy > 1e-6 ? null : 'fully-attenuated',
+        sourceId: validated.id,
+        anomalyId,
+        destinationSliceId: destinationBinding.slice.id,
+        exitPosition4: { ...exitPosition },
+        exitPosition: { ...exitLocal },
+        direction,
+        virtualPosition,
+        energy,
+        trace: result,
+        diagnostics: {
+            ...result.diagnostics,
+            outgoingTransitions: result.transitions.filter((entry) => entry.direction === 'out-of-anomaly').length,
+            exitHamiltonian: exitSample.hamiltonian ?? null,
+            virtualSourceDistance
+        }
+    };
+}
+
+
+/** Project the first receiving-slice segment of a successfully transmitted spotlight ray. */
+function projectOpticalSpotlightExitRay(result, spatialTransform, length = 400) {
+    if (!result?.transmitted || !result.exitPosition || !result.direction) return null;
+    if (typeof spatialTransform?.worldToRender !== 'function') {
+        throw new TypeError('Spotlight exit-ray projection requires a SpatialTransform.');
+    }
+    finitePositive(length, 'Spotlight debug-ray length');
+    const startWorld = normalizePosition3(result.exitPosition, 'Spotlight exit position');
+    const direction = normalizeDirection3(result.direction);
+    const endWorld = {
+        x: startWorld.x + direction.x * length,
+        y: startWorld.y + direction.y * length,
+        z: startWorld.z + direction.z * length
+    };
+    const startRender = spatialTransform.worldToRender(startWorld);
+    const endRender = spatialTransform.worldToRender(endWorld);
+    for (const [label, point] of [['start', startRender], ['end', endRender]]) {
+        if (!point || !['x', 'y', 'z'].every((axis) => Number.isFinite(point[axis]))) {
+            throw new RangeError(`Spotlight ${label} ray projection must be finite.`);
+        }
+    }
+    return { startWorld, endWorld, startRender, endRender, length };
+}
+
+function liftDirection(frame, direction) {
+    return frame.axes.reduce((result, axis, index) => {
+        const amount = direction[['x', 'y', 'z'][index]];
+        result.x += axis.x * amount;
+        result.y += axis.y * amount;
+        result.z += axis.z * amount;
+        result.w += axis.w * amount;
+        return result;
+    }, { x: 0, y: 0, z: 0, w: 0 });
+}
+
+function multiplyMatrix3Vector(matrix, vector) {
+    return [
+        matrix[0] * vector[0] + matrix[1] * vector[1] + matrix[2] * vector[2],
+        matrix[3] * vector[0] + matrix[4] * vector[1] + matrix[5] * vector[2],
+        matrix[6] * vector[0] + matrix[7] * vector[1] + matrix[8] * vector[2]
+    ];
+}
+
+function normalizeDirection3(value) {
+    const vector = normalizePosition3(value, 'Spotlight direction');
+    const length = Math.hypot(vector.x, vector.y, vector.z);
+    if (length <= 1e-10) throw new RangeError('Spotlight direction must be non-zero.');
+    return { x: vector.x / length, y: vector.y / length, z: vector.z / length };
+}
+
+function normalizePosition3(value, label = 'Spotlight position') {
+    if (!value || !['x', 'y', 'z'].every((axis) => Number.isFinite(value[axis]))) {
+        throw new TypeError(`${label} must contain finite x, y, and z coordinates.`);
+    }
+    return { x: value.x, y: value.y, z: value.z };
+}
+
+function normalizeColor(value) {
+    if (!Array.isArray(value) || value.length !== 3 ||
+        value.some((channel) => !Number.isFinite(channel) || channel < 0 || channel > 1)) {
+        throw new RangeError('Spotlight color must be an RGB array with channels between zero and one.');
+    }
+    return [...value];
+}
+
+function finitePositive(value, label, allowZero = false) {
+    if (!Number.isFinite(value) || (allowZero ? value < 0 : value <= 0)) {
+        throw new RangeError(`${label} must be ${allowZero ? 'non-negative' : 'positive'} and finite.`);
+    }
+    return value;
+}
+
+function requireString(value, label) {
+    if (typeof value !== 'string' || !value.trim()) throw new TypeError(`${label} must be a non-empty string.`);
+    return value;
+}
+
+function requireSource(source) {
+    if (!source || typeof source !== 'object') throw new TypeError('A spotlight source is required.');
+    return createOpticalSpotlightSource(source);
+}
+
+function clamp(value, minimum, maximum) {
+    return Math.min(maximum, Math.max(minimum, value));
+}
+
+export {
+    aimOpticalSpotlightSource,
+    createOpticalSpotlightSource,
+    moveOpticalSpotlightSource,
+    projectOpticalSpotlightExitRay,
+    rotateOpticalSpotlightSource,
+    traceOpticalSpotlightSource
+};
+
+
+========================================================================
 FILE: src/world/fields/geometry/optical-metric.js
 ========================================================================
 
@@ -4337,7 +5577,7 @@ import {
     assertVector4,
     createCanonicalSliceFrame,
     createSliceFrame
-} from './spatial-4d.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+} from './spatial-4d.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 
 const AXES = ['x', 'y', 'z', 'w'];
 const MATRIX3_SIZE = 9;
@@ -4725,7 +5965,7 @@ FILE: src/world/fields/geometry/optical-ray-integrator.js
 
 /** Deterministic CPU reference integrator for Hamiltonian optical rays in R4. */
 
-import { assertVector4 } from './spatial-4d.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { assertVector4 } from './spatial-4d.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 
 const AXES = ['x', 'y', 'z', 'w'];
 const STATE_SIZE = 8;
@@ -5204,8 +6444,8 @@ FILE: src/world/fields/geometry/optical-scene-registry.js
  * BVHs; streamed heightfields use analytic height sampling.
  */
 
-import { createOpticalMaterial } from './optical-contracts.js?v=somnium-20261108-phase16c-anomaly-optics-2';
-import { createSliceAddress, getSliceAddressKey } from './world-slice.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { createOpticalMaterial } from './optical-contracts.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
+import { createSliceAddress, getSliceAddressKey } from './world-slice.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 
 const AXES = ['x', 'y', 'z'];
 const DEFAULT_LEAF_SIZE = 8;
@@ -5817,9 +7057,9 @@ FILE: src/world/fields/geometry/optical-slice-tracer.js
 
 /** Slice-native ray tracing: Hamiltonian integration plus authoritative surface events. */
 
-import { ambientToSlice, assertVector4, dot4, sliceToAmbient } from './spatial-4d.js?v=somnium-20261108-phase16c-anomaly-optics-2';
-import { createOpticalMetricField, spatialTransformMetricProvider } from './optical-metric.js?v=somnium-20261108-phase16c-anomaly-optics-2';
-import { traceOpticalRay } from './optical-ray-integrator.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { ambientToSlice, assertVector4, dot4, sliceToAmbient } from './spatial-4d.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
+import { createOpticalMetricField, spatialTransformMetricProvider } from './optical-metric.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
+import { traceOpticalRay } from './optical-ray-integrator.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 
 const DEFAULT_SLICE_TOLERANCE = 1e-7;
 
@@ -6834,21 +8074,40 @@ FILE: src/world/fields/geometry/portal-preview-renderer.js
 class PortalPreviewRenderer {
     constructor(scene, options = {}) {
         this.scene = scene;
+        this.namePrefix = options.namePrefix ?? 'geometryPortalPreview';
         this.visible = false;
         this.ownedMeshes = [];
+        this.apertureShape = options.apertureShape ?? 'plane';
+        this.previewSurface = options.previewSurface ?? 'flat';
+        if (!['flat', 'spherical'].includes(this.previewSurface)) {
+            throw new RangeError(`Unsupported portal preview surface: ${this.previewSurface}`);
+        }
+        if (this.previewSurface === 'spherical' &&
+            !['circle', 'ellipse'].includes(this.apertureShape)) {
+            throw new RangeError('Spherical portal previews require a circular or elliptical aperture.');
+        }
+        this.apertureScale = 1;
+        this.maxApertureScale = options.maxApertureScale ?? 4;
+        if (!Number.isFinite(this.maxApertureScale) || this.maxApertureScale < 1 || this.maxApertureScale > 16) {
+            throw new RangeError('Portal maximum aperture scale must be finite and between 1 and 16.');
+        }
+        this.baseWidth = options.width ?? 4.6;
+        this.baseHeight = options.height ?? 5.4;
         this.camera = this.createCamera(options.camera ?? {});
-        this.texture = this.createRenderTarget(options.resolution ?? 512);
-        this.surface = this.createSurface(options.position ?? { x: 0, y: 2.5, z: 14.2 }, options.width ?? 4.6, options.height ?? 5.4);
+        this.texture = this.createRenderTarget(options.resolution ?? 512, this.baseWidth / this.baseHeight);
+        this.surface = this.createSurface(
+            options.position ?? { x: 0, y: 2.5, z: 14.2 }, this.baseWidth, this.baseHeight
+        );
         this.material = this.createMaterial();
         this.surface.material = this.material;
         this.surface.isPickable = false;
-        this.surface.metadata = { geometryPortal: true, renderOnly: true };
+        this.surface.metadata = { ...(this.surface.metadata || {}), geometryPortal: true, renderOnly: true };
         this.setVisible(false);
     }
 
     createCamera(options) {
         const camera = new BABYLON.FreeCamera(
-            'geometryPortalPreviewCamera',
+            `${this.namePrefix}Camera`,
             new BABYLON.Vector3(options.x ?? 0, options.y ?? 34, options.z ?? -58),
             this.scene
         );
@@ -6861,45 +8120,120 @@ class PortalPreviewRenderer {
         return camera;
     }
 
-    createRenderTarget(resolution) {
+    createRenderTarget(resolution, aspectRatio = 1) {
+        const size = normalizeRenderTargetSize(resolution, aspectRatio);
         const target = new BABYLON.RenderTargetTexture(
-            'geometryPortalRenderTarget',
-            { width: resolution, height: resolution },
+            `${this.namePrefix}RenderTarget`,
+            size,
             this.scene,
             false,
             true
         );
         target.activeCamera = this.camera;
         target.renderList = [];
-        target.refreshRate = 2;
+        // Portal previews are part of the live view, not a periodic postcard.
+        target.refreshRate = 1;
         target.gammaSpace = true;
         target.clearColor = new BABYLON.Color4(0.025, 0.04, 0.09, 1);
         return target;
     }
 
     createSurface(position, width, height) {
-        const surface = BABYLON.MeshBuilder.CreatePlane(
-            'geometryPortalSurface',
-            { width, height, sideOrientation: BABYLON.Mesh.DOUBLESIDE },
-            this.scene
-        );
+        let surface;
+        if (this.apertureShape === 'circle' || this.apertureShape === 'ellipse') {
+            if (this.previewSurface === 'spherical') {
+                // A complete closed sphere replaces the old spherical-cap
+                // approximation. Project the live destination frame onto its
+                // front hemisphere, while retaining both hemispheres in the
+                // actual geometry so the opening has genuine 3D volume.
+                surface = BABYLON.MeshBuilder.CreateSphere(
+                    `${this.namePrefix}Surface`,
+                    { diameter: 2, segments: 64, sideOrientation: BABYLON.Mesh.DOUBLESIDE, updatable: true },
+                    this.scene
+                );
+                applySphericalProjectionUvs(surface);
+                surface.scaling.set(width * 0.5, height * 0.5, Math.min(width, height) * 0.5);
+                surface.metadata = {
+                    ...(surface.metadata || {}),
+                    portalSphere: true,
+                    portalSphereProjection: 'front-orthographic'
+                };
+            } else {
+                surface = BABYLON.MeshBuilder.CreateDisc(
+                    `${this.namePrefix}Surface`,
+                    { radius: 1, tessellation: 96, sideOrientation: BABYLON.Mesh.DOUBLESIDE },
+                    this.scene
+                );
+                surface.scaling.set(width * 0.5, height * 0.5, 1);
+            }
+        } else {
+            surface = BABYLON.MeshBuilder.CreatePlane(
+                `${this.namePrefix}Surface`,
+                { width, height, sideOrientation: BABYLON.Mesh.DOUBLESIDE },
+                this.scene
+            );
+        }
         surface.position.set(position.x, position.y, position.z);
         return surface;
     }
 
     createMaterial() {
-        const material = new BABYLON.StandardMaterial('geometryPortalMaterial', this.scene);
+        const material = new BABYLON.StandardMaterial(`${this.namePrefix}Material`, this.scene);
         material.diffuseTexture = this.texture;
         material.emissiveTexture = this.texture;
         material.emissiveColor = BABYLON.Color3.White();
         material.disableLighting = true;
         material.backFaceCulling = false;
+        material.fogEnabled = false;
         material.specularColor = BABYLON.Color3.Black();
         return material;
     }
 
     setHomePose() {
         this.homePose = capturePose(this.surface, this.rim);
+        this.baseSurfaceScaling = cloneVector(this.surface.scaling);
+        this.baseRimScaling = this.rim ? cloneVector(this.rim.scaling) : null;
+    }
+
+    setCameraPose(position, target, up = { x: 0, y: 1, z: 0 }, fov = null) {
+        if (!position || !target || !up) throw new TypeError('Portal camera pose is incomplete.');
+        this.camera.position.set(position.x, position.y, position.z);
+        this.camera.upVector.set(up.x, up.y, up.z);
+        this.camera.setTarget(new BABYLON.Vector3(target.x, target.y, target.z));
+        if (Number.isFinite(fov) && fov > 0 && fov < Math.PI) this.camera.fov = fov;
+        this.lastCameraPose = {
+            position: cloneVector(position), target: cloneVector(target), up: cloneVector(up)
+        };
+    }
+
+    setApertureScale(scale) {
+        if (!Number.isFinite(scale)) throw new TypeError('Aperture scale must be finite.');
+        this.apertureScale = Math.max(0, Math.min(this.maxApertureScale, scale));
+        if (this.baseSurfaceScaling) {
+            this.surface.scaling.set(
+                this.baseSurfaceScaling.x * this.apertureScale,
+                this.baseSurfaceScaling.y * this.apertureScale,
+                this.baseSurfaceScaling.z * (this.previewSurface === 'spherical' ? this.apertureScale : 1)
+            );
+        }
+        if (this.rim && this.baseRimScaling) {
+            this.rim.scaling.set(
+                this.baseRimScaling.x * this.apertureScale,
+                this.baseRimScaling.y * this.apertureScale,
+                this.baseRimScaling.z
+            );
+        }
+        this.surface.isVisible = this.visible && this.apertureScale > 1e-3;
+        if (this.rim) this.rim.isVisible = this.visible && this.apertureScale > 1e-3;
+        this.syncRenderTargetVisibility();
+    }
+
+    syncRenderTargetVisibility() {
+        const shouldRender = this.visible && this.apertureScale > 1e-3;
+        const targets = this.scene.customRenderTargets;
+        const index = targets.indexOf(this.texture);
+        if (shouldRender && index < 0) targets.push(this.texture);
+        if (!shouldRender && index >= 0) targets.splice(index, 1);
     }
 
     setPose(position, direction = { x: 0, y: 0, z: 1 }) {
@@ -6932,11 +8266,9 @@ class PortalPreviewRenderer {
 
     setVisible(visible) {
         this.visible = Boolean(visible);
-        this.surface.isVisible = this.visible;
-        const targets = this.scene.customRenderTargets;
-        const index = targets.indexOf(this.texture);
-        if (this.visible && index < 0) targets.push(this.texture);
-        if (!this.visible && index >= 0) targets.splice(index, 1);
+        this.surface.isVisible = this.visible && this.apertureScale > 1e-3;
+        if (this.rim) this.rim.isVisible = this.visible && this.apertureScale > 1e-3;
+        this.syncRenderTargetVisibility();
     }
 
     getInfo() {
@@ -6944,6 +8276,11 @@ class PortalPreviewRenderer {
             visible: this.visible,
             renderOnly: true,
             renderListSize: this.ownedMeshes.length,
+            apertureShape: this.apertureShape,
+            previewSurface: this.previewSurface,
+            previewGeometry: this.previewSurface === 'spherical' ? 'closed-sphere' : 'flat-disc',
+            apertureScale: this.apertureScale,
+            cameraPose: this.lastCameraPose ?? null,
             resolution: this.texture.getSize()
         };
     }
@@ -6957,6 +8294,100 @@ class PortalPreviewRenderer {
         this.camera.dispose();
         this.ownedMeshes = [];
     }
+}
+
+
+/**
+ * Projects the live 2D portal frame onto a complete sphere using local XY
+ * coordinates. This keeps the destination image camera-like on the visible
+ * hemisphere instead of wrapping the image as an equirectangular planet map.
+ * The sphere itself remains a closed 3D surface on both hemispheres.
+ */
+function applySphericalProjectionUvs(surface) {
+    if (!surface || typeof BABYLON === 'undefined' ||
+        typeof surface.getVerticesData !== 'function' ||
+        typeof surface.updateVerticesData !== 'function') {
+        throw new TypeError('Spherical portal projection requires an updatable Babylon sphere mesh.');
+    }
+    const positionKind = BABYLON.VertexBuffer.PositionKind;
+    const uvKind = BABYLON.VertexBuffer.UVKind;
+    const positions = surface.getVerticesData(positionKind);
+    const uvs = surface.getVerticesData(uvKind);
+    if (!positions?.length || !uvs?.length || positions.length % 3 !== 0 ||
+        uvs.length !== positions.length / 3 * 2) {
+        throw new TypeError('Spherical portal mesh is missing compatible position/UV geometry.');
+    }
+    for (let vertex = 0, uv = 0; vertex < positions.length; vertex += 3, uv += 2) {
+        uvs[uv] = clamp01(0.5 + positions[vertex] * 0.5);
+        uvs[uv + 1] = clamp01(0.5 - positions[vertex + 1] * 0.5);
+    }
+    surface.updateVerticesData(uvKind, uvs, true);
+    return { uvs };
+}
+
+function clamp01(value) {
+    return Math.max(0, Math.min(1, value));
+}
+
+/**
+ * Curves a unit disc into a concave spherical cap without changing its UVs.
+ * The render-target image therefore remains a normal camera projection while
+ * the physical preview surface recedes toward the centre of the opening.
+ */
+function applySphericalCapGeometry(surface, sagittaRatio = 0.38) {
+    if (!surface || typeof BABYLON === 'undefined' ||
+        typeof surface.getVerticesData !== 'function' ||
+        typeof surface.getIndices !== 'function' ||
+        typeof surface.updateVerticesData !== 'function') {
+        throw new TypeError('Spherical portal surface requires an updatable Babylon disc mesh.');
+    }
+    if (!Number.isFinite(sagittaRatio) || sagittaRatio <= 0 || sagittaRatio >= 1) {
+        throw new RangeError('Spherical portal sagitta ratio must be between 0 and 1.');
+    }
+    const positionKind = BABYLON.VertexBuffer.PositionKind;
+    const normalKind = BABYLON.VertexBuffer.NormalKind;
+    const positions = surface.getVerticesData(positionKind);
+    const indices = surface.getIndices();
+    if (!positions?.length || !indices?.length || positions.length % 3 !== 0) {
+        throw new TypeError('Spherical portal disc is missing indexed position geometry.');
+    }
+    const sagitta = sagittaRatio;
+    const sphereRadius = (1 + sagitta * sagitta) / (2 * sagitta);
+    for (let index = 0; index < positions.length; index += 3) {
+        const x = positions[index];
+        const y = positions[index + 1];
+        const radialSquared = Math.min(1, x * x + y * y);
+        const sphereRoot = Math.sqrt(Math.max(0, sphereRadius * sphereRadius - radialSquared));
+        // Rim lies at z=0; the centre recedes by `sagitta` away from the
+        // observer, producing a concave bowl rather than a convex dome.
+        positions[index + 2] = sphereRadius - sagitta - sphereRoot;
+    }
+    const normals = new Float32Array(positions.length);
+    BABYLON.VertexData.ComputeNormals(positions, indices, normals);
+    surface.updateVerticesData(positionKind, positions, true);
+    surface.updateVerticesData(normalKind, normals, true);
+    surface.refreshBoundingInfo?.();
+    return { positions, normals, sagittaRatio };
+}
+
+function normalizeRenderTargetSize(resolution, aspectRatio) {
+    if (!Number.isFinite(aspectRatio) || aspectRatio <= 0) {
+        throw new RangeError('Portal aspect ratio must be positive and finite.');
+    }
+    if (typeof resolution === 'number') {
+        if (!Number.isSafeInteger(resolution) || resolution < 16) {
+            throw new RangeError('Portal render resolution must be an integer of at least 16 pixels.');
+        }
+        return {
+            width: resolution,
+            height: Math.max(16, Math.round(resolution / aspectRatio))
+        };
+    }
+    if (!resolution || !Number.isSafeInteger(resolution.width) ||
+        !Number.isSafeInteger(resolution.height) || resolution.width < 16 || resolution.height < 16) {
+        throw new RangeError('Portal render resolution requires integer width and height of at least 16 pixels.');
+    }
+    return { width: resolution.width, height: resolution.height };
 }
 
 function isRenderableMesh(mesh) {
@@ -6991,7 +8422,7 @@ function sameMeshes(left, right) {
     });
 }
 
-export { PortalPreviewRenderer };
+export { PortalPreviewRenderer, applySphericalCapGeometry, applySphericalProjectionUvs };
 
 
 ========================================================================
@@ -7008,8 +8439,8 @@ import {
     sliceToAmbient,
     subtract4
 } from './spatial-4d.js';
-import { SLICE_TRANSITION_ANOMALY } from './spatial-anomaly.js?v=somnium-20261108-phase16c-anomaly-optics-2';
-import { evaluateAnomalyInfluence } from './anomaly-influence-field.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { SLICE_TRANSITION_ANOMALY } from './spatial-anomaly.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
+import { evaluateAnomalyInfluence } from './anomaly-influence-field.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 
 const AXES = ['x', 'y', 'z', 'w'];
 
@@ -7045,6 +8476,8 @@ class SliceTransitionTraversalController {
             speed: 8,
             sprintSpeed: 12,
             entitySpeed: 8,
+            triggerDistanceBySlice: {},
+            presentationEndpointsBySlice: {},
             ...options.traversal
         };
         this.validateOptions();
@@ -7129,11 +8562,13 @@ class SliceTransitionTraversalController {
         for (const neighbor of neighbors) {
             const fromSource = this.corridor.source.sliceId === this.currentSliceId;
             const endpoint = fromSource ? this.corridor.source : this.corridor.destination;
-            const dx = endpoint.position.x - position.x;
-            const dz = endpoint.position.z - position.z;
+            const presentationPosition = this.getPresentationEndpoint(this.currentSliceId) ?? endpoint.position;
+            const triggerDistance = this.getEntryTriggerDistance(this.currentSliceId);
+            const dx = presentationPosition.x - position.x;
+            const dz = presentationPosition.z - position.z;
             const distance = Math.hypot(dx, dz);
-            diagnostic = { ...diagnostic, distance, entryRadius: this.options.triggerDistance };
-            if (distance > this.options.triggerDistance) continue;
+            diagnostic = { ...diagnostic, distance, entryRadius: triggerDistance };
+            if (distance > triggerDistance) continue;
             const heading = distance < 1e-6 ? 1 : (forwardX * dx + forwardZ * dz) / distance;
             if (heading < this.options.headingThreshold) {
                 diagnostic = { ...diagnostic, reason: 'WRONG_HEADING', heading, headingThreshold: this.options.headingThreshold };
@@ -7145,7 +8580,8 @@ class SliceTransitionTraversalController {
                 diagnostic = { ...diagnostic, reason: 'OUTSIDE_ANOMALY_REGION', heading };
                 continue;
             }
-            if (!this.hasChunkConnection(this.currentSliceId, position)) {
+            const physicalPosition = this.getPhysicalEndpointLocalPosition(currentWorld, position);
+            if (!this.hasChunkConnection(this.currentSliceId, physicalPosition)) {
                 diagnostic = { ...diagnostic, reason: 'NO_CHUNK_CONNECTION', heading };
                 continue;
             }
@@ -7163,9 +8599,77 @@ class SliceTransitionTraversalController {
     getAmbientPlayerPosition() {
         const world = this.worlds.get(this.currentSliceId);
         if (!world) return null;
-        const base = sliceToAmbient(world.slice.frame, this.player.worldPosition);
+        const physicalPosition = this.getPhysicalEndpointLocalPosition(world, this.player.worldPosition);
+        const base = sliceToAmbient(world.slice.frame, physicalPosition);
         const prior = this.player.spatialPosition4D;
         const normalOffset = prior && this.player.sliceId === this.currentSliceId
+            ? ambientToSlice(world.slice.frame, prior).normalOffset : 0;
+        return add4(base, scale4(world.slice.frame.normal, normalOffset));
+    }
+
+    getPresentationEndpoint(sliceId) {
+        const configured = this.options.presentationEndpointsBySlice?.[sliceId];
+        if (!configured) return null;
+        const position = configured.position ?? configured;
+        return isFinitePosition3(position) ? { ...position } : null;
+    }
+
+    getEntryTriggerDistance(sliceId) {
+        const configured = this.options.triggerDistanceBySlice?.[sliceId];
+        return Number.isFinite(configured) && configured > 0 ? configured : this.options.triggerDistance;
+    }
+
+    isNearPresentationPortal(sliceId, position = null) {
+        const world = this.worlds.get(sliceId);
+        const local = position ?? (sliceId === this.currentSliceId ? this.player.worldPosition : null);
+        const presentation = this.getPresentationEndpoint(sliceId);
+        if (!world || !local || !presentation) return false;
+        return Math.hypot(local.x - presentation.x, local.z - presentation.z) <=
+            this.getEntryTriggerDistance(sliceId);
+    }
+
+    getPhysicalEndpointLocalPosition(world, localPosition) {
+        if (!world || !localPosition) return localPosition;
+        const endpoint = endpointForSlice(this.corridor, world.slice.id);
+        const presentation = this.getPresentationEndpoint(world.slice.id);
+        if (!endpoint || !presentation) return { ...localPosition };
+        const portalDistance = Math.hypot(
+            localPosition.x - presentation.x, localPosition.z - presentation.z
+        );
+        // A controller can own a slice without owning the player's currently
+        // nearby mouth. Only rebase coordinates inside this portal's approach
+        // envelope; elsewhere preserve the ordinary world coordinates.
+        if (portalDistance > this.getEntryTriggerDistance(world.slice.id)) return { ...localPosition };
+        const ground = world.terrain?.sampleAt?.(localPosition.x, localPosition.z);
+        const heightAboveGround = ground && Number.isFinite(ground.y)
+            ? localPosition.y - ground.y
+            : 0;
+        return {
+            x: endpoint.position.x + (localPosition.x - presentation.x),
+            y: endpoint.position.y + heightAboveGround,
+            z: endpoint.position.z + (localPosition.z - presentation.z)
+        };
+    }
+
+    getPresentationLocalPosition(world, physicalLocalPosition) {
+        if (!world || !physicalLocalPosition) return physicalLocalPosition;
+        const endpoint = endpointForSlice(this.corridor, world.slice.id);
+        const presentation = this.getPresentationEndpoint(world.slice.id);
+        if (!endpoint || !presentation) return { ...physicalLocalPosition };
+        return {
+            x: physicalLocalPosition.x + presentation.x - endpoint.position.x,
+            y: physicalLocalPosition.y,
+            z: physicalLocalPosition.z + presentation.z - endpoint.position.z
+        };
+    }
+
+    getPhysicalAmbientPosition(world, position4D = null) {
+        if (!world) return null;
+        if (position4D) return position4D;
+        const local = this.getPhysicalEndpointLocalPosition(world, this.player.worldPosition);
+        const base = sliceToAmbient(world.slice.frame, local);
+        const prior = this.player.spatialPosition4D;
+        const normalOffset = prior && this.player.sliceId === world.slice.id
             ? ambientToSlice(world.slice.frame, prior).normalOffset : 0;
         return add4(base, scale4(world.slice.frame.normal, normalOffset));
     }
@@ -7210,10 +8714,10 @@ class SliceTransitionTraversalController {
         };
     }
 
-    advanceAmbientInfluenceMovement(deltaSeconds) {
+    advanceAmbientInfluenceMovement(deltaSeconds, position4DOverride = null) {
         const input = this.getMovementInput();
         if (!input.crossSectionW) return false;
-        const position4D = this.getAmbientPlayerPosition();
+        const position4D = position4DOverride ?? this.getAmbientPlayerPosition();
         if (!position4D) return false;
         const info = this.getInfluenceMovementInfo(position4D, input.crossSectionW);
         if (!info) return false;
@@ -7248,7 +8752,7 @@ class SliceTransitionTraversalController {
                 this.target = info.targetWorld;
                 this.direction = info.direction;
                 this.spatialPosition4D = candidate;
-                this.completeTransit(info.targetWorld, candidate);
+                this.completeTransit(info.targetWorld, candidate, info.sourceWorld);
                 return true;
             }
         }
@@ -7399,8 +8903,8 @@ class SliceTransitionTraversalController {
         );
     }
 
-    completeTransit(world, position4D = this.spatialPosition4D) {
-        const arrival = this.createArrivalPosition(world, position4D);
+    completeTransit(world, position4D = this.spatialPosition4D, fromWorld = this.startWorld) {
+        const arrival = this.createArrivalPosition(world, position4D, fromWorld);
         this.player.setSpatialContext?.(world.transform, world.slice.id, world.layerMask);
         this.player.spatialPosition4D = null;
         this.player.setWorldPosition(arrival);
@@ -7428,10 +8932,14 @@ class SliceTransitionTraversalController {
         return arrival;
     }
 
-    createArrivalPosition(world, position4D) {
-        const local = ambientToSlice(world.slice.frame, position4D).position;
+    createArrivalPosition(world, position4D, fromWorld = this.startWorld) {
+        let local = ambientToSlice(world.slice.frame, position4D).position;
         const fallback = world.slice.id === this.corridor.destination.sliceId
             ? this.corridor.destination.position : this.corridor.source.position;
+        // A presentation portal may be deliberately far from the compact
+        // canonical anomaly endpoint. Preserve the physical anomaly geometry,
+        // then place the arriving player at the matching visual mouth.
+        local = this.getPresentationLocalPosition(world, local);
         const terrain = world.terrain;
         const x = clampToTerrain(local.x, terrain.min.x, terrain.max.x);
         const z = clampToTerrain(local.z, terrain.min.z, terrain.max.z);
@@ -7458,10 +8966,12 @@ class SliceTransitionTraversalController {
             if (neighbor.corridorId !== this.corridor.id) continue;
             const fromSource = this.corridor.source.sliceId === fromSliceId;
             const endpoint = fromSource ? this.corridor.source : this.corridor.destination;
-            const dx = endpoint.position.x - entity.worldPosition.x;
-            const dz = endpoint.position.z - entity.worldPosition.z;
+            const presentation = this.getPresentationEndpoint(fromSliceId) ?? endpoint.position;
+            const triggerDistance = this.getEntryTriggerDistance(fromSliceId);
+            const dx = presentation.x - entity.worldPosition.x;
+            const dz = presentation.z - entity.worldPosition.z;
             const distance = Math.hypot(dx, dz);
-            if (distance <= 1e-6 || distance > this.options.triggerDistance) continue;
+            if (distance <= 1e-6 || distance > triggerDistance) continue;
             const heading = (inputForward.x * dx + inputForward.z * dz) / distance;
             if (heading >= this.options.headingThreshold) return this.beginEntityTransit(entity, fromSliceId);
         }
@@ -7476,8 +8986,10 @@ class SliceTransitionTraversalController {
         if (!neighbor) return false;
         const source = this.worlds.get(fromSliceId);
         const target = this.worlds.get(neighbor.sliceId);
-        if (!source || !target || !this.hasChunkConnection(fromSliceId, entity.worldPosition)) return false;
-        const position4D = sliceToAmbient(source.slice.frame, entity.worldPosition);
+        if (!source || !target) return false;
+        const physicalPosition = this.getPhysicalEndpointLocalPosition(source, entity.worldPosition);
+        if (!this.hasChunkConnection(fromSliceId, physicalPosition)) return false;
+        const position4D = sliceToAmbient(source.slice.frame, physicalPosition);
         if (!this.isInsideRegion(position4D)) return false;
         this.entityTransits.set(entity, {
             entity, source, target, fromSliceId,
@@ -7509,7 +9021,7 @@ class SliceTransitionTraversalController {
             const progress = clamp(this.calculateEntityProgress(candidate, state.source, state.target), 0, 1);
             this.corridorChunk?.updateOccupant(entity, progress, candidate);
             if (progress >= 1 - 1e-8) {
-                const arrival = this.createArrivalPosition(state.target, candidate);
+                const arrival = this.createArrivalPosition(state.target, candidate, state.source);
                 entity.setSpatialContext?.(state.target.transform, state.target.slice.id, state.target.layerMask);
                 entity.setWorldPosition?.(arrival);
                 if (!entity.setWorldPosition) entity.worldPosition = arrival;
@@ -7557,6 +9069,17 @@ class SliceTransitionTraversalController {
         }
         if (!Number.isFinite(headingThreshold) || headingThreshold < -1 || headingThreshold > 1) {
             throw new RangeError('Slice-transition headingThreshold must be between -1 and 1.');
+        }
+        for (const [sliceId, distance] of Object.entries(this.options.triggerDistanceBySlice ?? {})) {
+            if (!sliceId || !Number.isFinite(distance) || distance <= 0) {
+                throw new RangeError('Per-slice anomaly trigger distances must be positive and finite.');
+            }
+        }
+        for (const [sliceId, endpoint] of Object.entries(this.options.presentationEndpointsBySlice ?? {})) {
+            const position = endpoint?.position ?? endpoint;
+            if (!sliceId || !isFinitePosition3(position)) {
+                throw new TypeError('Presentation endpoints must contain finite positions for each slice.');
+            }
         }
     }
 
@@ -7610,6 +9133,16 @@ function clamp(value, minimum, maximum) {
 function requireObject(value, label) {
     if (!value || typeof value !== 'object') throw new TypeError(`${label} is required.`);
     return value;
+}
+
+function endpointForSlice(anomaly, sliceId) {
+    if (anomaly?.source?.sliceId === sliceId) return anomaly.source;
+    if (anomaly?.destination?.sliceId === sliceId) return anomaly.destination;
+    return null;
+}
+
+function isFinitePosition3(position) {
+    return Boolean(position) && ['x', 'y', 'z'].every((axis) => Number.isFinite(position[axis]));
 }
 
 function noop() {}
@@ -7879,8 +9412,8 @@ FILE: src/world/fields/geometry/spatial-anomaly.js
 /** Typed, serializable anomaly definitions sharing one explicit topology contract. */
 
 import { createPosition3 } from './spatial-4d.js';
-import { createAnomalyOptics } from './optical-contracts.js?v=somnium-20261108-phase16c-anomaly-optics-2';
-import { createSpatialCorridor } from './spatial-corridor.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { createAnomalyOptics } from './optical-contracts.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
+import { createSpatialCorridor } from './spatial-corridor.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 
 const SPATIAL_ANOMALY_SCHEMA_VERSION = 1;
 const SLICE_TRANSITION_ANOMALY = 'slice-transition';
@@ -7919,6 +9452,7 @@ function createSliceTransitionAnomaly(options = {}) {
         region: createRegion(options.region),
         influence: createInfluence(options.influence),
         optics: createAnomalyOptics(options.optics),
+        view: createAnomalyViewConfig(options.view),
         entryRadius: options.entryRadius ?? 3.4,
         visible: options.visible ?? true,
         traversable: options.traversable ?? false,
@@ -7937,6 +9471,70 @@ function createSliceTransitionAnomaly(options = {}) {
         }
     }
     return anomaly;
+}
+
+
+function createAnomalyViewConfig(options = {}) {
+    const result = {
+        enabled: options.enabled ?? true,
+        mapping: options.mapping ?? 'endpoint-frame',
+        apertureShape: options.apertureShape ?? 'circle',
+        previewSurface: options.previewSurface ?? 'flat',
+        showRim: options.showRim ?? false,
+        crossSection: options.crossSection ?? 'constant',
+        interiorBoundary: options.interiorBoundary ?? 'none',
+        centerNormalOffset: options.centerNormalOffset ?? null,
+        destinationSphereStartScale: options.destinationSphereStartScale ?? 0.08,
+        destinationSphereGrowthExponent: options.destinationSphereGrowthExponent ?? 0.55
+    };
+    if (typeof result.enabled !== 'boolean') {
+        throw new TypeError('Anomaly view enabled must be boolean.');
+    }
+    if (!['endpoint-frame', 'static'].includes(result.mapping)) {
+        throw new RangeError(`Unsupported anomaly view mapping: ${result.mapping}`);
+    }
+    if (!['circle', 'ellipse', 'rectangle'].includes(result.apertureShape)) {
+        throw new RangeError(`Unsupported anomaly aperture shape: ${result.apertureShape}`);
+    }
+    if (!['flat', 'spherical'].includes(result.previewSurface)) {
+        throw new RangeError(`Unsupported anomaly preview surface: ${result.previewSurface}`);
+    }
+    if (result.previewSurface === 'spherical' && result.apertureShape === 'rectangle') {
+        throw new RangeError('A spherical anomaly preview surface requires a circular or elliptical aperture.');
+    }
+    if (typeof result.showRim !== 'boolean') {
+        throw new TypeError('Anomaly view showRim must be boolean.');
+    }
+    if (!['constant', 'euclidean-4d-ball'].includes(result.crossSection)) {
+        throw new RangeError(`Unsupported anomaly aperture cross-section: ${result.crossSection}`);
+    }
+    if (!['none', 'open-4d-hypercube', 'open-4d-cylinder'].includes(result.interiorBoundary)) {
+        throw new RangeError(`Unsupported anomaly interior boundary: ${result.interiorBoundary}`);
+    }
+    if (options.interiorBoundaryRadii !== undefined) {
+        const radii = options.interiorBoundaryRadii;
+        if (!radii || !Number.isFinite(radii.source) || radii.source <= 0 ||
+            !Number.isFinite(radii.destination) || radii.destination <= 0 ||
+            radii.source > 1000 || radii.destination > 1000) {
+            throw new RangeError('Anomaly interior boundary radii must be positive finite values no greater than 1000.');
+        }
+        result.interiorBoundaryRadii = { source: radii.source, destination: radii.destination };
+    }
+    if (result.interiorBoundary === 'open-4d-cylinder' && !result.interiorBoundaryRadii) {
+        throw new TypeError('An open 4D cylinder requires source and destination interior boundary radii.');
+    }
+    if (result.centerNormalOffset !== null && !Number.isFinite(result.centerNormalOffset)) {
+        throw new TypeError('Anomaly view centerNormalOffset must be finite or null.');
+    }
+    if (!Number.isFinite(result.destinationSphereStartScale) ||
+        result.destinationSphereStartScale <= 0 || result.destinationSphereStartScale > 1) {
+        throw new RangeError('Anomaly destinationSphereStartScale must be greater than 0 and at most 1.');
+    }
+    if (!Number.isFinite(result.destinationSphereGrowthExponent) ||
+        result.destinationSphereGrowthExponent <= 0 || result.destinationSphereGrowthExponent > 1) {
+        throw new RangeError('Anomaly destinationSphereGrowthExponent must be greater than 0 and at most 1.');
+    }
+    return result;
 }
 
 function createEndpoint(endpoint, label) {
@@ -8033,6 +9631,7 @@ export {
     SLICE_TRANSITION_ANOMALY,
     SPATIAL_ANOMALY_SCHEMA_VERSION,
     containsAmbientPoint,
+    createAnomalyViewConfig,
     createSliceTransitionAnomaly,
     createSpatialAnomaly
 };
@@ -8055,7 +9654,7 @@ import {
     subtract4,
     transportPerpendicularFrame
 } from './spatial-4d.js';
-import { createAnomalyOptics } from './optical-contracts.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { createAnomalyOptics } from './optical-contracts.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 
 const SPATIAL_CORRIDOR_SCHEMA_VERSION = 1;
 const MAX_CORRIDOR_SAMPLES = 4096;
@@ -9048,9 +10647,9 @@ FILE: src/world/fields/geometry/world-topology.js
 /** Explicit cross-slice visibility and traversal graph. */
 
 import { sliceToAmbient, subtract4, norm4, dot4 } from './spatial-4d.js';
-import { createSpatialAnomaly, containsAmbientPoint, BEZIER_CORRIDOR_ANOMALY, SLICE_TRANSITION_ANOMALY } from './spatial-anomaly.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { createSpatialAnomaly, containsAmbientPoint, BEZIER_CORRIDOR_ANOMALY, SLICE_TRANSITION_ANOMALY } from './spatial-anomaly.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 import { createWorldSlice } from './world-slice.js';
-import { resolveAnomalyInfluence } from './anomaly-influence-field.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { resolveAnomalyInfluence } from './anomaly-influence-field.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 
 const WORLD_TOPOLOGY_SCHEMA_VERSION = 1;
 const DEFAULT_ENDPOINT_TOLERANCE = 1e-7;
@@ -9285,6 +10884,6 @@ export { WORLD_TOPOLOGY_SCHEMA_VERSION, WorldTopology };
 
 ========================================================================
 END OF DIRECTORY SOURCE DUMP
-Files included: 32
+Files included: 36
 Binary/unreadable files skipped: 0
 ========================================================================

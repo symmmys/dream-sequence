@@ -1,0 +1,38 @@
+SOMNIUM — GEOMETRY PHASE 18E INSTALLATION
+
+1. Extract the complete Phase 18E archive into a clean project directory.
+2. Ensure the directory being served contains index.html (not an outer ZIP wrapper).
+3. Start the local server from that directory:
+
+   python3 -m http.server 8081
+
+4. Open:
+
+   http://127.0.0.1:8081/
+
+5. Hard-refresh the browser after replacing a previous build. Phase 18E uses:
+
+   somnium-20261109-phase18e-anomaly-commit-radii-1
+
+ANOMALY EDITOR WORKFLOW
+
+1. Open BUILD → Anomalies and select an anomaly or create a draft.
+2. Choose a Plane for each mouth, place both mouths, and configure their XYZ positions and yaw/pitch/roll.
+3. Set Aperture radius and W-freedom radius. Both values are persisted in the runtime definition:
+   - Aperture radius controls the physical optical aperture and entry/trigger radius.
+   - W-freedom radius controls the anomaly influence field's maximum W reach.
+4. Click SAVE & PLACE ANOMALY, or press Ctrl+Enter while the Anomalies panel is active and focus is not inside an input, select, button, textarea, or editable region.
+5. The action validates both mouths, persists the final configuration, and enables the anomaly. For the three built-in runtime IDs it also applies the saved definition to the live portal/traversal resources.
+6. Reload the page to verify persistence.
+
+IMPORTANT SCOPE NOTE
+
+Phase 18E does not yet dynamically construct portal renderer/traversal-controller pairs for arbitrary newly created anomaly IDs. Those new records are saved and enabled in the Plane/anomaly database, but the live runtime network currently has live pairs only for the three built-in anomaly IDs. Dynamic runtime registration is a follow-on implementation step. The editor reports this distinction rather than claiming a new custom ID was attached to the live world.
+
+AUTOMATED TESTS
+
+From the extracted project root:
+
+   node --experimental-default-type=module --test tests/*.test.mjs
+
+See GEOMETRY-PHASE-18E-TEST-RESULTS.txt for the verified result.

@@ -1,0 +1,34 @@
+SOMNIUM — GEOMETRY PHASE 18E TEST RESULTS
+
+Static validation
+-----------------
+JavaScript source syntax checks: 133 files passed.
+Test-file syntax checks: 38 modules passed.
+Relative import validation: 0 missing imports.
+
+Automated suite
+---------------
+Command:
+  node --experimental-default-type=module --test tests/*.test.mjs
+
+Result:
+  346 tests passed
+  0 tests failed
+  0 skipped
+
+New coverage
+------------
+- Anomaly editor exposes an explicit Save & Place action.
+- Ctrl+Enter is wired as the keyboard shortcut and is ignored while focus is in editable/form controls.
+- Both endpoint mouths must be placed before final save/place.
+- Aperture radius is stored as both the anomaly entry radius and optical aperture radius.
+- W-freedom radius is stored as influence.maxWReach.
+- Runtime conversion preserves the configured aperture and W-freedom radii.
+- Browser module cache identifier is advanced to the Phase 18E build.
+
+Scope / verification notes
+--------------------------
+- Existing three built-in anomaly IDs are saved and applied to live runtime portal/traversal resources.
+- New custom anomaly records can be saved and enabled in Plane/anomaly persistence, but automatic live portal/controller registration for arbitrary IDs remains future work.
+- Automated Node tests and static syntax/import validation are performed in this package.
+- No live browser/WebGL session was available here; the browser smoke test remains for the user.

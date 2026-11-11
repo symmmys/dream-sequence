@@ -1,0 +1,51 @@
+Phase 18J patch files relative to the complete Phase 18I project
+Changed files: 32
+Added files: 8
+Deleted files: 0
+
+CHANGED FILES
+index.html
+src/demo/geometry-demo-camera-controller.js
+src/demo/geometry-demo-topology.js
+src/demo/geometry-demo-world.js
+src/demo/hypercube-4d-renderer.js
+src/editor/building-editor.js
+src/editor/plane-editor.js
+src/editor/plane-object-renderer.js
+src/main.js
+src/scene/create-scene.js
+src/world/fields/geometry/anomaly-boundary-renderer.js
+src/world/fields/geometry/anomaly-influence-field.js
+src/world/fields/geometry/anomaly-view-transform.js
+src/world/fields/geometry/hypercube-4d.js
+src/world/fields/geometry/optical-anomaly-tracer.js
+src/world/fields/geometry/optical-contracts.js
+src/world/fields/geometry/optical-debug-renderer.js
+src/world/fields/geometry/optical-light-source.js
+src/world/fields/geometry/optical-metric.js
+src/world/fields/geometry/optical-ray-integrator.js
+src/world/fields/geometry/optical-scene-registry.js
+src/world/fields/geometry/optical-slice-tracer.js
+src/world/fields/geometry/slice-transition-traversal-controller.js
+src/world/fields/geometry/spatial-anomaly.js
+src/world/fields/geometry/spatial-corridor.js
+src/world/fields/geometry/world-topology.js
+src/world/spatial-chunk-graph.js
+src/world/world-manager.js
+tests/geometry-demo-topology.test.mjs
+tests/phase18b-anomaly-editor-integration.test.mjs
+tests/shared-transform-tools-regression.test.mjs
+tests/world-manager-visibility.test.mjs
+
+ADDED FILES
+GEOMETRY-PHASE-18J-EDITOR-FINALIZATION.md
+GEOMETRY-PHASE-18J-TEST-RESULTS.txt
+INSTALLATION-GEOMETRY-PHASE-18J.txt
+PHASE-18J-FULL-TEST-OUTPUT.txt
+PHASE-18J-PATCH-FILE-MANIFEST.txt
+PHASE-18J-PATCH-MANIFEST.txt
+phase18j-import-check.txt
+tests/geometry-demo-plane-background.test.mjs
+
+DELETED FILES
+

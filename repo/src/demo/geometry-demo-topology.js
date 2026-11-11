@@ -1,10 +1,10 @@
 /** Builds the demo world graph: 4D chamber, Poincare chamber, and main world. */
 
 import { createWorldSlice } from '../world/fields/geometry/world-slice.js';
-import { createSliceTransitionAnomaly } from '../world/fields/geometry/spatial-anomaly.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
-import { sliceToAmbient } from '../world/fields/geometry/spatial-4d.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
-import { WorldTopology } from '../world/fields/geometry/world-topology.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
-import { SpatialChunkGraph } from '../world/spatial-chunk-graph.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+import { createSliceTransitionAnomaly } from '../world/fields/geometry/spatial-anomaly.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
+import { sliceToAmbient } from '../world/fields/geometry/spatial-4d.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
+import { WorldTopology } from '../world/fields/geometry/world-topology.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
+import { SpatialChunkGraph } from '../world/spatial-chunk-graph.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
 
 const SOURCE_SLICE_ID = 'geometry-demo-room';
 const HYPERCUBE_SLICE_ID = 'geometry-demo-4d-chamber';
@@ -105,6 +105,12 @@ function createMainWorldCorridor(sourceSlice, mainSlice, mainAnchor) {
             wCouplingProfileBias: 0.006, refractiveIndex: 1,
             attenuationPerUnit: 0, transmission: 1
         },
+        view: {
+            previewSurface: 'spherical', showRim: false,
+            interiorBoundary: 'open-4d-cylinder',
+            interiorBoundaryRadii: { source: 4.0, destination: 7.0 },
+            passagePresentation: { mouthSeparation: 80, cameraInset: 8 }
+        },
         visible: true,
         traversable: true,
         bidirectional: true
@@ -129,6 +135,12 @@ function createHypercubeCorridor(hypercubeSlice, sourceSlice) {
             apertureRadius: 3.5, entryRadialBias: 4, wCouplingScale: 1, refractiveIndex: 1,
             metricSampling: 'ambient',
             attenuationPerUnit: 0, transmission: 1
+        },
+        view: {
+            previewSurface: 'spherical', showRim: false,
+            interiorBoundary: 'open-4d-cylinder',
+            interiorBoundaryRadii: { source: 3.4, destination: 4.8 },
+            passagePresentation: { mouthSeparation: 80, cameraInset: 8 }
         },
         visible: true,
         traversable: true,
@@ -170,7 +182,11 @@ function createHypercubeMainWorldCorridor(hypercubeSlice, mainSlice, mainAnchor)
         },
         view: {
             enabled: true, mapping: 'endpoint-frame', apertureShape: 'circle',
-            crossSection: 'euclidean-4d-ball'
+            previewSurface: 'spherical', showRim: false,
+            crossSection: 'euclidean-4d-ball',
+            interiorBoundary: 'open-4d-cylinder',
+            interiorBoundaryRadii: { source: 2.8, destination: 7.0 },
+            passagePresentation: { mouthSeparation: 80, cameraInset: 8 }
         },
         visible: true,
         traversable: true,

@@ -1,0 +1,36 @@
+SOMNIUM — GEOMETRY PHASE 17I TEST RESULTS
+Build: somnium-20261109-phase17i-bidirectional-spherical-passage-1
+Date: November 9, 2026
+Baseline: Phase 17H — Complete Destination Sphere and Inner-Mouth Growth
+
+FULL AUTOMATED REGRESSION SUITE
+Command: node --test tests/*.test.mjs
+Result: 322 passed, 0 failed.
+
+FOCUSED REGRESSIONS
+- Entrance and exit are independent complete spherical renderers.
+- Mouth centers are separated along a normalized configurable display-space axis.
+- Optional separation curves interpolate with quintic smootherstep.
+- Perspective makes entrance apparent angular radius shrink monotonically while exit apparent angular radius grows monotonically.
+- Source-world render list is assigned to the entrance in forward transit.
+- Destination-world render list is assigned to the exit in forward transit.
+- Reverse traversal swaps endpoint world assignments and endpoint physical radii.
+- Both mouth surfaces render on an isolated passage layer against a black clear color.
+- GeometryDemoWorld delegates active spherical anomaly transit to the dual-mouth presentation and hides ordinary endpoint portals.
+- Repeated render updates do not accumulate the display-space camera offset; the original follow/free controller pose is restored before its next update.
+- Entrance projection and source-world render camera face backward into the source world; exit projection faces back toward the passage.
+- The stable presentation axis follows the player travel heading in follow mode and the travel-aligned free-camera direction at entry; a camera orbit offset does not redefine the axis.
+- Existing endpoint-frame camera transport and Phase 17H spherical preview regressions remain covered.
+
+STATIC VERIFICATION
+- Source JavaScript syntax: 128/128 passed.
+- Test module syntax: 33/33 passed.
+- Relative module references: 333 checked across source and test modules; 0 missing (214 in source modules).
+- Cache-busting build identifier: consistent (`somnium-20261109-phase17i-bidirectional-spherical-passage-1`); stale Phase 17H IDs in active `index.html`, `src`, and `tests`: 0.
+
+ARCHIVE VERIFICATION
+- ZIP integrity: passed.
+- Full regression suite from extracted archive: 322 passed, 0 failed.
+
+VISUAL VERIFICATION
+No live browser/WebGL session was available in this environment. Manual validation is required for actual camera orbit composition, sphere UV behavior at off-axis viewpoints, render-target performance, and endpoint handoff appearance.

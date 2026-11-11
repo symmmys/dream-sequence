@@ -1,6 +1,6 @@
 /** Deterministic CPU reference integrator for Hamiltonian optical rays in R4. */
 
-import { assertVector4 } from './spatial-4d.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+import { assertVector4 } from './spatial-4d.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
 
 const AXES = ['x', 'y', 'z', 'w'];
 const STATE_SIZE = 8;

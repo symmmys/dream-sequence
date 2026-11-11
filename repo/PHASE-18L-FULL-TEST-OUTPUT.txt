@@ -1,0 +1,2637 @@
+TAP version 13
+# Subtest: open 4D hypercube boundary produces six side panels and omits both W end caps
+ok 1 - open 4D hypercube boundary produces six side panels and omits both W end caps
+  ---
+  duration_ms: 5.603064
+  type: 'test'
+  ...
+# Subtest: boundary cross-section follows the requested W coordinate and clips outside the 4D region
+ok 2 - boundary cross-section follows the requested W coordinate and clips outside the 4D region
+  ---
+  duration_ms: 7.423205
+  type: 'test'
+  ...
+# Subtest: boundary panels honor the displayed portal endpoint offset without moving canonical anomaly geometry
+ok 3 - boundary panels honor the displayed portal endpoint offset without moving canonical anomaly geometry
+  ---
+  duration_ms: 1.847171
+  type: 'test'
+  ...
+# Subtest: boundary renderer reports unsupported rotated W frames without crashing
+ok 4 - boundary renderer reports unsupported rotated W frames without crashing
+  ---
+  duration_ms: 0.218293
+  type: 'test'
+  ...
+# Subtest: boundary renderer updates geometry and visibility and disposes Babylon resources
+ok 5 - boundary renderer updates geometry and visibility and disposes Babylon resources
+  ---
+  duration_ms: 4.39676
+  type: 'test'
+  ...
+# Subtest: tapered 4D cylinder grows smoothly from its source radius to its destination radius
+ok 6 - tapered 4D cylinder grows smoothly from its source radius to its destination radius
+  ---
+  duration_ms: 16.913802
+  type: 'test'
+  ...
+# Subtest: tapered cylinder destination mouth remains at full radius beyond the destination W handoff
+ok 7 - tapered cylinder destination mouth remains at full radius beyond the destination W handoff
+  ---
+  duration_ms: 0.529713
+  type: 'test'
+  ...
+# Subtest: tapered cylinder radius clamps outside its endpoint interval and respects reversed W direction
+ok 8 - tapered cylinder radius clamps outside its endpoint interval and respects reversed W direction
+  ---
+  duration_ms: 0.483119
+  type: 'test'
+  ...
+# Subtest: tapered cylinder applies portal presentation offsets without changing canonical endpoints
+ok 9 - tapered cylinder applies portal presentation offsets without changing canonical endpoints
+  ---
+  duration_ms: 1.376381
+  type: 'test'
+  ...
+# Subtest: tapered cylinder declines non-W-aligned anomaly axes explicitly
+ok 10 - tapered cylinder declines non-W-aligned anomaly axes explicitly
+  ---
+  duration_ms: 0.454365
+  type: 'test'
+  ...
+# Subtest: cylinder boundary renderer updates the section radius with W and disposes resources
+ok 11 - cylinder boundary renderer updates the section radius with W and disposes resources
+  ---
+  duration_ms: 4.905515
+  type: 'test'
+  ...
+# Subtest: smootherstep has zero and full freedom at the spherical radii
+ok 12 - smootherstep has zero and full freedom at the spherical radii
+  ---
+  duration_ms: 1.314236
+  type: 'test'
+  ...
+# Subtest: freedom changes smoothly and monotonically through the transition shell
+ok 13 - freedom changes smoothly and monotonically through the transition shell
+  ---
+  duration_ms: 0.494101
+  type: 'test'
+  ...
+# Subtest: ambient 4D distance includes XYZ as well as W displacement
+ok 14 - ambient 4D distance includes XYZ as well as W displacement
+  ---
+  duration_ms: 0.147195
+  type: 'test'
+  ...
+# Subtest: resolved anomaly center is the ambient midpoint and default W reach is slice-normal span
+ok 15 - resolved anomaly center is the ambient midpoint and default W reach is slice-normal span
+  ---
+  duration_ms: 1.077904
+  type: 'test'
+  ...
+# Subtest: configured anomaly radii, W range, and player-stat multipliers remain independently tunable
+ok 16 - configured anomaly radii, W range, and player-stat multipliers remain independently tunable
+  ---
+  duration_ms: 0.280382
+  type: 'test'
+  ...
+# Subtest: chunk reachability requires both spatial proximity and sufficient W reach
+ok 17 - chunk reachability requires both spatial proximity and sufficient W reach
+  ---
+  duration_ms: 0.194029
+  type: 'test'
+  ...
+# Subtest: invalid field configuration is rejected instead of silently producing NaN reachability
+ok 18 - invalid field configuration is rejected instead of silently producing NaN reachability
+  ---
+  duration_ms: 0.574832
+  type: 'test'
+  ...
+# Subtest: endpoint-derived anomaly centers follow endpoint updates while fixed centers remain explicit
+ok 19 - endpoint-derived anomaly centers follow endpoint updates while fixed centers remain explicit
+  ---
+  duration_ms: 0.301866
+  type: 'test'
+  ...
+# Subtest: passage layout puts the mouths on opposite sides of a configurable depth axis
+ok 20 - passage layout puts the mouths on opposite sides of a configurable depth axis
+  ---
+  duration_ms: 4.619649
+  type: 'test'
+  ...
+# Subtest: passage layout uses a smooth optional separation curve
+ok 21 - passage layout uses a smooth optional separation curve
+  ---
+  duration_ms: 0.603935
+  type: 'test'
+  ...
+# Subtest: perspective makes the entrance apparent radius shrink while the exit grows
+ok 22 - perspective makes the entrance apparent radius shrink while the exit grows
+  ---
+  duration_ms: 0.920721
+  type: 'test'
+  ...
+# Subtest: passage presentation renders both endpoint worlds on a black-only camera layer
+ok 23 - passage presentation renders both endpoint worlds on a black-only camera layer
+  ---
+  duration_ms: 4.3628
+  type: 'test'
+  ...
+# Subtest: passage camera mapping is idempotent and preserves independent camera movement
+ok 24 - passage camera mapping is idempotent and preserves independent camera movement
+  ---
+  duration_ms: 4.466369
+  type: 'test'
+  ...
+# Subtest: spherical mouth projection axes face into the passage and entrance imagery looks back to source
+ok 25 - spherical mouth projection axes face into the passage and entrance imagery looks back to source
+  ---
+  duration_ms: 0.865463
+  type: 'test'
+  ...
+# Subtest: reverse traversal assigns the destination world to the entrance and source world to the exit
+ok 26 - reverse traversal assigns the destination world to the entrance and source world to the exit
+  ---
+  duration_ms: 0.672628
+  type: 'test'
+  ...
+# Subtest: presentation frame follows explicit travel direction while camera view remains independently oriented
+ok 27 - presentation frame follows explicit travel direction while camera view remains independently oriented
+  ---
+  duration_ms: 1.216168
+  type: 'test'
+  ...
+# Subtest: anomaly Euler orientation converts to a normalized quaternion and back
+ok 28 - anomaly Euler orientation converts to a normalized quaternion and back
+  ---
+  duration_ms: 1.249
+  type: 'test'
+  ...
+# Subtest: placing both mouths persists independent Plane, position, and orientation settings
+ok 29 - placing both mouths persists independent Plane, position, and orientation settings
+  ---
+  duration_ms: 12.974674
+  type: 'test'
+  ...
+# Subtest: aligning Mouth B is a one-time copy and retains its selected Plane
+ok 30 - aligning Mouth B is a one-time copy and retains its selected Plane
+  ---
+  duration_ms: 2.182715
+  type: 'test'
+  ...
+# Subtest: connection-level visibility and traversal settings update independently
+ok 31 - connection-level visibility and traversal settings update independently
+  ---
+  duration_ms: 3.414566
+  type: 'test'
+  ...
+# Subtest: persistent anomaly normalization retains placement workflow flags
+ok 32 - persistent anomaly normalization retains placement workflow flags
+  ---
+  duration_ms: 3.140035
+  type: 'test'
+  ...
+# Subtest: endpoint-frame view transport maps camera translation and direction into the remote slice
+ok 33 - endpoint-frame view transport maps camera translation and direction into the remote slice
+  ---
+  duration_ms: 4.496775
+  type: 'test'
+  ...
+# Subtest: viewer camera mapping uses the displayed portal mouth while retaining the canonical remote endpoint
+ok 34 - viewer camera mapping uses the displayed portal mouth while retaining the canonical remote endpoint
+  ---
+  duration_ms: 0.691888
+  type: 'test'
+  ...
+# Subtest: remote camera pose follows viewer orbit and lateral movement instead of using a fixed postcard
+ok 35 - remote camera pose follows viewer orbit and lateral movement instead of using a fixed postcard
+  ---
+  duration_ms: 0.473296
+  type: 'test'
+  ...
+# Subtest: destination preview camera progressively approaches the remote endpoint while preserving screen-up clearance
+ok 36 - destination preview camera progressively approaches the remote endpoint while preserving screen-up clearance
+  ---
+  duration_ms: 0.390961
+  type: 'test'
+  ...
+# Subtest: view transport is reversible between the two endpoint slices
+ok 37 - view transport is reversible between the two endpoint slices
+  ---
+  duration_ms: 0.796986
+  type: 'test'
+  ...
+# Subtest: view transport returns null when a virtual camera falls outside a finite destination chart
+ok 38 - view transport returns null when a virtual camera falls outside a finite destination chart
+  ---
+  duration_ms: 0.388871
+  type: 'test'
+  ...
+# Subtest: rotated slice frames remain valid inputs to the endpoint-frame view mapping
+ok 39 - rotated slice frames remain valid inputs to the endpoint-frame view mapping
+  ---
+  duration_ms: 0.44117
+  type: 'test'
+  ...
+# Subtest: a 4D spherical aperture shrinks with slice-normal offset and vanishes outside its radius
+ok 40 - a 4D spherical aperture shrinks with slice-normal offset and vanishes outside its radius
+  ---
+  duration_ms: 0.233946
+  type: 'test'
+  ...
+# Subtest: GeometryDemoWorld updates the remote camera while keeping tapered-cylinder mouth geometry stable
+ok 41 - GeometryDemoWorld updates the remote camera while keeping tapered-cylinder mouth geometry stable
+  ---
+  duration_ms: 85.044165
+  type: 'test'
+  ...
+# Subtest: GeometryDemoWorld delegates active spherical anomaly transit to the dual-mouth presentation
+ok 42 - GeometryDemoWorld delegates active spherical anomaly transit to the dual-mouth presentation
+  ---
+  duration_ms: 1.104436
+  type: 'test'
+  ...
+# Subtest: camera transport uses the rotated screen-up axis rather than the world-up reference
+ok 43 - camera transport uses the rotated screen-up axis rather than the world-up reference
+  ---
+  duration_ms: 0.279411
+  type: 'test'
+  ...
+# Subtest: 4D spherical aperture derives its centre offset from the resolved ambient anomaly centre
+ok 44 - 4D spherical aperture derives its centre offset from the resolved ambient anomaly centre
+  ---
+  duration_ms: 0.4478
+  type: 'test'
+  ...
+# Subtest: complete destination sphere grows faster than the tapered tube cross-section during forward transit
+ok 45 - complete destination sphere grows faster than the tapered tube cross-section during forward transit
+  ---
+  duration_ms: 0.238969
+  type: 'test'
+  ...
+# Subtest: destination sphere growth is direction-independent and reaches the local tube radius at either endpoint
+ok 46 - destination sphere growth is direction-independent and reaches the local tube radius at either endpoint
+  ---
+  duration_ms: 0.192953
+  type: 'test'
+  ...
+# Subtest: flat cylinder previews do not receive the inner-sphere growth animation
+ok 47 - flat cylinder previews do not receive the inner-sphere growth animation
+  ---
+  duration_ms: 0.239146
+  type: 'test'
+  ...
+# Subtest: explicit view centre offset overrides the anomaly-derived 4D centre
+ok 48 - explicit view centre offset overrides the anomaly-derived 4D centre
+  ---
+  duration_ms: 0.326088
+  type: 'test'
+  ...
+# Subtest: anomaly view contract validates custom aperture shape and cross-section centre offset
+ok 49 - anomaly view contract validates custom aperture shape and cross-section centre offset
+  ---
+  duration_ms: 0.672225
+  type: 'test'
+  ...
+# Subtest: anomaly view configuration supports explicit open hypercube interior boundaries
+ok 50 - anomaly view configuration supports explicit open hypercube interior boundaries
+  ---
+  duration_ms: 0.173038
+  type: 'test'
+  ...
+# Subtest: anomaly view contract validates tapered cylinder radii at both endpoints
+ok 51 - anomaly view contract validates tapered cylinder radii at both endpoints
+  ---
+  duration_ms: 0.14517
+  type: 'test'
+  ...
+# Subtest: legacy drag-to-draw room workflow is absent from the Building Editor
+ok 52 - legacy drag-to-draw room workflow is absent from the Building Editor
+  ---
+  duration_ms: 1.828775
+  type: 'test'
+  ...
+# Subtest: building scale defaults to identity and survives serialization round-trip
+ok 53 - building scale defaults to identity and survives serialization round-trip
+  ---
+  duration_ms: 19.802595
+  type: 'test'
+  ...
+# Subtest: legacy building records without scale retain identity scale
+ok 54 - legacy building records without scale retain identity scale
+  ---
+  duration_ms: 0.281268
+  type: 'test'
+  ...
+# Subtest: building scale rejects zero, negative, and non-finite axes
+ok 55 - building scale rejects zero, negative, and non-finite axes
+  ---
+  duration_ms: 0.586901
+  type: 'test'
+  ...
+# Subtest: corridor renderers anchor their respective mouths in each slice render frame
+ok 56 - corridor renderers anchor their respective mouths in each slice render frame
+  ---
+  duration_ms: 46.746603
+  type: 'test'
+  ...
+# Subtest: corridor shell uses bounded opacity so the destination remains visible through it
+ok 57 - corridor shell uses bounded opacity so the destination remains visible through it
+  ---
+  duration_ms: 4.285271
+  type: 'test'
+  ...
+# Subtest: corridor renderer rejects opaque-range opacity values
+ok 58 - corridor renderer rejects opaque-range opacity values
+  ---
+  duration_ms: 2.184901
+  type: 'test'
+  ...
+# Subtest: corridor shell defaults to a more transparent inspection opacity
+ok 59 - corridor shell defaults to a more transparent inspection opacity
+  ---
+  duration_ms: 2.810932
+  type: 'test'
+  ...
+# Subtest: network exposes both corridor routes from the intermediate chamber
+ok 60 - network exposes both corridor routes from the intermediate chamber
+  ---
+  duration_ms: 5.930657
+  type: 'test'
+  ...
+# Subtest: only the corridor connected to the current slice may begin player transit
+ok 61 - only the corridor connected to the current slice may begin player transit
+  ---
+  duration_ms: 1.606438
+  type: 'test'
+  ...
+# Subtest: network keeps unrelated corridor entity updates running during player transit
+ok 62 - network keeps unrelated corridor entity updates running during player transit
+  ---
+  duration_ms: 0.871745
+  type: 'test'
+  ...
+# Subtest: the player can traverse the connected anomaly chain one corridor chunk at a time
+ok 63 - the player can traverse the connected anomaly chain one corridor chunk at a time
+  ---
+  duration_ms: 0.315949
+  type: 'test'
+  ...
+# Subtest: ambient position lookup skips synchronized controllers that do not own the current slice
+ok 64 - ambient position lookup skips synchronized controllers that do not own the current slice
+  ---
+  duration_ms: 0.717657
+  type: 'test'
+  ...
+# Subtest: ambient W movement evaluates routes that own the active Main World slice
+ok 65 - ambient W movement evaluates routes that own the active Main World slice
+  ---
+  duration_ms: 0.452582
+  type: 'test'
+  ...
+# Subtest: network prefers the portal mapping whose visible mouth contains the player
+ok 66 - network prefers the portal mapping whose visible mouth contains the player
+  ---
+  duration_ms: 0.290625
+  type: 'test'
+  ...
+# Subtest: network can attach and detach a newly constructed runtime controller
+ok 67 - network can attach and detach a newly constructed runtime controller
+  ---
+  duration_ms: 0.518999
+  type: 'test'
+  ...
+# Subtest: network rejects duplicate runtime controller IDs without disturbing existing routes
+ok 68 - network rejects duplicate runtime controller IDs without disturbing existing routes
+  ---
+  duration_ms: 0.755652
+  type: 'test'
+  ...
+# Subtest: new controllers are bound to the network slice-change callback
+ok 69 - new controllers are bound to the network slice-change callback
+  ---
+  duration_ms: 0.44509
+  type: 'test'
+  ...
+# Subtest: player-controlled corridor movement transfers source slice to destination
+ok 70 - player-controlled corridor movement transfers source slice to destination
+  ---
+  duration_ms: 17.310835
+  type: 'test'
+  ...
+# Subtest: corridor progress is controlled by forward and backward movement input
+ok 71 - corridor progress is controlled by forward and backward movement input
+  ---
+  duration_ms: 9.351805
+  type: 'test'
+  ...
+# Subtest: destination handoff preserves the in-slice component of corridor cross-section position
+ok 72 - destination handoff preserves the in-slice component of corridor cross-section position
+  ---
+  duration_ms: 4.26237
+  type: 'test'
+  ...
+# Subtest: corridor entry works across a world-chunk boundary and records occupancy
+ok 73 - corridor entry works across a world-chunk boundary and records occupancy
+  ---
+  duration_ms: 4.024766
+  type: 'test'
+  ...
+# Subtest: bidirectional corridor supports return traversal into the source slice
+ok 74 - bidirectional corridor supports return traversal into the source slice
+  ---
+  duration_ms: 3.744119
+  type: 'test'
+  ...
+# Subtest: one-way corridor does not permit reverse entry
+ok 75 - one-way corridor does not permit reverse entry
+  ---
+  duration_ms: 3.132456
+  type: 'test'
+  ...
+# Subtest: corridor entry requires proximity, facing, and forward input
+ok 76 - corridor entry requires proximity, facing, and forward input
+  ---
+  duration_ms: 2.739642
+  type: 'test'
+  ...
+# Subtest: transverse input changes the player position in the corridor cross-section
+ok 77 - transverse input changes the player position in the corridor cross-section
+  ---
+  duration_ms: 3.267302
+  type: 'test'
+  ...
+# Subtest: third cross-section axis changes the fourth ambient coordinate
+ok 78 - third cross-section axis changes the fourth ambient coordinate
+  ---
+  duration_ms: 3.618536
+  type: 'test'
+  ...
+# Subtest: combined cross-section movement stays inside the corridor radius
+ok 79 - combined cross-section movement stays inside the corridor radius
+  ---
+  duration_ms: 1.982414
+  type: 'test'
+  ...
+# Subtest: reverse input returns the player through the mouth they entered
+ok 80 - reverse input returns the player through the mouth they entered
+  ---
+  duration_ms: 2.178966
+  type: 'test'
+  ...
+# Subtest: geometry demo contains no floor or ceiling plane meshes
+ok 81 - geometry demo contains no floor or ceiling plane meshes
+  ---
+  duration_ms: 14.822225
+  type: 'test'
+  ...
+# Subtest: non-player spatial entities traverse the same corridor chunk
+ok 82 - non-player spatial entities traverse the same corridor chunk
+  ---
+  duration_ms: 3.313375
+  type: 'test'
+  ...
+# Subtest: non-player entities can use the same proximity and facing entry gate
+ok 83 - non-player entities can use the same proximity and facing entry gate
+  ---
+  duration_ms: 3.237474
+  type: 'test'
+  ...
+# Subtest: follow camera aims toward the destination window while traversing
+ok 84 - follow camera aims toward the destination window while traversing
+  ---
+  duration_ms: 2.343374
+  type: 'test'
+  ...
+# D&D tactical logic regression tests loaded.
+# Subtest: altitude survives character save and legacy saves default to ground level
+ok 85 - altitude survives character save and legacy saves default to ground level
+  ---
+  duration_ms: 4.782859
+  type: 'test'
+  ...
+# Subtest: movement remains independent and extended movement spends Dash as an action
+ok 86 - movement remains independent and extended movement spends Dash as an action
+  ---
+  duration_ms: 1.302794
+  type: 'test'
+  ...
+# Subtest: an already-spent non-Dash action prevents extended movement
+ok 87 - an already-spent non-Dash action prevents extended movement
+  ---
+  duration_ms: 0.753222
+  type: 'test'
+  ...
+# Subtest: movement preview separates normal range from Dash range
+ok 88 - movement preview separates normal range from Dash range
+  ---
+  duration_ms: 0.756676
+  type: 'test'
+  ...
+# Subtest: characters sharing a cell receive distinct, non-overlapping model slots
+ok 89 - characters sharing a cell receive distinct, non-overlapping model slots
+  ---
+  duration_ms: 0.603674
+  type: 'test'
+  ...
+# Subtest: cell world coordinates resolve to the geometric center
+ok 90 - cell world coordinates resolve to the geometric center
+  ---
+  duration_ms: 0.27243
+  type: 'test'
+  ...
+# Subtest: rendered characters use cell centers, non-overlapping co-occupancy slots, and terrain-relative altitude
+ok 91 - rendered characters use cell centers, non-overlapping co-occupancy slots, and terrain-relative altitude
+  ---
+  duration_ms: 0.955488
+  type: 'test'
+  ...
+# Subtest: movement preserves altitude while spending Dash only for a Dash-region destination
+ok 92 - movement preserves altitude while spending Dash only for a Dash-region destination
+  ---
+  duration_ms: 0.570954
+  type: 'test'
+  ...
+# Subtest: editor mouse-wheel zoom exposes 1x, 10x, and 100x presets with matching Babylon precision
+ok 93 - editor mouse-wheel zoom exposes 1x, 10x, and 100x presets with matching Babylon precision
+  ---
+  duration_ms: 9.628568
+  type: 'test'
+  ...
+# Subtest: B enters the building editor from the main menu
+ok 94 - B enters the building editor from the main menu
+  ---
+  duration_ms: 1.336428
+  type: 'test'
+  ...
+# Subtest: B exits the building editor without affecting text entry
+ok 95 - B exits the building editor without affecting text entry
+  ---
+  duration_ms: 2.881754
+  type: 'test'
+  ...
+# Subtest: B opens the building editor from navigable gameplay modes
+ok 96 - B opens the building editor from navigable gameplay modes
+  ---
+  duration_ms: 0.804492
+  type: 'test'
+  ...
+# Subtest: B opens the building editor from geometryDemo and preserves the spatial mode on exit
+ok 97 - B opens the building editor from geometryDemo and preserves the spatial mode on exit
+  ---
+  duration_ms: 0.655815
+  type: 'test'
+  ...
+# Subtest: GameManager captures B before mode-specific viewport keyboard handlers
+ok 98 - GameManager captures B before mode-specific viewport keyboard handlers
+  ---
+  duration_ms: 12.049652
+  type: 'test'
+  ...
+# Subtest: metric grid visibility is independently controlled by active slice and user preference
+ok 99 - metric grid visibility is independently controlled by active slice and user preference
+  ---
+  duration_ms: 1.604172
+  type: 'test'
+  ...
+# Subtest: terrain-conformed metric grid samples surface height at each vertex
+ok 100 - terrain-conformed metric grid samples surface height at each vertex
+  ---
+  duration_ms: 0.4671
+  type: 'test'
+  ...
+# Subtest: terrain gaps split metric-grid lines instead of drawing across missing samples
+ok 101 - terrain gaps split metric-grid lines instead of drawing across missing samples
+  ---
+  duration_ms: 0.582182
+  type: 'test'
+  ...
+# Subtest: Main World ambient position resolves through a controller that owns that slice
+ok 102 - Main World ambient position resolves through a controller that owns that slice
+  ---
+  duration_ms: 7.42177
+  type: 'test'
+  ...
+# Subtest: W freedom remains usable on the Main World side and supports movement back toward the connected slice
+ok 103 - W freedom remains usable on the Main World side and supports movement back toward the connected slice
+  ---
+  duration_ms: 2.725561
+  type: 'test'
+  ...
+# Subtest: player can re-enter the direct anomaly from the Main World after clearing the exit lock
+ok 104 - player can re-enter the direct anomaly from the Main World after clearing the exit lock
+  ---
+  duration_ms: 6.192348
+  type: 'test'
+  ...
+# Subtest: Main World HUD reports active W freedom when its connected ambient field is available
+ok 105 - Main World HUD reports active W freedom when its connected ambient field is available
+  ---
+  duration_ms: 1.764629
+  type: 'test'
+  ...
+# Subtest: mouth orientations rotate the player heading into the destination mouth frame
+ok 106 - mouth orientations rotate the player heading into the destination mouth frame
+  ---
+  duration_ms: 1.156383
+  type: 'test'
+  ...
+# Subtest: a saved custom anomaly can be registered as a new live portal traversal route
+ok 107 - a saved custom anomaly can be registered as a new live portal traversal route
+  ---
+  duration_ms: 1.530595
+  type: 'test'
+  ...
+# [GeometryDemoCamera] Build: 2026-11-10-phase18l-w-dimension-runtime-and-editor-hotkeys-1
+# [GeometryDemoCamera] Build: 2026-11-10-phase18l-w-dimension-runtime-and-editor-hotkeys-1
+# [GeometryDemoCamera] Build: 2026-11-10-phase18l-w-dimension-runtime-and-editor-hotkeys-1
+# [GeometryDemoCamera] Build: 2026-11-10-phase18l-w-dimension-runtime-and-editor-hotkeys-1
+# [GeometryDemoCamera] Build: 2026-11-10-phase18l-w-dimension-runtime-and-editor-hotkeys-1
+# [GeometryDemoCamera] Build: 2026-11-10-phase18l-w-dimension-runtime-and-editor-hotkeys-1
+# [GeometryDemoCamera] Build: 2026-11-10-phase18l-w-dimension-runtime-and-editor-hotkeys-1
+# [GeometryDemoCamera] Build: 2026-11-10-phase18l-w-dimension-runtime-and-editor-hotkeys-1
+# [GeometryDemoCamera] Build: 2026-11-10-phase18l-w-dimension-runtime-and-editor-hotkeys-1
+# [GeometryDemoCamera] Build: 2026-11-10-phase18l-w-dimension-runtime-and-editor-hotkeys-1
+# [GeometryDemoCamera] Build: 2026-11-10-phase18l-w-dimension-runtime-and-editor-hotkeys-1
+# [SpatialTransform] Geometry: poincare
+# [GeometryDemoCamera] Build: 2026-11-10-phase18l-w-dimension-runtime-and-editor-hotkeys-1
+# [GeometryDemoCamera] Build: 2026-11-10-phase18l-w-dimension-runtime-and-editor-hotkeys-1
+# [GeometryDemoCamera] Build: 2026-11-10-phase18l-w-dimension-runtime-and-editor-hotkeys-1
+# [GeometryDemoCamera] Build: 2026-11-10-phase18l-w-dimension-runtime-and-editor-hotkeys-1
+# [SpatialTransform] Geometry: poincare
+# [GeometryDemoCamera] Build: 2026-11-10-phase18l-w-dimension-runtime-and-editor-hotkeys-1
+# [GeometryDemoCamera] Build: 2026-11-10-phase18l-w-dimension-runtime-and-editor-hotkeys-1
+# [SpatialTransform] Geometry: poincare
+# [GeometryDemoCamera] Build: 2026-11-10-phase18l-w-dimension-runtime-and-editor-hotkeys-1
+# [SpatialTransform] Geometry: poincare
+# [GeometryDemoCamera] Build: 2026-11-10-phase18l-w-dimension-runtime-and-editor-hotkeys-1
+# Subtest: geometry demo camera starts in follow mode and free mode suppresses player input
+ok 108 - geometry demo camera starts in follow mode and free mode suppresses player input
+  ---
+  duration_ms: 7.533792
+  type: 'test'
+  ...
+# Subtest: free camera can enter a corridor and independently move along its four frame axes
+ok 109 - free camera can enter a corridor and independently move along its four frame axes
+  ---
+  duration_ms: 1.017583
+  type: 'test'
+  ...
+# Subtest: free camera crossing the corridor exit switches to the destination slice
+ok 110 - free camera crossing the corridor exit switches to the destination slice
+  ---
+  duration_ms: 0.971369
+  type: 'test'
+  ...
+# Subtest: free camera can be seeded from an active player corridor transit
+ok 111 - free camera can be seeded from an active player corridor transit
+  ---
+  duration_ms: 0.645383
+  type: 'test'
+  ...
+# Subtest: free camera mouse-look remains effective while traversing a corridor
+ok 112 - free camera mouse-look remains effective while traversing a corridor
+  ---
+  duration_ms: 1.060741
+  type: 'test'
+  ...
+# Subtest: free-camera mouse yaw applies each drag delta exactly once
+ok 113 - free-camera mouse yaw applies each drag delta exactly once
+  ---
+  duration_ms: 0.885982
+  type: 'test'
+  ...
+# Subtest: free camera view slice follows its independent corridor handoff
+ok 114 - free camera view slice follows its independent corridor handoff
+  ---
+  duration_ms: 1.449806
+  type: 'test'
+  ...
+# Subtest: free-camera arrival uses the current endpoint sample rather than the prior frame
+ok 115 - free-camera arrival uses the current endpoint sample rather than the prior frame
+  ---
+  duration_ms: 0.612672
+  type: 'test'
+  ...
+# Subtest: free camera uses E/Q for independent W movement only after entering a slice-transition anomaly
+ok 116 - free camera uses E/Q for independent W movement only after entering a slice-transition anomaly
+  ---
+  duration_ms: 5.111865
+  type: 'test'
+  ...
+# Subtest: free camera W movement remains disabled in an ordinary 3D slice
+ok 117 - free camera W movement remains disabled in an ordinary 3D slice
+  ---
+  duration_ms: 3.270471
+  type: 'test'
+  ...
+# Subtest: free camera remains inside the open Poincare ball during ordinary movement and corridor checks
+ok 118 - free camera remains inside the open Poincare ball during ordinary movement and corridor checks
+  ---
+  duration_ms: 2.651027
+  type: 'test'
+  ...
+# Subtest: follow camera targets the character model instead of the tesseract
+ok 119 - follow camera targets the character model instead of the tesseract
+  ---
+  duration_ms: 0.546413
+  type: 'test'
+  ...
+# Subtest: follow camera orbit has no arbitrary pitch clamp and zoom stays available
+ok 120 - follow camera orbit has no arbitrary pitch clamp and zoom stays available
+  ---
+  duration_ms: 0.701919
+  type: 'test'
+  ...
+# Subtest: modified R key remains available to browser shortcuts in the free camera
+ok 121 - modified R key remains available to browser shortcuts in the free camera
+  ---
+  duration_ms: 0.758746
+  type: 'test'
+  ...
+# Subtest: free camera anomaly movement is constrained to the Poincare world chart
+ok 122 - free camera anomaly movement is constrained to the Poincare world chart
+  ---
+  duration_ms: 4.87454
+  type: 'test'
+  ...
+# Subtest: free-camera W freedom permits movement both toward and away from a connected slice
+ok 123 - free-camera W freedom permits movement both toward and away from a connected slice
+  ---
+  duration_ms: 1.201041
+  type: 'test'
+  ...
+# Subtest: free camera ambient handoff clamps positions to the destination Poincare chart
+ok 124 - free camera ambient handoff clamps positions to the destination Poincare chart
+  ---
+  duration_ms: 1.140649
+  type: 'test'
+  ...
+# Subtest: switching from third-person to free camera constrains the inherited Poincare camera pose
+ok 125 - switching from third-person to free camera constrains the inherited Poincare camera pose
+  ---
+  duration_ms: 0.722277
+  type: 'test'
+  ...
+# Subtest: free camera resolves an enlarged Main World portal mouth to its canonical anomaly endpoint
+ok 126 - free camera resolves an enlarged Main World portal mouth to its canonical anomaly endpoint
+  ---
+  duration_ms: 0.559554
+  type: 'test'
+  ...
+# Subtest: user-defined Plane camera moves through its bounded W thickness with E/Q
+ok 127 - user-defined Plane camera moves through its bounded W thickness with E/Q
+  ---
+  duration_ms: 0.597538
+  type: 'test'
+  ...
+# Subtest: runtime Plane background follows the active slice and honors saved opacity
+ok 128 - runtime Plane background follows the active slice and honors saved opacity
+  ---
+  duration_ms: 97.904196
+  type: 'test'
+  ...
+# Subtest: leaving Plane editing reapplies the saved background of the runtime Plane
+ok 129 - leaving Plane editing reapplies the saved background of the runtime Plane
+  ---
+  duration_ms: 5.885536
+  type: 'test'
+  ...
+# Subtest: destination preview stays in front of the player during corridor transit
+ok 130 - destination preview stays in front of the player during corridor transit
+  ---
+  duration_ms: 2.102679
+  type: 'test'
+  ...
+# Subtest: reverse corridor transit previews the source world through its destination aperture
+ok 131 - reverse corridor transit previews the source world through its destination aperture
+  ---
+  duration_ms: 0.184557
+  type: 'test'
+  ...
+# Subtest: free-camera corridor inspection also preserves the destination window
+ok 132 - free-camera corridor inspection also preserves the destination window
+  ---
+  duration_ms: 0.296087
+  type: 'test'
+  ...
+# Subtest: free-camera transit takes precedence over a stationary player transit
+ok 133 - free-camera transit takes precedence over a stationary player transit
+  ---
+  duration_ms: 0.157423
+  type: 'test'
+  ...
+# Subtest: portal visibility follows the free camera slice rather than the player slice
+ok 134 - portal visibility follows the free camera slice rather than the player slice
+  ---
+  duration_ms: 0.126077
+  type: 'test'
+  ...
+# Subtest: portal look-ahead remains near the viewer instead of waiting until late transit
+ok 135 - portal look-ahead remains near the viewer instead of waiting until late transit
+  ---
+  duration_ms: 0.165265
+  type: 'test'
+  ...
+# Subtest: camera presentation selects the free camera slice without changing player ownership
+ok 136 - camera presentation selects the free camera slice without changing player ownership
+  ---
+  duration_ms: 0.375409
+  type: 'test'
+  ...
+# Subtest: destination chunk focus follows a free camera after its independent handoff
+ok 137 - destination chunk focus follows a free camera after its independent handoff
+  ---
+  duration_ms: 0.390939
+  type: 'test'
+  ...
+# Subtest: metric grid activation selects the active slice and synchronizes its visibility
+ok 138 - metric grid activation selects the active slice and synchronizes its visibility
+  ---
+  duration_ms: 0.860554
+  type: 'test'
+  ...
+# Subtest: G toggles the metric grid in the demo while browser-modified shortcuts are untouched
+ok 139 - G toggles the metric grid in the demo while browser-modified shortcuts are untouched
+  ---
+  duration_ms: 0.734821
+  type: 'test'
+  ...
+# Subtest: Main World metric grid is registered as a terrain-conformed slice grid
+ok 140 - Main World metric grid is registered as a terrain-conformed slice grid
+  ---
+  duration_ms: 13.08598
+  type: 'test'
+  ...
+# Subtest: camera presentation activates only the grid belonging to the current slice
+ok 141 - camera presentation activates only the grid belonging to the current slice
+  ---
+  duration_ms: 0.556395
+  type: 'test'
+  ...
+# Subtest: Main World anomaly preview portals are large and spread apart without moving physical anomaly endpoints
+ok 142 - Main World anomaly preview portals are large and spread apart without moving physical anomaly endpoints
+  ---
+  duration_ms: 0.24539
+  type: 'test'
+  ...
+# Subtest: Main World anomaly portal layout validates its world anchor
+ok 143 - Main World anomaly portal layout validates its world anchor
+  ---
+  duration_ms: 0.687999
+  type: 'test'
+  ...
+# Subtest: destination portal previews include the visible transmitted optical ray
+ok 144 - destination portal previews include the visible transmitted optical ray
+  ---
+  duration_ms: 0.171961
+  type: 'test'
+  ...
+# [SpatialTransform] Geometry: poincare
+# Subtest: third-person camera boom stays inside its open render-space projection bounds
+ok 145 - third-person camera boom stays inside its open render-space projection bounds
+  ---
+  duration_ms: 4.521944
+  type: 'test'
+  ...
+# Subtest: follow camera boom distance is applied after projection in render space
+ok 146 - follow camera boom distance is applied after projection in render space
+  ---
+  duration_ms: 0.971613
+  type: 'test'
+  ...
+# Subtest: third-person camera leaves positions unchanged when a transform has no finite bounds
+ok 147 - third-person camera leaves positions unchanged when a transform has no finite bounds
+  ---
+  duration_ms: 0.367656
+  type: 'test'
+  ...
+# Subtest: demo topology registers all three default slice-transition anomalies
+ok 148 - demo topology registers all three default slice-transition anomalies
+  ---
+  duration_ms: 7.965021
+  type: 'test'
+  ...
+# Subtest: browser demo topology loads a versioned type-aware WorldTopology module
+ok 149 - browser demo topology loads a versioned type-aware WorldTopology module
+  ---
+  duration_ms: 1.042671
+  type: 'test'
+  ...
+# Subtest: the 4D chamber has a direct, bidirectional +5-W anomaly to the live main-world slice
+ok 150 - the 4D chamber has a direct, bidirectional +5-W anomaly to the live main-world slice
+  ---
+  duration_ms: 2.001581
+  type: 'test'
+  ...
+# Subtest: the labeled 4D-room exit traverses exactly +5 W and hands off to the live main-world terrain
+ok 151 - the labeled 4D-room exit traverses exactly +5 W and hands off to the live main-world terrain
+  ---
+  duration_ms: 4.270133
+  type: 'test'
+  ...
+# Subtest: the 4D chamber exit has a visible main-world label
+ok 152 - the 4D chamber exit has a visible main-world label
+  ---
+  duration_ms: 0.876617
+  type: 'test'
+  ...
+# Subtest: the Poincare-to-hypercube anomaly exposes a wider entry aperture
+ok 153 - the Poincare-to-hypercube anomaly exposes a wider entry aperture
+  ---
+  duration_ms: 1.47355
+  type: 'test'
+  ...
+# Subtest: the Poincare-side anomaly can be entered from the widened portal aperture
+ok 154 - the Poincare-side anomaly can be entered from the widened portal aperture
+  ---
+  duration_ms: 1.521241
+  type: 'test'
+  ...
+# Subtest: 4D vector operations preserve orthogonal components and lengths
+ok 155 - 4D vector operations preserve orthogonal components and lengths
+  ---
+  duration_ms: 2.594991
+  type: 'test'
+  ...
+# Subtest: zero vectors and non-finite coordinates are rejected
+ok 156 - zero vectors and non-finite coordinates are rejected
+  ---
+  duration_ms: 0.464334
+  type: 'test'
+  ...
+# Subtest: canonical slice frames round-trip local coordinates and expose normal offset
+ok 157 - canonical slice frames round-trip local coordinates and expose normal offset
+  ---
+  duration_ms: 0.724024
+  type: 'test'
+  ...
+# Subtest: rotated slice frames remain orthonormal in the XW plane
+ok 158 - rotated slice frames remain orthonormal in the XW plane
+  ---
+  duration_ms: 0.550868
+  type: 'test'
+  ...
+# Subtest: 4D perpendicular frames are orthonormal and orthogonal to the tangent
+ok 159 - 4D perpendicular frames are orthonormal and orthogonal to the tangent
+  ---
+  duration_ms: 1.266246
+  type: 'test'
+  ...
+# Subtest: cubic corridor interpolation returns exact endpoints and stable midpoint
+ok 160 - cubic corridor interpolation returns exact endpoints and stable midpoint
+  ---
+  duration_ms: 1.478031
+  type: 'test'
+  ...
+# Subtest: stationary Bezier endpoints use a one-sided corridor tangent
+ok 161 - stationary Bezier endpoints use a one-sided corridor tangent
+  ---
+  duration_ms: 0.381174
+  type: 'test'
+  ...
+# Subtest: corridor frame sampling is deterministic, orthogonal, and smoothly transported
+ok 162 - corridor frame sampling is deterministic, orthogonal, and smoothly transported
+  ---
+  duration_ms: 8.87564
+  type: 'test'
+  ...
+# Subtest: corridor radius profile interpolates deterministically
+ok 163 - corridor radius profile interpolates deterministically
+  ---
+  duration_ms: 0.579891
+  type: 'test'
+  ...
+# Subtest: slice addresses include slice identity and accept negative chunk coordinates
+ok 164 - slice addresses include slice identity and accept negative chunk coordinates
+  ---
+  duration_ms: 0.754103
+  type: 'test'
+  ...
+# Subtest: numeric proximity in w does not create cross-slice adjacency
+ok 165 - numeric proximity in w does not create cross-slice adjacency
+  ---
+  duration_ms: 0.63376
+  type: 'test'
+  ...
+# Subtest: visible portals expose preview destinations without enabling traversal
+ok 166 - visible portals expose preview destinations without enabling traversal
+  ---
+  duration_ms: 0.748402
+  type: 'test'
+  ...
+# Subtest: traversable corridors can be hidden independently of preview visibility
+ok 167 - traversable corridors can be hidden independently of preview visibility
+  ---
+  duration_ms: 0.311165
+  type: 'test'
+  ...
+# Subtest: traversable corridors create explicit bidirectional topology edges
+ok 168 - traversable corridors create explicit bidirectional topology edges
+  ---
+  duration_ms: 0.413204
+  type: 'test'
+  ...
+# Subtest: visibility is independent of one-way traversal permissions
+ok 169 - visibility is independent of one-way traversal permissions
+  ---
+  duration_ms: 0.497693
+  type: 'test'
+  ...
+# Subtest: corridor endpoints must agree with the registered slice frames
+ok 170 - corridor endpoints must agree with the registered slice frames
+  ---
+  duration_ms: 0.446094
+  type: 'test'
+  ...
+# Subtest: topology getters return copies rather than mutable internal records
+ok 171 - topology getters return copies rather than mutable internal records
+  ---
+  duration_ms: 0.485156
+  type: 'test'
+  ...
+# Subtest: topology updates require increasing revisions and preserve slice references
+ok 172 - topology updates require increasing revisions and preserve slice references
+  ---
+  duration_ms: 0.920285
+  type: 'test'
+  ...
+# Subtest: topology serializes and restores its versioned domain records
+ok 173 - topology serializes and restores its versioned domain records
+  ---
+  duration_ms: 1.060772
+  type: 'test'
+  ...
+# Subtest: Poincare metric factor and bounded visual scale match their definitions
+ok 174 - Poincare metric factor and bounded visual scale match their definitions
+  ---
+  duration_ms: 0.266379
+  type: 'test'
+  ...
+# Subtest: corridors default to coordinate length and validate intrinsic metric compression
+ok 175 - corridors default to coordinate length and validate intrinsic metric compression
+  ---
+  duration_ms: 0.370552
+  type: 'test'
+  ...
+# Subtest: tesseract contains 16 distinct corners and 32 single-axis edges
+ok 176 - tesseract contains 16 distinct corners and 32 single-axis edges
+  ---
+  duration_ms: 6.632308
+  type: 'test'
+  ...
+# Subtest: XW-plane rotation moves vertices through the fourth dimension
+ok 177 - XW-plane rotation moves vertices through the fourth dimension
+  ---
+  duration_ms: 0.421079
+  type: 'test'
+  ...
+# Subtest: central axis-aligned slice is a cube with six square faces
+ok 178 - central axis-aligned slice is a cube with six square faces
+  ---
+  duration_ms: 1.526263
+  type: 'test'
+  ...
+# Subtest: oblique 4D orientation produces a non-cubic central section
+ok 179 - oblique 4D orientation produces a non-cubic central section
+  ---
+  duration_ms: 1.896813
+  type: 'test'
+  ...
+# Subtest: cross-section is a closed polyhedral boundary with two faces per edge
+ok 180 - cross-section is a closed polyhedral boundary with two faces per edge
+  ---
+  duration_ms: 0.52525
+  type: 'test'
+  ...
+# Subtest: moving along W reveals different 3D cross-sections
+ok 181 - moving along W reveals different 3D cross-sections
+  ---
+  duration_ms: 1.862077
+  type: 'test'
+  ...
+# Subtest: W slice topology changes continuously with 4D rotation
+ok 182 - W slice topology changes continuously with 4D rotation
+  ---
+  duration_ms: 2.121617
+  type: 'test'
+  ...
+# Subtest: Babylon renderer rebuilds a real slice surface and edge shell in place
+ok 183 - Babylon renderer rebuilds a real slice surface and edge shell in place
+  ---
+  duration_ms: 18.999947
+  type: 'test'
+  ...
+# Subtest: geometry HUD exposes clickable spotlight controls with matching L and P hotkeys
+ok 184 - geometry HUD exposes clickable spotlight controls with matching L and P hotkeys
+  ---
+  duration_ms: 1.102257
+  type: 'test'
+  ...
+# Subtest: spotlight edit HUD state follows keyboard and button toggles
+ok 185 - spotlight edit HUD state follows keyboard and button toggles
+  ---
+  duration_ms: 0.305353
+  type: 'test'
+  ...
+# Subtest: test-ray HUD state follows keyboard and button toggles
+ok 186 - test-ray HUD state follows keyboard and button toggles
+  ---
+  duration_ms: 0.251296
+  type: 'test'
+  ...
+# Subtest: spotlight HUD buttons invoke their application callbacks and mirror returned state
+ok 187 - spotlight HUD buttons invoke their application callbacks and mirror returned state
+  ---
+  duration_ms: 0.49168
+  type: 'test'
+  ...
+# Subtest: geometry demo corridor terminates in the existing somnium-main world slice
+ok 188 - geometry demo corridor terminates in the existing somnium-main world slice
+  ---
+  duration_ms: 7.954744
+  type: 'test'
+  ...
+# Subtest: the main-world terrain chunk is reachable from the chamber through the corridor chunk
+ok 189 - the main-world terrain chunk is reachable from the chamber through the corridor chunk
+  ---
+  duration_ms: 3.83325
+  type: 'test'
+  ...
+# Subtest: geometry demo shares the live main world manager, terrain, transform, and chunk graph
+ok 190 - geometry demo shares the live main world manager, terrain, transform, and chunk graph
+  ---
+  duration_ms: 6.265126
+  type: 'test'
+  ...
+# Subtest: the new 4D chamber connects to the Poincare chamber through its own corridor chunk
+ok 191 - the new 4D chamber connects to the Poincare chamber through its own corridor chunk
+  ---
+  duration_ms: 2.383991
+  type: 'test'
+  ...
+# Subtest: the geometry demo starts in the 4D chamber with the player-follow camera
+ok 192 - the geometry demo starts in the 4D chamber with the player-follow camera
+  ---
+  duration_ms: 3.997975
+  type: 'test'
+  ...
+# Subtest: demo anomalies are bounded slice transitions while the legacy Bezier metric remains available
+ok 193 - demo anomalies are bounded slice transitions while the legacy Bezier metric remains available
+  ---
+  duration_ms: 2.34229
+  type: 'test'
+  ...
+# [SpatialTransform] Geometry: poincare
+# [SpatialTransform] Geometry: euclidean
+# [SpatialTransform] Geometry: poincare
+# Subtest: optical topology is independent of player traversal permissions
+ok 194 - optical topology is independent of player traversal permissions
+  ---
+  duration_ms: 4.774637
+  type: 'test'
+  ...
+# Subtest: one-way optical permission does not create a reverse optical edge
+ok 195 - one-way optical permission does not create a reverse optical edge
+  ---
+  duration_ms: 0.80028
+  type: 'test'
+  ...
+# Subtest: disabled anomaly optics never create optical topology edges
+ok 196 - disabled anomaly optics never create optical topology edges
+  ---
+  duration_ms: 0.717944
+  type: 'test'
+  ...
+# Subtest: optical chunk reachability is separate from traversable chunk reachability
+ok 197 - optical chunk reachability is separate from traversable chunk reachability
+  ---
+  duration_ms: 2.017976
+  type: 'test'
+  ...
+# Subtest: anomaly optical field blends endpoint slice metrics and opens a genuine fourth direction
+ok 198 - anomaly optical field blends endpoint slice metrics and opens a genuine fourth direction
+  ---
+  duration_ms: 3.472476
+  type: 'test'
+  ...
+# Subtest: all three demo anomaly bridges accept the live-scale Poincare and Euclidean metrics
+ok 199 - all three demo anomaly bridges accept the live-scale Poincare and Euclidean metrics
+  ---
+  duration_ms: 7.164204
+  type: 'test'
+  ...
+# Subtest: ray enters a non-player-traversable anomaly, propagates in R4, and exits into the destination slice
+ok 200 - ray enters a non-player-traversable anomaly, propagates in R4, and exits into the destination slice
+  ---
+  duration_ms: 803.014446
+  type: 'test'
+  ...
+# Subtest: ray cannot enter an anomaly whose optical W budget is smaller than its slice separation
+ok 201 - ray cannot enter an anomaly whose optical W budget is smaller than its slice separation
+  ---
+  duration_ms: 16.736628
+  type: 'test'
+  ...
+# Subtest: optical chunk candidates are exposed through the anomaly tracer
+ok 202 - optical chunk candidates are exposed through the anomaly tracer
+  ---
+  duration_ms: 1.517381
+  type: 'test'
+  ...
+# Subtest: bidirectional optical transport also works from the destination slice
+ok 203 - bidirectional optical transport also works from the destination slice
+  ---
+  duration_ms: 673.950475
+  type: 'test'
+  ...
+# Subtest: one-way optical anomaly cannot be entered from its destination slice
+ok 204 - one-way optical anomaly cannot be entered from its destination slice
+  ---
+  duration_ms: 52.436687
+  type: 'test'
+  ...
+# Subtest: anomaly traversal terminates at a bounded region instead of escaping into arbitrary R4
+ok 205 - anomaly traversal terminates at a bounded region instead of escaping into arbitrary R4
+  ---
+  duration_ms: 473.674547
+  type: 'test'
+  ...
+# Subtest: reachability query reports disabled optical links without throwing
+ok 206 - reachability query reports disabled optical links without throwing
+  ---
+  duration_ms: 0.90864
+  type: 'test'
+  ...
+# Subtest: reachability query enforces one-way optical direction independently of player traversal
+ok 207 - reachability query enforces one-way optical direction independently of player traversal
+  ---
+  duration_ms: 0.542961
+  type: 'test'
+  ...
+# Subtest: reachability query consults optical chunk graph before declaring a cross-slice chunk reachable
+ok 208 - reachability query consults optical chunk graph before declaring a cross-slice chunk reachable
+  ---
+  duration_ms: 0.864297
+  type: 'test'
+  ...
+# Subtest: slice entry is blocked when the optical destination chunk is not reachable
+ok 209 - slice entry is blocked when the optical destination chunk is not reachable
+  ---
+  duration_ms: 29.467849
+  type: 'test'
+  ...
+# Subtest: anomaly exit is held when the destination chunk is no longer optically reachable
+ok 210 - anomaly exit is held when the destination chunk is no longer optically reachable
+  ---
+  duration_ms: 833.609097
+  type: 'test'
+  ...
+# Subtest: optical debug renderer projects authoritative slice samples only at draw time
+ok 211 - optical debug renderer projects authoritative slice samples only at draw time
+  ---
+  duration_ms: 2.853561
+  type: 'test'
+  ...
+# Subtest: optical debug renderer validates slice transform and disposes idempotently
+ok 212 - optical debug renderer validates slice transform and disposes idempotently
+  ---
+  duration_ms: 0.549626
+  type: 'test'
+  ...
+# [SpatialTransform] Geometry: poincare
+# [SpatialTransform] Geometry: poincare
+# [SpatialTransform] Geometry: euclidean
+# [SpatialTransform] Geometry: poincare
+# [SpatialTransform] Geometry: poincare
+# [SpatialTransform] Geometry: euclidean
+# [SpatialTransform] Geometry: poincare
+# [SpatialTransform] Geometry: poincare
+# [SpatialTransform] Geometry: euclidean
+# Subtest: all three demo anomalies transmit optical rays in both configured directions
+ok 213 - all three demo anomalies transmit optical rays in both configured directions
+  ---
+  duration_ms: 13182.165856
+  type: 'test'
+  ...
+# Subtest: one optical ray can traverse two explicitly connected anomalies in sequence
+ok 214 - one optical ray can traverse two explicitly connected anomalies in sequence
+  ---
+  duration_ms: 5563.19006
+  type: 'test'
+  ...
+# Subtest: live Main World Poincare ray crosses the anomaly into the chamber using aperture-local metric matching
+ok 215 - live Main World Poincare ray crosses the anomaly into the chamber using aperture-local metric matching
+  ---
+  duration_ms: 374.643588
+  type: 'test'
+  ...
+# Subtest: live Euclidean-to-Poincare and Poincare-to-Euclidean rays cross the 75-W ambient anomaly
+ok 216 - live Euclidean-to-Poincare and Poincare-to-Euclidean rays cross the 75-W ambient anomaly
+  ---
+  duration_ms: 4639.138995
+  type: 'test'
+  ...
+# Subtest: live Euclidean-to-Poincare and Poincare-to-Euclidean rays cross the direct +5-W anomaly
+ok 217 - live Euclidean-to-Poincare and Poincare-to-Euclidean rays cross the direct +5-W anomaly
+  ---
+  duration_ms: 1953.278093
+  type: 'test'
+  ...
+# [SpatialTransform] Geometry: euclidean
+# [SpatialTransform] Geometry: poincare
+# Subtest: optical material and anomaly optics contracts validate independently of gameplay traversal
+ok 218 - optical material and anomaly optics contracts validate independently of gameplay traversal
+  ---
+  duration_ms: 3.906709
+  type: 'test'
+  ...
+# Subtest: anomaly optics accepts endpoint, pointwise, and ambient metric sampling modes
+ok 219 - anomaly optics accepts endpoint, pointwise, and ambient metric sampling modes
+  ---
+  duration_ms: 0.320493
+  type: 'test'
+  ...
+# Subtest: optical anomaly coupling reuses only the radial envelope and ignores player freedom modifiers
+ok 220 - optical anomaly coupling reuses only the radial envelope and ignores player freedom modifiers
+  ---
+  duration_ms: 0.401327
+  type: 'test'
+  ...
+# Subtest: optical profile bias changes the shell shape without changing horizon or core endpoints
+ok 221 - optical profile bias changes the shell shape without changing horizon or core endpoints
+  ---
+  duration_ms: 0.509337
+  type: 'test'
+  ...
+# Subtest: Euclidean constant optical metric produces a straight ray and constant canonical momentum
+ok 222 - Euclidean constant optical metric produces a straight ray and constant canonical momentum
+  ---
+  duration_ms: 76.094073
+  type: 'test'
+  ...
+# Subtest: uniform refractive index preserves the geometric ray while scaling optical travel time
+ok 223 - uniform refractive index preserves the geometric ray while scaling optical travel time
+  ---
+  duration_ms: 76.81627
+  type: 'test'
+  ...
+# Subtest: a graded refractive-index field bends rays while conserving the Hamiltonian
+ok 224 - a graded refractive-index field bends rays while conserving the Hamiltonian
+  ---
+  duration_ms: 113.60358
+  type: 'test'
+  ...
+# Subtest: SpatialTransform metric provider supplies authoritative slice geometry to optics
+ok 225 - SpatialTransform metric provider supplies authoritative slice geometry to optics
+  ---
+  duration_ms: 3.408414
+  type: 'test'
+  ...
+# Subtest: scale-balanced optical metric blending remains SPD across very different chart units
+ok 226 - scale-balanced optical metric blending remains SPD across very different chart units
+  ---
+  duration_ms: 1.101206
+  type: 'test'
+  ...
+# Subtest: small but well-conditioned Poincare world metrics remain invertible for optical transport
+ok 227 - small but well-conditioned Poincare world metrics remain invertible for optical transport
+  ---
+  duration_ms: 2.339749
+  type: 'test'
+  ...
+# Subtest: the optical integrator terminates cleanly at an explicit metric-domain boundary
+ok 228 - the optical integrator terminates cleanly at an explicit metric-domain boundary
+  ---
+  duration_ms: 34.949389
+  type: 'test'
+  ...
+# Subtest: zero W coupling constrains normal propagation without non-finite metric entries
+ok 229 - zero W coupling constrains normal propagation without non-finite metric entries
+  ---
+  duration_ms: 33.896567
+  type: 'test'
+  ...
+# Subtest: constant partial W coupling permits controlled normal ray propagation
+ok 230 - constant partial W coupling permits controlled normal ray propagation
+  ---
+  duration_ms: 78.113042
+  type: 'test'
+  ...
+# Subtest: increasing W optical coupling smoothly lowers normal optical cost
+ok 231 - increasing W optical coupling smoothly lowers normal optical cost
+  ---
+  duration_ms: 0.6558
+  type: 'test'
+  ...
+# Subtest: optical metric is symmetric positive definite for rotated frames and anisotropic slice metrics
+ok 232 - optical metric is symmetric positive definite for rotated frames and anisotropic slice metrics
+  ---
+  duration_ms: 1.046377
+  type: 'test'
+  ...
+# Subtest: positive-definite slice metrics blend by normalized convex weights
+ok 233 - positive-definite slice metrics blend by normalized convex weights
+  ---
+  duration_ms: 0.310182
+  type: 'test'
+  ...
+# Subtest: Poincare radial ray recovers the known geodesic through the ball origin
+ok 234 - Poincare radial ray recovers the known geodesic through the ball origin
+  ---
+  duration_ms: 144.865769
+  type: 'test'
+  ...
+# Subtest: invalid Poincare chart samples are rejected rather than silently clipped
+ok 235 - invalid Poincare chart samples are rejected rather than silently clipped
+  ---
+  duration_ms: 0.534687
+  type: 'test'
+  ...
+# Subtest: ray debug serialization is deterministic and contains no runtime objects
+ok 236 - ray debug serialization is deterministic and contains no runtime objects
+  ---
+  duration_ms: 41.767672
+  type: 'test'
+  ...
+# Subtest: ray state, metric callback, and integration options reject invalid numeric input
+ok 237 - ray state, metric callback, and integration options reject invalid numeric input
+  ---
+  duration_ms: 0.464903
+  type: 'test'
+  ...
+# [SpatialTransform] Geometry: euclidean
+# [SpatialTransform] Geometry: poincare
+# [SpatialTransform] Geometry: poincare
+# [SpatialTransform] Geometry: euclidean
+# Subtest: triangle BVH returns the nearest authoritative slice-local surface hit
+ok 238 - triangle BVH returns the nearest authoritative slice-local surface hit
+  ---
+  duration_ms: 4.310211
+  type: 'test'
+  ...
+# Subtest: triangle BVH rejects other slices and supports explicit chunk-address filtering
+ok 239 - triangle BVH rejects other slices and supports explicit chunk-address filtering
+  ---
+  duration_ms: 0.627241
+  type: 'test'
+  ...
+# Subtest: triangle registrations copy source buffers and rebuild deterministically on revision updates
+ok 240 - triangle registrations copy source buffers and rebuild deterministically on revision updates
+  ---
+  duration_ms: 0.53472
+  type: 'test'
+  ...
+# Subtest: Babylon geometry adapter registers pre-projection vertices with slice and chunk identity
+ok 241 - Babylon geometry adapter registers pre-projection vertices with slice and chunk identity
+  ---
+  duration_ms: 0.960519
+  type: 'test'
+  ...
+# Subtest: Babylon geometry adapter excludes debug and render-only surfaces from optical intersections
+ok 242 - Babylon geometry adapter excludes debug and render-only surfaces from optical intersections
+  ---
+  duration_ms: 0.342246
+  type: 'test'
+  ...
+# Subtest: disabled optical materials do not occlude rays
+ok 243 - disabled optical materials do not occlude rays
+  ---
+  duration_ms: 0.179824
+  type: 'test'
+  ...
+# Subtest: triangle registry validates topology, finite coordinates, and revisions
+ok 244 - triangle registry validates topology, finite coordinates, and revisions
+  ---
+  duration_ms: 0.754611
+  type: 'test'
+  ...
+# Subtest: analytic heightfield intersection finds a flat-terrain crossing and surface normal
+ok 245 - analytic heightfield intersection finds a flat-terrain crossing and surface normal
+  ---
+  duration_ms: 0.907266
+  type: 'test'
+  ...
+# Subtest: heightfield intersection sampling follows the full source raster resolution, not chunk-local dimensions
+ok 246 - heightfield intersection sampling follows the full source raster resolution, not chunk-local dimensions
+  ---
+  duration_ms: 0.558838
+  type: 'test'
+  ...
+# Subtest: non-square heightmaps use independent X and Z raster spacing
+ok 247 - non-square heightmaps use independent X and Z raster spacing
+  ---
+  duration_ms: 0.688214
+  type: 'test'
+  ...
+# Subtest: analytic heightfield intersection respects chunk bounds and does not leak across chunks
+ok 248 - analytic heightfield intersection respects chunk bounds and does not leak across chunks
+  ---
+  duration_ms: 0.314707
+  type: 'test'
+  ...
+# Subtest: analytic heightfield normals follow a sloped surface
+ok 249 - analytic heightfield normals follow a sloped surface
+  ---
+  duration_ms: 0.250239
+  type: 'test'
+  ...
+# Subtest: unregistered geometry cannot create a hit and disposal clears the optical scene
+ok 250 - unregistered geometry cannot create a hit and disposal clears the optical scene
+  ---
+  duration_ms: 0.256346
+  type: 'test'
+  ...
+# Subtest: slice-native Euclidean tracing stops at the first registered triangle
+ok 251 - slice-native Euclidean tracing stops at the first registered triangle
+  ---
+  duration_ms: 47.931658
+  type: 'test'
+  ...
+# Subtest: slice-native Euclidean tracing supports arbitrarily oriented ambient 4D slice frames
+ok 252 - slice-native Euclidean tracing supports arbitrarily oriented ambient 4D slice frames
+  ---
+  duration_ms: 74.527522
+  type: 'test'
+  ...
+# Subtest: slice-native tracer rejects momentum with a component normal to the slice
+ok 253 - slice-native tracer rejects momentum with a component normal to the slice
+  ---
+  duration_ms: 0.719713
+  type: 'test'
+  ...
+# Subtest: slice-native tracing rejects a ray whose initial position is off the slice
+ok 254 - slice-native tracing rejects a ray whose initial position is off the slice
+  ---
+  duration_ms: 0.309311
+  type: 'test'
+  ...
+# Subtest: slice-native ray hits only geometry registered to its own slice
+ok 255 - slice-native ray hits only geometry registered to its own slice
+  ---
+  duration_ms: 31.744667
+  type: 'test'
+  ...
+# Subtest: Poincare slice tracer intersects authoritative ball-coordinate geometry along a geodesic
+ok 256 - Poincare slice tracer intersects authoritative ball-coordinate geometry along a geodesic
+  ---
+  duration_ms: 134.218853
+  type: 'test'
+  ...
+# Subtest: Poincare non-radial ray samples agree with the intrinsic geodesic reference
+ok 257 - Poincare non-radial ray samples agree with the intrinsic geodesic reference
+  ---
+  duration_ms: 183.41122
+  type: 'test'
+  ...
+# Subtest: slice-global static geometry remains hittable when streamed chunks are filtered
+ok 258 - slice-global static geometry remains hittable when streamed chunks are filtered
+  ---
+  duration_ms: 0.27241
+  type: 'test'
+  ...
+# Subtest: equal-distance triangle hits resolve deterministically by object id
+ok 259 - equal-distance triangle hits resolve deterministically by object id
+  ---
+  duration_ms: 0.152517
+  type: 'test'
+  ...
+# Subtest: Poincare SpatialTransform slice tracer integrates a curved ray and resolves a local-space surface hit
+ok 260 - Poincare SpatialTransform slice tracer integrates a curved ray and resolves a local-space surface hit
+  ---
+  duration_ms: 101.682732
+  type: 'test'
+  ...
+# Subtest: slice-native Poincare tracing uses the supplied slice chart bounds rather than render-space positions
+ok 261 - slice-native Poincare tracing uses the supplied slice chart bounds rather than render-space positions
+  ---
+  duration_ms: 0.877372
+  type: 'test'
+  ...
+# Subtest: createSliceOpticalField uses the slice SpatialTransform metric and constrains W
+ok 262 - createSliceOpticalField uses the slice SpatialTransform metric and constrains W
+  ---
+  duration_ms: 4.037077
+  type: 'test'
+  ...
+# [SpatialTransform] Geometry: poincare
+# [SpatialTransform] Geometry: poincare
+# [SpatialTransform] Geometry: euclidean
+# [OpticalSpotlight] Test light/ray OFF.
+# [OpticalSpotlight] Test light/ray ON.
+# Subtest: spotlight source contract normalizes directions and validates optical parameters
+ok 263 - spotlight source contract normalizes directions and validates optical parameters
+  ---
+  duration_ms: 3.660312
+  type: 'test'
+  ...
+# Subtest: spotlight editing moves its source and rotates its direction without mutating prior state
+ok 264 - spotlight editing moves its source and rotates its direction without mutating prior state
+  ---
+  duration_ms: 0.653359
+  type: 'test'
+  ...
+# Subtest: a spotlight centre ray crosses the authorized 4D anomaly and yields a destination virtual emitter
+ok 265 - a spotlight centre ray crosses the authorized 4D anomaly and yields a destination virtual emitter
+  ---
+  duration_ms: 407.614455
+  type: 'test'
+  ...
+# Subtest: spotlight transport remains finite with the live Main World Poincare transform
+ok 266 - spotlight transport remains finite with the live Main World Poincare transform
+  ---
+  duration_ms: 260.299387
+  type: 'test'
+  ...
+# Subtest: transmitted spotlight exposes a projected receiving-side ray segment
+ok 267 - transmitted spotlight exposes a projected receiving-side ray segment
+  ---
+  duration_ms: 236.478736
+  type: 'test'
+  ...
+# Subtest: a spotlight pointed away from the anomaly produces no receiving-side light
+ok 268 - a spotlight pointed away from the anomaly produces no receiving-side light
+  ---
+  duration_ms: 286.253226
+  type: 'test'
+  ...
+# Subtest: GeometryDemoWorld renders the transmitted ray on the Main World layer
+ok 269 - GeometryDemoWorld renders the transmitted ray on the Main World layer
+  ---
+  duration_ms: 0.854067
+  type: 'test'
+  ...
+# Subtest: receiving spotlight uses bounded Main World shadow casters and restores mesh state
+ok 270 - receiving spotlight uses bounded Main World shadow casters and restores mesh state
+  ---
+  duration_ms: 2.566189
+  type: 'test'
+  ...
+# Subtest: receiving spotlight remains useful without a shadow generator
+ok 271 - receiving spotlight remains useful without a shadow generator
+  ---
+  duration_ms: 0.461416
+  type: 'test'
+  ...
+# Subtest: spotlight cleanup resets Babylon includedOnlyMeshes with an array, never null
+ok 272 - spotlight cleanup resets Babylon includedOnlyMeshes with an array, never null
+  ---
+  duration_ms: 0.512961
+  type: 'test'
+  ...
+# Subtest: spotlight initialization satisfies Babylon Light includedOnlyMeshes array setter
+ok 273 - spotlight initialization satisfies Babylon Light includedOnlyMeshes array setter
+  ---
+  duration_ms: 2.259146
+  type: 'test'
+  ...
+# Subtest: receiving spotlight and debug ray are rebased to the separated Main World portal mouth
+ok 274 - receiving spotlight and debug ray are rebased to the separated Main World portal mouth
+  ---
+  duration_ms: 0.258254
+  type: 'test'
+  ...
+# Subtest: P toggles the optical test source and transmitted ray without changing edit mode
+ok 275 - P toggles the optical test source and transmitted ray without changing edit mode
+  ---
+  duration_ms: 0.794582
+  type: 'test'
+  ...
+# Subtest: spotlight edit mode captures mouse drag and rotates the source aim
+ok 276 - spotlight edit mode captures mouse drag and rotates the source aim
+  ---
+  duration_ms: 1.379612
+  type: 'test'
+  ...
+# Subtest: Level Builder exposes Planes and Object Editor at top level, with Plane Editor and Anomalies subtabs
+ok 277 - Level Builder exposes Planes and Object Editor at top level, with Plane Editor and Anomalies subtabs
+  ---
+  duration_ms: 1.894215
+  type: 'test'
+  ...
+# Subtest: Object Editor preserves the floor-plan-to-building workflow and placement controls
+ok 278 - Object Editor preserves the floor-plan-to-building workflow and placement controls
+  ---
+  duration_ms: 0.305672
+  type: 'test'
+  ...
+# Subtest: Anomalies panel exposes persistent CRUD and enabled-state controls
+ok 279 - Anomalies panel exposes persistent CRUD and enabled-state controls
+  ---
+  duration_ms: 0.28011
+  type: 'test'
+  ...
+# Subtest: scene injects the separate Plane/anomaly persistence service into the editor
+ok 280 - scene injects the separate Plane/anomaly persistence service into the editor
+  ---
+  duration_ms: 0.15009
+  type: 'test'
+  ...
+# Subtest: Anomaly selection populates Plane controls from persisted and live Plane registries
+ok 281 - Anomaly selection populates Plane controls from persisted and live Plane registries
+  ---
+  duration_ms: 0.503711
+  type: 'test'
+  ...
+# Subtest: saved anomaly edits are applied to the live runtime topology
+ok 282 - saved anomaly edits are applied to the live runtime topology
+  ---
+  duration_ms: 0.234193
+  type: 'test'
+  ...
+# Subtest: Anomaly editor exposes an explicit save/place action and Ctrl+Enter shortcut
+ok 283 - Anomaly editor exposes an explicit save/place action and Ctrl+Enter shortcut
+  ---
+  duration_ms: 0.229955
+  type: 'test'
+  ...
+# Subtest: Anomaly editor exposes independently persisted aperture and W-freedom radii
+ok 284 - Anomaly editor exposes independently persisted aperture and W-freedom radii
+  ---
+  duration_ms: 0.145745
+  type: 'test'
+  ...
+# Subtest: Planes and Object Editor tabs advertise and implement 1/2 keyboard navigation
+ok 285 - Planes and Object Editor tabs advertise and implement 1/2 keyboard navigation
+  ---
+  duration_ms: 0.405383
+  type: 'test'
+  ...
+# Subtest: Build launcher matches the main menu button treatment and advertises B
+ok 286 - Build launcher matches the main menu button treatment and advertises B
+  ---
+  duration_ms: 0.7446
+  type: 'test'
+  ...
+# Subtest: dynamic saved anomalies are loaded into the live runtime after network construction
+ok 287 - dynamic saved anomalies are loaded into the live runtime after network construction
+  ---
+  duration_ms: 14.246483
+  type: 'test'
+  ...
+# Subtest: Anomaly submenu uses the shared scale gizmo to edit aperture radius
+ok 288 - Anomaly submenu uses the shared scale gizmo to edit aperture radius
+  ---
+  duration_ms: 0.249121
+  type: 'test'
+  ...
+# Subtest: Anomaly placement pointer workflow is routed through the nested Plane submenu
+ok 289 - Anomaly placement pointer workflow is routed through the nested Plane submenu
+  ---
+  duration_ms: 1.076887
+  type: 'test'
+  ...
+# Subtest: Plane object color updates both diffuse and emissive channels, including the 4D demo renderer
+ok 290 - Plane object color updates both diffuse and emissive channels, including the 4D demo renderer
+  ---
+  duration_ms: 5.731423
+  type: 'test'
+  ...
+# Subtest: Plane background override survives the CelestialSystem per-frame sky update
+ok 291 - Plane background override survives the CelestialSystem per-frame sky update
+  ---
+  duration_ms: 5.116359
+  type: 'test'
+  ...
+# Subtest: Plane save is available through Ctrl+S, including while a Plane form field is focused
+ok 292 - Plane save is available through Ctrl+S, including while a Plane form field is focused
+  ---
+  duration_ms: 1.79408
+  type: 'test'
+  ...
+# [SpatialTransform] Geometry: euclidean
+# [SpatialTransform] Geometry: euclidean
+# Subtest: saved user Planes are promoted into idempotent runtime slices for anomaly endpoints
+ok 293 - saved user Planes are promoted into idempotent runtime slices for anomaly endpoints
+  ---
+  duration_ms: 7.191575
+  type: 'test'
+  ...
+# Subtest: Plane background definition can be saved before runtime registration infrastructure is available
+ok 294 - Plane background definition can be saved before runtime registration infrastructure is available
+  ---
+  duration_ms: 0.434087
+  type: 'test'
+  ...
+# Subtest: portal preview lists include Plane-authored objects by planeId and retain context-hidden eligible objects
+ok 295 - portal preview lists include Plane-authored objects by planeId and retain context-hidden eligible objects
+  ---
+  duration_ms: 0.418484
+  type: 'test'
+  ...
+# Subtest: Plane object metadata exposes slice identity and separates authored visibility from context visibility
+ok 296 - Plane object metadata exposes slice identity and separates authored visibility from context visibility
+  ---
+  duration_ms: 5.014391
+  type: 'test'
+  ...
+# Subtest: anomaly endpoint selectors and mouth changes register saved Planes before requiring runtime worlds
+ok 297 - anomaly endpoint selectors and mouth changes register saved Planes before requiring runtime worlds
+  ---
+  duration_ms: 1.618156
+  type: 'test'
+  ...
+# Subtest: hypercube surface, edges, and section vertices carry their owning Plane ID for portal previews
+ok 298 - hypercube surface, edges, and section vertices carry their owning Plane ID for portal previews
+  ---
+  duration_ms: 0.84695
+  type: 'test'
+  ...
+# Subtest: newly saved Planes are registered before they are offered as anomaly mouth destinations
+ok 299 - newly saved Planes are registered before they are offered as anomaly mouth destinations
+  ---
+  duration_ms: 19.797463
+  type: 'test'
+  ...
+# Subtest: selecting a saved custom Plane promotes it to runtime before activating the anomaly editor camera
+ok 300 - selecting a saved custom Plane promotes it to runtime before activating the anomaly editor camera
+  ---
+  duration_ms: 0.822792
+  type: 'test'
+  ...
+# Subtest: Plane save refreshes newly authored meshes before rebuilding connected anomaly preview lists
+ok 301 - Plane save refreshes newly authored meshes before rebuilding connected anomaly preview lists
+  ---
+  duration_ms: 4.076763
+  type: 'test'
+  ...
+# Subtest: Plane Editor creates a new 4D box definition with independent W thickness and center
+ok 302 - Plane Editor creates a new 4D box definition with independent W thickness and center
+  ---
+  duration_ms: 3.973734
+  type: 'test'
+  ...
+# Subtest: Plane Editor modifies existing Plane without changing its frame orientation or object records
+ok 303 - Plane Editor modifies existing Plane without changing its frame orientation or object records
+  ---
+  duration_ms: 0.998998
+  type: 'test'
+  ...
+# Subtest: Plane Editor rejects non-positive dimensions and invalid appearance values
+ok 304 - Plane Editor rejects non-positive dimensions and invalid appearance values
+  ---
+  duration_ms: 0.717057
+  type: 'test'
+  ...
+# [SpatialTransform] Geometry: poincare
+# [SpatialTransform] Geometry: euclidean
+# Subtest: Plane object definitions normalize stable local position, rotation, scale, visibility, and material data
+ok 305 - Plane object definitions normalize stable local position, rotation, scale, visibility, and material data
+  ---
+  duration_ms: 1.978335
+  type: 'test'
+  ...
+# Subtest: label object definitions default to camera-facing annotations but preserve explicit orientation
+ok 306 - label object definitions default to camera-facing annotations but preserve explicit orientation
+  ---
+  duration_ms: 0.382333
+  type: 'test'
+  ...
+# Subtest: Plane frame transform converts local coordinates through its ambient origin and tangent axes
+ok 307 - Plane frame transform converts local coordinates through its ambient origin and tangent axes
+  ---
+  duration_ms: 0.802419
+  type: 'test'
+  ...
+# Subtest: Plane-local preview projections clamp points beyond finite Poincare bounds without relaxing strict transforms
+ok 308 - Plane-local preview projections clamp points beyond finite Poincare bounds without relaxing strict transforms
+  ---
+  duration_ms: 3.046456
+  type: 'test'
+  ...
+# Subtest: custom Plane geometry contexts construct and use a real SpatialTransform
+ok 309 - custom Plane geometry contexts construct and use a real SpatialTransform
+  ---
+  duration_ms: 0.856256
+  type: 'test'
+  ...
+# Subtest: Plane frame transform reports singular XYZ projections and uses a deterministic fallback
+ok 310 - Plane frame transform reports singular XYZ projections and uses a deterministic fallback
+  ---
+  duration_ms: 0.425552
+  type: 'test'
+  ...
+# Subtest: Plane background inputs apply immediately to the active editor scene with configured opacity
+ok 311 - Plane background inputs apply immediately to the active editor scene with configured opacity
+  ---
+  duration_ms: 0.486091
+  type: 'test'
+  ...
+# Subtest: Plane Editor definition commits edited object records without changing the Plane frame
+ok 312 - Plane Editor definition commits edited object records without changing the Plane frame
+  ---
+  duration_ms: 0.981783
+  type: 'test'
+  ...
+# Subtest: Plane editor exposes local object creation, selection, numeric transforms, and shared gizmo modes
+ok 313 - Plane editor exposes local object creation, selection, numeric transforms, and shared gizmo modes
+  ---
+  duration_ms: 11.692362
+  type: 'test'
+  ...
+# Subtest: Plane object renderer projects editable local geometry, tags pickable meshes, and supports procedural tesseract sections
+ok 314 - Plane object renderer projects editable local geometry, tags pickable meshes, and supports procedural tesseract sections
+  ---
+  duration_ms: 1.881348
+  type: 'test'
+  ...
+# Subtest: editor camera zoom selector and V hotkey are exposed only in the Planes workflow
+ok 315 - editor camera zoom selector and V hotkey are exposed only in the Planes workflow
+  ---
+  duration_ms: 2.444522
+  type: 'test'
+  ...
+# Subtest: Demo Plane object migration is additive, one-time, and includes the room primitives, labels, and tesseract
+ok 316 - Demo Plane object migration is additive, one-time, and includes the room primitives, labels, and tesseract
+  ---
+  duration_ms: 1.127279
+  type: 'test'
+  ...
+# Subtest: Demo renders Plane records instead of recreating hard-coded room meshes, and applies tesseract records to runtime
+ok 317 - Demo renders Plane records instead of recreating hard-coded room meshes, and applies tesseract records to runtime
+  ---
+  duration_ms: 2.378009
+  type: 'test'
+  ...
+# Subtest: Plane selection promotes the saved definition before resolving the camera context
+ok 318 - Plane selection promotes the saved definition before resolving the camera context
+  ---
+  duration_ms: 1.085777
+  type: 'test'
+  ...
+# Subtest: editor keyboard shortcuts select transform modes and Plane subtabs without stealing typing
+ok 319 - editor keyboard shortcuts select transform modes and Plane subtabs without stealing typing
+  ---
+  duration_ms: 1.54728
+  type: 'test'
+  ...
+# Subtest: additional authored hypercubes are not suppressed as duplicates of the original demo tesseract
+ok 320 - additional authored hypercubes are not suppressed as duplicates of the original demo tesseract
+  ---
+  duration_ms: 2.302534
+  type: 'test'
+  ...
+# Subtest: Plane registry exposes the three stable demo Plane identities
+ok 321 - Plane registry exposes the three stable demo Plane identities
+  ---
+  duration_ms: 26.76424
+  type: 'test'
+  ...
+# Subtest: Plane registry clones records and rejects duplicate or unknown identities
+ok 322 - Plane registry clones records and rejects duplicate or unknown identities
+  ---
+  duration_ms: 0.975906
+  type: 'test'
+  ...
+# Subtest: Plane registry JSON round trip preserves stable identities
+ok 323 - Plane registry JSON round trip preserves stable identities
+  ---
+  duration_ms: 0.680229
+  type: 'test'
+  ...
+# Subtest: three existing demo anomalies become persistent definitions with original IDs and endpoint Plane IDs
+ok 324 - three existing demo anomalies become persistent definitions with original IDs and endpoint Plane IDs
+  ---
+  duration_ms: 3.738801
+  type: 'test'
+  ...
+# Subtest: Plane/anomaly persistence uses a separate database and separate stores from saved Worlds
+ok 325 - Plane/anomaly persistence uses a separate database and separate stores from saved Worlds
+  ---
+  duration_ms: 0.183662
+  type: 'test'
+  ...
+# Subtest: Plane v1 records migrate to v2 with a 4D box container and editable object collection
+ok 326 - Plane v1 records migrate to v2 with a 4D box container and editable object collection
+  ---
+  duration_ms: 0.164875
+  type: 'test'
+  ...
+# Subtest: Plane definitions preserve editable container settings and serializable object records
+ok 327 - Plane definitions preserve editable container settings and serializable object records
+  ---
+  duration_ms: 2.39878
+  type: 'test'
+  ...
+# Subtest: Plane object definitions support procedural hypercubes and validate transform data
+ok 328 - Plane object definitions support procedural hypercubes and validate transform data
+  ---
+  duration_ms: 0.379872
+  type: 'test'
+  ...
+# Subtest: WASD moves the character across both horizontal world axes
+ok 329 - WASD moves the character across both horizontal world axes
+  ---
+  duration_ms: 2.668037
+  type: 'test'
+  ...
+# Subtest: space initiates a jump with gravity returning the player to terrain
+ok 330 - space initiates a jump with gravity returning the player to terrain
+  ---
+  duration_ms: 0.708685
+  type: 'test'
+  ...
+# Subtest: suspended world movement still exposes input to the corridor controller
+ok 331 - suspended world movement still exposes input to the corridor controller
+  ---
+  duration_ms: 1.070017
+  type: 'test'
+  ...
+# Subtest: R/F expose the second corridor axis while Space remains a jump request
+ok 332 - R/F expose the second corridor axis while Space remains a jump request
+  ---
+  duration_ms: 0.179754
+  type: 'test'
+  ...
+# Subtest: Q and E expose the third independent corridor cross-section axis
+ok 333 - Q and E expose the third independent corridor cross-section axis
+  ---
+  duration_ms: 0.263747
+  type: 'test'
+  ...
+# Subtest: E/Q do not move the ordinary 3D player along the fourth axis
+ok 334 - E/Q do not move the ordinary 3D player along the fourth axis
+  ---
+  duration_ms: 0.165108
+  type: 'test'
+  ...
+# Subtest: Ctrl+R and Cmd+R are not captured by the movement controller
+ok 335 - Ctrl+R and Cmd+R are not captured by the movement controller
+  ---
+  duration_ms: 0.137074
+  type: 'test'
+  ...
+# Subtest: movement profiles can change per world and restore chamber-scale movement
+ok 336 - movement profiles can change per world and restore chamber-scale movement
+  ---
+  duration_ms: 0.92636
+  type: 'test'
+  ...
+# Subtest: legacy spherical-cap helper remains available and preserves projection UVs
+ok 337 - legacy spherical-cap helper remains available and preserves projection UVs
+  ---
+  duration_ms: 3.523432
+  type: 'test'
+  ...
+# Subtest: portal renderer supports a 3D spherical preview surface with depth-aware scaling
+ok 338 - portal renderer supports a 3D spherical preview surface with depth-aware scaling
+  ---
+  duration_ms: 1.383196
+  type: 'test'
+  ...
+# Subtest: flat circular preview remains available and is not curved
+ok 339 - flat circular preview remains available and is not curved
+  ---
+  duration_ms: 0.536918
+  type: 'test'
+  ...
+# Subtest: portal preview target matches aperture aspect and updates every frame
+ok 340 - portal preview target matches aperture aspect and updates every frame
+  ---
+  duration_ms: 0.39659
+  type: 'test'
+  ...
+# Subtest: portal preview temporarily reveals Plane objects hidden by the active-slice context
+ok 341 - portal preview temporarily reveals Plane objects hidden by the active-slice context
+  ---
+  duration_ms: 0.541802
+  type: 'test'
+  ...
+# Subtest: persistent endpoint edits become runtime endpoint positions and orientations
+ok 342 - persistent endpoint edits become runtime endpoint positions and orientations
+  ---
+  duration_ms: 5.002941
+  type: 'test'
+  ...
+# Subtest: disabled and unplaced persistent anomalies cannot become visible or traversable
+ok 343 - disabled and unplaced persistent anomalies cannot become visible or traversable
+  ---
+  duration_ms: 1.408718
+  type: 'test'
+  ...
+# Subtest: persistent connection flags are reflected in runtime topology settings
+ok 344 - persistent connection flags are reflected in runtime topology settings
+  ---
+  duration_ms: 1.337443
+  type: 'test'
+  ...
+# Subtest: persistent aperture and W-freedom radii are carried into the runtime anomaly
+ok 345 - persistent aperture and W-freedom radii are carried into the runtime anomaly
+  ---
+  duration_ms: 3.372511
+  type: 'test'
+  ...
+# Subtest: gizmo controls eagerly create and subscribe to all lazily-created Babylon gizmos
+ok 346 - gizmo controls eagerly create and subscribe to all lazily-created Babylon gizmos
+  ---
+  duration_ms: 9.827956
+  type: 'test'
+  ...
+# Subtest: Plane gizmo utility meshes inherit the active demo Plane layer mask
+ok 347 - Plane gizmo utility meshes inherit the active demo Plane layer mask
+  ---
+  duration_ms: 0.637802
+  type: 'test'
+  ...
+# Subtest: scale gizmo uses a separate proxy, leaves the rotation target at unit scale, and reports drag phases
+ok 348 - scale gizmo uses a separate proxy, leaves the rotation target at unit scale, and reports drag phases
+  ---
+  duration_ms: 1.23985
+  type: 'test'
+  ...
+# Subtest: detached gizmos remain hidden when the user changes transform mode without a selection
+ok 349 - detached gizmos remain hidden when the user changes transform mode without a selection
+  ---
+  duration_ms: 0.390699
+  type: 'test'
+  ...
+# Subtest: box building generator produces one visible furniture-bucket component
+ok 350 - box building generator produces one visible furniture-bucket component
+  ---
+  duration_ms: 1.558709
+  type: 'test'
+  ...
+# Subtest: box preview creates filled Babylon meshes as well as its outline
+ok 351 - box preview creates filled Babylon meshes as well as its outline
+  ---
+  duration_ms: 2.383335
+  type: 'test'
+  ...
+# Subtest: Object Editor is focused on the floor-plan-to-building workflow, not standalone box placement
+ok 352 - Object Editor is focused on the floor-plan-to-building workflow, not standalone box placement
+  ---
+  duration_ms: 4.670543
+  type: 'test'
+  ...
+# Subtest: building preview outline and solid preview share the projected component transform
+ok 353 - building preview outline and solid preview share the projected component transform
+  ---
+  duration_ms: 1.101065
+  type: 'test'
+  ...
+# Subtest: Plane object transform controls leave all three rotation axes enabled
+ok 354 - Plane object transform controls leave all three rotation axes enabled
+  ---
+  duration_ms: 0.562824
+  type: 'test'
+  ...
+# [SpatialTransform] Geometry: poincare
+# [SpatialTransform] Geometry: poincare
+# Subtest: presentation mouths rebase distant Main World coordinates onto compact canonical anomaly endpoints
+ok 355 - presentation mouths rebase distant Main World coordinates onto compact canonical anomaly endpoints
+  ---
+  duration_ms: 7.717722
+  type: 'test'
+  ...
+# Subtest: presentation mapping preserves the canonical source endpoint and only rebases within its approach radius
+ok 356 - presentation mapping preserves the canonical source endpoint and only rebases within its approach radius
+  ---
+  duration_ms: 0.828391
+  type: 'test'
+  ...
+# Subtest: spatial anomaly factory defaults to slice transitions and preserves explicit Bezier corridors
+ok 357 - spatial anomaly factory defaults to slice transitions and preserves explicit Bezier corridors
+  ---
+  duration_ms: 1.526341
+  type: 'test'
+  ...
+# Subtest: slice-transition anomalies require finite four-dimensional bounds containing distinct slice planes
+ok 358 - slice-transition anomalies require finite four-dimensional bounds containing distinct slice planes
+  ---
+  duration_ms: 1.120636
+  type: 'test'
+  ...
+# Subtest: entry checks the complete 4D region before starting traversal
+ok 359 - entry checks the complete 4D region before starting traversal
+  ---
+  duration_ms: 1.257232
+  type: 'test'
+  ...
+# Subtest: anomaly entry enables independent X, Y, Z, and W movement without changing chunk addressing
+ok 360 - anomaly entry enables independent X, Y, Z, and W movement without changing chunk addressing
+  ---
+  duration_ms: 2.896376
+  type: 'test'
+  ...
+# Subtest: bounded anomaly movement clamps XYZ and W within its registered 4D region
+ok 361 - bounded anomaly movement clamps XYZ and W within its registered 4D region
+  ---
+  duration_ms: 5.207042
+  type: 'test'
+  ...
+# Subtest: crossing the W slice plane performs a clean destination handoff and reverse traversal
+ok 362 - crossing the W slice plane performs a clean destination handoff and reverse traversal
+  ---
+  duration_ms: 3.492142
+  type: 'test'
+  ...
+# Subtest: the smooth W-freedom field begins outside the bounded anomaly and scales approach movement
+ok 363 - the smooth W-freedom field begins outside the bounded anomaly and scales approach movement
+  ---
+  duration_ms: 1.770999
+  type: 'test'
+  ...
+# Subtest: W movement reaches full speed in the anomaly inner sphere
+ok 364 - W movement reaches full speed in the anomaly inner sphere
+  ---
+  duration_ms: 1.536653
+  type: 'test'
+  ...
+# Subtest: controller exposes the player-stat modifier hook to movement and chunk reachability
+ok 365 - controller exposes the player-stat modifier hook to movement and chunk reachability
+  ---
+  duration_ms: 1.354778
+  type: 'test'
+  ...
+# Subtest: continuous W freedom permits movement in both directions from either connected slice
+ok 366 - continuous W freedom permits movement in both directions from either connected slice
+  ---
+  duration_ms: 1.053388
+  type: 'test'
+  ...
+# Subtest: bounded anomaly permits independent negative and positive W exploration around its source plane
+ok 367 - bounded anomaly permits independent negative and positive W exploration around its source plane
+  ---
+  duration_ms: 3.496457
+  type: 'test'
+  ...
+# Subtest: player anomaly traversal clamps its local position before Poincare projection
+ok 368 - player anomaly traversal clamps its local position before Poincare projection
+  ---
+  duration_ms: 5.554213
+  type: 'test'
+  ...
+# Subtest: main-world handoff applies its faster movement profile and preserves bidirectional W freedom
+ok 369 - main-world handoff applies its faster movement profile and preserves bidirectional W freedom
+  ---
+  duration_ms: 1.01977
+  type: 'test'
+  ...
+# Subtest: destination handoff clamps arrival coordinates before entering a bounded Poincare chart
+ok 370 - destination handoff clamps arrival coordinates before entering a bounded Poincare chart
+  ---
+  duration_ms: 0.873914
+  type: 'test'
+  ...
+# Subtest: corridor is a first-class chunk between source and destination world chunks
+ok 371 - corridor is a first-class chunk between source and destination world chunks
+  ---
+  duration_ms: 4.733087
+  type: 'test'
+  ...
+# Subtest: fourth-coordinate proximity never creates chunk adjacency
+ok 372 - fourth-coordinate proximity never creates chunk adjacency
+  ---
+  duration_ms: 0.650906
+  type: 'test'
+  ...
+# Subtest: one-way corridor exposes chunk adjacency only in its permitted direction
+ok 373 - one-way corridor exposes chunk adjacency only in its permitted direction
+  ---
+  duration_ms: 0.736196
+  type: 'test'
+  ...
+# Subtest: non-traversable corridor chunk exists but does not join simulation neighborhoods
+ok 374 - non-traversable corridor chunk exists but does not join simulation neighborhoods
+  ---
+  duration_ms: 1.109687
+  type: 'test'
+  ...
+# Subtest: loaded chunk registration is independent from graph connectivity
+ok 375 - loaded chunk registration is independent from graph connectivity
+  ---
+  duration_ms: 0.933848
+  type: 'test'
+  ...
+# Subtest: loaded chunk references refresh when a remote corridor neighbour loads or unloads
+ok 376 - loaded chunk references refresh when a remote corridor neighbour loads or unloads
+  ---
+  duration_ms: 1.910319
+  type: 'test'
+  ...
+# Subtest: cross-slice chunk reachability scales with the ambient anomaly field and configured W range
+ok 377 - cross-slice chunk reachability scales with the ambient anomaly field and configured W range
+  ---
+  duration_ms: 3.503205
+  type: 'test'
+  ...
+# Subtest: registered spatial mode activates, pauses, resumes, and deactivates its own systems
+ok 378 - registered spatial mode activates, pauses, resumes, and deactivates its own systems
+  ---
+  duration_ms: 2.1488
+  type: 'test'
+  ...
+# Subtest: spatial modes reject missing controllers and duplicate registrations
+ok 379 - spatial modes reject missing controllers and duplicate registrations
+  ---
+  duration_ms: 0.954834
+  type: 'test'
+  ...
+# [SpatialTransform] Geometry: poincare
+# [SpatialTransform] Geometry: euclidean
+# [SpatialTransform] Geometry: poincare
+# [SpatialTransform] Geometry: euclidean
+# [SpatialTransform] Geometry: inverted-poincare
+# Subtest: Poincare render-space camera positions are clamped strictly inside the open ball
+ok 380 - Poincare render-space camera positions are clamped strictly inside the open ball
+  ---
+  duration_ms: 3.489798
+  type: 'test'
+  ...
+# Subtest: Euclidean render coordinates are not altered by the chart constraint
+ok 381 - Euclidean render coordinates are not altered by the chart constraint
+  ---
+  duration_ms: 0.338213
+  type: 'test'
+  ...
+# Subtest: Poincare world positions are constrained to the finite chart domain before rendering
+ok 382 - Poincare world positions are constrained to the finite chart domain before rendering
+  ---
+  duration_ms: 0.634542
+  type: 'test'
+  ...
+# Subtest: Euclidean world positions remain unchanged by chart-domain constraint
+ok 383 - Euclidean world positions remain unchanged by chart-domain constraint
+  ---
+  duration_ms: 0.299523
+  type: 'test'
+  ...
+# Subtest: inverted-Poincare world positions use the same finite chart-domain constraint
+ok 384 - inverted-Poincare world positions use the same finite chart-domain constraint
+  ---
+  duration_ms: 0.324563
+  type: 'test'
+  ...
+# Subtest: clamp defaults to the normalized range and rejects invalid values
+ok 385 - clamp defaults to the normalized range and rejects invalid values
+  ---
+  duration_ms: 0.730717
+  type: 'test'
+  ...
+# Subtest: topographic elevation maps to the configured soil classes
+ok 386 - topographic elevation maps to the configured soil classes
+  ---
+  duration_ms: 0.192883
+  type: 'test'
+  ...
+# Subtest: terrain vertex colors remain finite and visible across elevation and slope ranges
+ok 387 - terrain vertex colors remain finite and visible across elevation and slope ranges
+  ---
+  duration_ms: 1.215747
+  type: 'test'
+  ...
+# Subtest: invalid height and slope samples do not propagate NaN into vertex colors
+ok 388 - invalid height and slope samples do not propagate NaN into vertex colors
+  ---
+  duration_ms: 0.224714
+  type: 'test'
+  ...
+# Subtest: terrain worker emits finite RGB vertex colors for a generated chunk
+ok 389 - terrain worker emits finite RGB vertex colors for a generated chunk
+  ---
+  duration_ms: 9.366079
+  type: 'test'
+  ...
+# Subtest: synchronous chunk rendering uses the same soil palette as worker generation
+ok 390 - synchronous chunk rendering uses the same soil palette as worker generation
+  ---
+  duration_ms: 1.059755
+  type: 'test'
+  ...
+# [SpatialTransform] Geometry: spherical
+# [SpatialTransform] Geometry: inverted-poincare
+# Subtest: heightmap sampler bilinearly interpolates grayscale terrain and clamps edges
+ok 391 - heightmap sampler bilinearly interpolates grayscale terrain and clamps edges
+  ---
+  duration_ms: 1.662331
+  type: 'test'
+  ...
+# Subtest: heightmap validates dimensions, channels, and elevation limits
+ok 392 - heightmap validates dimensions, channels, and elevation limits
+  ---
+  duration_ms: 0.546168
+  type: 'test'
+  ...
+# Subtest: color-ramp decoding and sampled statistics are deterministic
+ok 393 - color-ramp decoding and sampled statistics are deterministic
+  ---
+  duration_ms: 0.775237
+  type: 'test'
+  ...
+# Subtest: topographic factory creates an independent slice and terrain sampler
+ok 394 - topographic factory creates an independent slice and terrain sampler
+  ---
+  duration_ms: 3.405646
+  type: 'test'
+  ...
+# Subtest: independent topographic inputs create isolated world slices
+ok 395 - independent topographic inputs create isolated world slices
+  ---
+  duration_ms: 3.288661
+  type: 'test'
+  ...
+# Subtest: topographic mesh buffers generate indexed geometry at bounded resolution
+ok 396 - topographic mesh buffers generate indexed geometry at bounded resolution
+  ---
+  duration_ms: 0.779887
+  type: 'test'
+  ...
+# Subtest: spherical and inverted-Poincare charts round-trip away from singularities
+ok 397 - spherical and inverted-Poincare charts round-trip away from singularities
+  ---
+  duration_ms: 1.666299
+  type: 'test'
+  ...
+# [HeightmapTerrain] Primary map failed validation; loading fallback fallback-map.png. Error: truncated image
+#     at Object.load (file:///mnt/data/somnium_phase18/phase18L-work/tests/topography-generation.test.mjs:160:52)
+#     at HeightmapTerrain.load (file:///mnt/data/somnium_phase18/phase18L-work/src/environment/heightmap-terrain.js:29:46)
+#     at TestContext.fallbackTerrain (file:///mnt/data/somnium_phase18/phase18L-work/tests/topography-generation.test.mjs:173:19)
+#     at async Test.run (node:internal/test_runner/test:1054:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# [HeightmapTerrain] Loaded: {
+#   ready: true,
+#   image: { width: 2, height: 2 },
+#   source: 'fallback-map.png',
+#   usingFallback: true,
+#   worldSize: 100,
+#   heightChannel: 'average',
+#   configuredHeightRange: { min: -2, max: 2 },
+#   sampledHeightRange: { min: -2, max: 2, variation: 4 },
+#   averageHeight: -0.24705882352941141,
+#   sampleCount: 1089,
+#   samples: [
+#     { x: -50, z: -50, height: -2 },
+#     { x: 0, z: -50, height: -1.4980392156862745 },
+#     { x: 50, z: -50, height: -0.996078431372549 },
+#     { x: -50, z: 0, height: -0.996078431372549 },
+#     { x: 0, z: 0, height: -0.24705882352941178 },
+#     { x: 50, z: 0, height: 0.5019607843137255 },
+#     { x: -50, z: 50, height: 0.007843137254901933 },
+#     { x: 0, z: 50, height: 1.003921568627451 },
+#     { x: 50, z: 50, height: 2 }
+#   ]
+# }
+# Subtest: gameplay terrain falls back cleanly when its primary topographic asset is unreadable
+ok 398 - gameplay terrain falls back cleanly when its primary topographic asset is unreadable
+  ---
+  duration_ms: 19.230417
+  type: 'test'
+  ...
+# [SpatialTransform] Geometry: spherical
+# [GeometryRenderer] Initialized: {
+#   geometry: 'spherical',
+#   enabled: true,
+#   renderScale: 10,
+#   projection: {
+#     geometry: 'poincare-3d',
+#     dimensions: 3,
+#     curvature: -1,
+#     radius: 1,
+#     center: { x: 0, y: 0, z: 0 },
+#     bounds: { minX: -20, maxX: 20, minY: -20, maxY: 20, minZ: -20, maxZ: 20 },
+#     characteristicLength: 100000,
+#     boundaryReachable: false
+#   },
+#   metric: {
+#     geometry: 'poincare-3d',
+#     curvature: -1,
+#     radius: 1,
+#     dimensions: 3,
+#     boundaryReachable: false
+#   },
+#   visualScale: 'unit'
+# }
+# [GeometryRenderer] Disposed: {
+#   enabled: false,
+#   geometry: 'spherical',
+#   transformedMeshes: 1,
+#   transformedVertices: 3,
+#   restoredMeshes: 1
+# }
+# [HeightmapTerrain] Primary map failed validation; loading fallback complete-demo.png. Error: Topographic raster has 14 fully transparent trailing rows.
+#     at assertCompleteRaster (file:///mnt/data/somnium_phase18/phase18L-work/src/environment/heightmap-terrain.js:206:15)
+#     at HeightmapTerrain.load (file:///mnt/data/somnium_phase18/phase18L-work/src/environment/heightmap-terrain.js:30:13)
+#     at async TestContext.transparentTailFallback (file:///mnt/data/somnium_phase18/phase18L-work/tests/topography-generation.test.mjs:237:5)
+#     at async Test.run (node:internal/test_runner/test:1054:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# [HeightmapTerrain] Loaded: {
+#   ready: true,
+#   image: { width: 2, height: 16 },
+#   source: 'complete-demo.png',
+#   usingFallback: true,
+#   worldSize: 20,
+#   heightChannel: 'average',
+#   configuredHeightRange: { min: -1, max: 1 },
+#   sampledHeightRange: { min: -1, max: 0.9063725490196077, variation: 1.9063725490196077 },
+#   averageHeight: -0.8911616161616162,
+#   sampleCount: 1089,
+#   samples: [
+#     { x: -10, z: -10, height: -1 },
+#     { x: 0, z: -10, height: -0.7490196078431373 },
+#     { x: 10, z: -10, height: -0.4980392156862745 },
+#     { x: -10, z: 0, height: -1 },
+#     { x: 0, z: 0, height: -1 },
+#     { x: 10, z: 0, height: -1 },
+#     { x: -10, z: 10, height: -1 },
+#     { x: 0, z: 10, height: -1 },
+#     { x: 10, z: 10, height: -1 }
+#   ]
+# }
+# Subtest: Babylon adapter projects by slice and restores original mesh buffers without replacing materials
+ok 399 - Babylon adapter projects by slice and restores original mesh buffers without replacing materials
+  ---
+  duration_ms: 7.241272
+  type: 'test'
+  ...
+# Subtest: terrain fallback detects a silently truncated image with a transparent tail
+ok 400 - terrain fallback detects a silently truncated image with a transparent tail
+  ---
+  duration_ms: 3.746322
+  type: 'test'
+  ...
+# [GeometryDemo] WorldManager.setVisible failed; using compatibility fallback. TypeError: legacy method is incompatible
+#     at Object.setVisible (file:///mnt/data/somnium_phase18/phase18L-work/tests/world-manager-visibility.test.mjs:65:30)
+#     at applyManagerVisibility (file:///mnt/data/somnium_phase18/phase18L-work/src/demo/world-manager-visibility.js:17:17)
+#     at setWorldManagerVisibility (file:///mnt/data/somnium_phase18/phase18L-work/src/demo/world-manager-visibility.js:9:9)
+#     at TestContext.brokenManagerApi (file:///mnt/data/somnium_phase18/phase18L-work/tests/world-manager-visibility.test.mjs:68:5)
+#     at Test.runInAsyncScope (node:async_hooks:214:14)
+#     at Test.run (node:internal/test_runner/test:1047:25)
+#     at Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+#     at Test.postRun (node:internal/test_runner/test:1173:19)
+#     at Test.run (node:internal/test_runner/test:1101:12)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# Subtest: visibility delegates to the current WorldManager API
+ok 401 - visibility delegates to the current WorldManager API
+  ---
+  duration_ms: 1.552128
+  type: 'test'
+  ...
+# Subtest: visibility supports a legacy manager without setVisible()
+ok 402 - visibility supports a legacy manager without setVisible()
+  ---
+  duration_ms: 0.337504
+  type: 'test'
+  ...
+# Subtest: visibility handles managers that expose meshes but no chunk map
+ok 403 - visibility handles managers that expose meshes but no chunk map
+  ---
+  duration_ms: 0.200723
+  type: 'test'
+  ...
+# Subtest: visibility safely handles an uninitialized manager
+ok 404 - visibility safely handles an uninitialized manager
+  ---
+  duration_ms: 0.173564
+  type: 'test'
+  ...
+# Subtest: visibility falls back when a manager method throws
+ok 405 - visibility falls back when a manager method throws
+  ---
+  duration_ms: 2.773932
+  type: 'test'
+  ...
+# Subtest: WorldManager exposes the visibility API
+ok 406 - WorldManager exposes the visibility API
+  ---
+  duration_ms: 0.142114
+  type: 'test'
+  ...
+# Subtest: geometry demo borrows the live main-world manager instead of owning a separate destination
+ok 407 - geometry demo borrows the live main-world manager instead of owning a separate destination
+  ---
+  duration_ms: 1.443117
+  type: 'test'
+  ...
+# Subtest: application entry chain uses one cache-busting build identifier
+ok 408 - application entry chain uses one cache-busting build identifier
+  ---
+  duration_ms: 0.660396
+  type: 'test'
+  ...
+# Subtest: WorldManager visibility tolerates calls before chunk initialization
+ok 409 - WorldManager visibility tolerates calls before chunk initialization
+  ---
+  duration_ms: 0.437304
+  type: 'test'
+  ...
+# Subtest: WorldManager visibility updates resident chunk meshes
+ok 410 - WorldManager visibility updates resident chunk meshes
+  ---
+  duration_ms: 0.357881
+  type: 'test'
+  ...
+# Subtest: WorldManager schedules reachable cross-slice chunks and retains them through the hysteresis window
+ok 411 - WorldManager schedules reachable cross-slice chunks and retains them through the hysteresis window
+  ---
+  duration_ms: 1.792951
+  type: 'test'
+  ...
+1..411
+# tests 411
+# suites 0
+# pass 411
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 36482.653253

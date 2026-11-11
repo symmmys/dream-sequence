@@ -20,13 +20,38 @@ class EditorCamera {
         this.camera.lowerRadiusLimit = 0.1;
         this.camera.upperRadiusLimit = Number.MAX_VALUE;
 
-        this.camera.wheelPrecision = 5;
+        this.baseWheelPrecision = options.wheelPrecision ?? 5;
+        this.wheelZoomMultiplier = 1;
+        this.setWheelZoomMultiplier(options.wheelZoomMultiplier ?? 1);
         this.camera.panningSensibility = 40;
         this.camera.angularSensibilityX = 1000;
         this.camera.angularSensibilityY = 1000;
 
         this.camera.inertia = 0.8;
         this.camera.detachControl();
+    }
+
+    setWheelZoomMultiplier(multiplier) {
+        const supported = [1, 10, 100];
+        if (!supported.includes(multiplier)) {
+            throw new RangeError(`Unsupported wheel zoom multiplier: ${multiplier}. Choose 1, 10, or 100.`);
+        }
+        this.wheelZoomMultiplier = multiplier;
+        // Babylon's wheelPrecision is a divisor: lower values zoom faster.
+        // Keep the original feel at 1x and scale it linearly for the presets.
+        this.camera.wheelPrecision = this.baseWheelPrecision / multiplier;
+        const wheelInput = this.camera.inputs?.attached?.mousewheel;
+        if (wheelInput) wheelInput.wheelPrecision = this.baseWheelPrecision / multiplier;
+        return this.wheelZoomMultiplier;
+    }
+
+    getWheelZoomMultiplier() { return this.wheelZoomMultiplier; }
+
+    cycleWheelZoomMultiplier(direction = 1) {
+        const presets = [1, 10, 100];
+        const current = presets.indexOf(this.wheelZoomMultiplier);
+        const next = (current + (direction < 0 ? presets.length - 1 : 1)) % presets.length;
+        return this.setWheelZoomMultiplier(presets[next]);
     }
 
     focus(position, radius) {

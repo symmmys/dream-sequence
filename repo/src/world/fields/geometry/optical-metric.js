@@ -8,7 +8,7 @@ import {
     assertVector4,
     createCanonicalSliceFrame,
     createSliceFrame
-} from './spatial-4d.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+} from './spatial-4d.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
 
 const AXES = ['x', 'y', 'z', 'w'];
 const MATRIX3_SIZE = 9;

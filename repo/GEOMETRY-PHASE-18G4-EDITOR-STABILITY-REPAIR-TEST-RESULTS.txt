@@ -1,0 +1,46 @@
+SOMNIUM GEOMETRY — PHASE 18G4 EDITOR STABILITY REPAIR
+AUTOMATED TEST AND STATIC VALIDATION RESULTS
+Build: 2026-11-10-phase18g4-editor-stability-repair-1
+
+FULL REGRESSION SUITE
+---------------------
+Command: node --test tests/*.test.mjs
+Tests:   388
+Passed:  388
+Failed:  0
+Skipped: 0
+Cancelled: 0
+Result:  PASS
+
+FOCUSED EDITOR TESTS
+--------------------
+Command:
+  node --test tests/plane-object-editor.test.mjs tests/editor-camera-zoom.test.mjs tests/shared-transform-tools-regression.test.mjs
+Tests:   23
+Passed:  23
+Failed:  0
+Result:  PASS
+
+STATIC CHECKS
+-------------
+JavaScript source syntax (src/**/*.js): PASS
+Test syntax (tests/**/*.mjs): PASS
+Relative imports checked: 379
+Missing relative imports: 0
+Old build identifier occurrences in index.html, src, tests: 0
+New build identifier occurrences in index.html, src, tests: 84
+
+COVERAGE ADDED OR EXTENDED
+--------------------------
+- Plane gizmo utility-layer meshes track the active demo Plane layer mask.
+- Hypercube cross-section surface is directly pickable; the invisible hit proxy remains available.
+- Hypercube bounds refresh after procedural section updates.
+- Plane background updates the active editor scene with configured opacity.
+- Plane background color and opacity remain in the saved Plane definition.
+- Editor camera wheel zoom supports 1x, 10x, and 100x values and cycling in both directions.
+- V hotkey is scoped to the Planes editor workflow.
+- Finite Poincaré preview projection constrains editor-only points while strict transforms remain strict.
+
+LIMITATIONS
+-----------
+No live browser, pointer-interaction, or WebGL rendering session was available during this build. The browser checks in the implementation note remain necessary to confirm runtime appearance and interaction.

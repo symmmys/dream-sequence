@@ -1,0 +1,25 @@
+SOMNIUM GEOMETRY — PHASE 18J PATCH MANIFEST
+
+Base archive: Somnium_Geometry_Phase_18I_Plane_Contained_Build_and_Anomaly_Tools.zip
+Release archive: Somnium_Geometry_Phase_18J_Editor_Finalization.zip
+Patch archive: Somnium_Geometry_Phase_18J_Editor_Finalization_Patch.zip
+
+Patch comparison against a freshly extracted Phase 18I full archive:
+- 32 changed files
+- 8 added files
+- 0 deleted files
+- Exact tree comparison after patch application is required before release.
+
+Functional changes:
+- Saved Plane background color/opacity now follows the active runtime slice.
+- Switching out of geometry-demo modes restores the ordinary scene background.
+- Plane save shortcut: Ctrl+S, including focused Plane form controls.
+- Top-level Level Builder tabs are Planes (1) and Object Editor (2).
+- Plane subtabs are Plane Editor and Anomalies.
+- Object Editor contains the existing create-building-from-floor-plan workflow.
+- Existing camera zoom, object editing, anomaly placement, and aperture gizmo workflows remain.
+
+The incremental patch is based on the complete Phase 18I project. It must not be applied directly to Phase 18H or an earlier archive.
+
+See PHASE-18J-PATCH-FILE-MANIFEST.txt for the exact changed/added file list.
+No IndexedDB schema migration is included. No browser storage reset is required.

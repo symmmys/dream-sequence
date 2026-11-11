@@ -1,0 +1,48 @@
+SOMNIUM PHASE 18N — PATCH MANIFEST
+
+Patch base: Phase 18M full project archive
+Patch target: Phase 18N Universe W-Slice Navigation
+
+Files added or modified: 39 (including this manifest)
+Files deleted: 0
+
+Added/modified paths:
+  [added] PHASE-18N-PATCH-MANIFEST.txt
+  [added] GEOMETRY-PHASE-18N-TEST-RESULTS.txt
+  [added] GEOMETRY-PHASE-18N-UNIVERSE-W-SLICE-NAVIGATION.md
+  [added] INSTALLATION-GEOMETRY-PHASE-18N.txt
+  [added] PHASE-18N-FULL-TEST-OUTPUT.txt
+  [modified] index.html
+  [modified] src/demo/corridor-traversal-network.js
+  [modified] src/demo/geometry-demo-camera-controller.js
+  [modified] src/demo/geometry-demo-topology.js
+  [modified] src/demo/geometry-demo-world.js
+  [modified] src/demo/hypercube-4d-renderer.js
+  [modified] src/editor/building-editor.js
+  [modified] src/editor/plane-editor.js
+  [modified] src/editor/plane-object-renderer.js
+  [modified] src/main.js
+  [modified] src/scene/create-scene.js
+  [modified] src/world/fields/geometry/anomaly-boundary-renderer.js
+  [modified] src/world/fields/geometry/anomaly-influence-field.js
+  [modified] src/world/fields/geometry/anomaly-view-transform.js
+  [modified] src/world/fields/geometry/hypercube-4d.js
+  [modified] src/world/fields/geometry/optical-anomaly-tracer.js
+  [modified] src/world/fields/geometry/optical-contracts.js
+  [modified] src/world/fields/geometry/optical-debug-renderer.js
+  [modified] src/world/fields/geometry/optical-light-source.js
+  [modified] src/world/fields/geometry/optical-metric.js
+  [modified] src/world/fields/geometry/optical-ray-integrator.js
+  [modified] src/world/fields/geometry/optical-scene-registry.js
+  [modified] src/world/fields/geometry/optical-slice-tracer.js
+  [modified] src/world/fields/geometry/slice-transition-traversal-controller.js
+  [modified] src/world/fields/geometry/spatial-anomaly.js
+  [modified] src/world/fields/geometry/spatial-corridor.js
+  [added] src/world/fields/geometry/w-slice-range.js
+  [modified] src/world/fields/geometry/world-topology.js
+  [modified] src/world/spatial-chunk-graph.js
+  [modified] src/world/world-manager.js
+  [modified] tests/geometry-demo-topology.test.mjs
+  [modified] tests/plane-object-editor.test.mjs
+  [added] tests/w-slice-range.test.mjs
+  [modified] tests/world-manager-visibility.test.mjs

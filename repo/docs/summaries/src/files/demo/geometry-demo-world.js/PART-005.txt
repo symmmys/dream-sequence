@@ -1,0 +1,300 @@
+            [...next].every((mesh) => this.spotlightShadowCasters.has(mesh))) return;
+
+        for (const mesh of this.spotlightShadowCasters) {
+            if (next.has(mesh)) continue;
+            this.spotlightShadowGenerator?.removeShadowCaster?.(mesh, false);
+            if (this.spotlightOriginalReceiveShadows.has(mesh)) {
+                mesh.receiveShadows = this.spotlightOriginalReceiveShadows.get(mesh);
+                this.spotlightOriginalReceiveShadows.delete(mesh);
+            }
+        }
+        for (const mesh of next) {
+            if (!this.spotlightShadowCasters.has(mesh)) {
+                this.spotlightOriginalReceiveShadows.set(mesh, Boolean(mesh.receiveShadows));
+                this.spotlightShadowGenerator?.addShadowCaster?.(mesh, false);
+            }
+            mesh.receiveShadows = true;
+        }
+        this.spotlightShadowCasters = next;
+        this.destinationSpotlight.includedOnlyMeshes = candidates;
+    }
+
+    clearOpticalSpotlightShadowCasters() {
+        for (const mesh of this.spotlightShadowCasters ?? []) {
+            this.spotlightShadowGenerator?.removeShadowCaster?.(mesh, false);
+        }
+        for (const [mesh, receiveShadows] of this.spotlightOriginalReceiveShadows ?? []) {
+            if (!mesh.isDisposed?.()) mesh.receiveShadows = receiveShadows;
+        }
+        this.spotlightShadowCasters?.clear();
+        this.spotlightOriginalReceiveShadows?.clear();
+        if (this.destinationSpotlight) this.destinationSpotlight.includedOnlyMeshes = [];
+    }
+
+    getOpticalSpotlightDiagnostics() {
+        return {
+            source: this.spotlightSource ? {
+                ...this.spotlightSource,
+                position: { ...this.spotlightSource.position },
+                direction: { ...this.spotlightSource.direction },
+                color: [...this.spotlightSource.color]
+            } : null,
+            editing: Boolean(this.spotlightEditorActive),
+            testRayEnabled: Boolean(this.spotlightTestRayEnabled && this.spotlightSource?.enabled),
+            trace: this.spotlightTraceState ? {
+                transmitted: Boolean(this.spotlightTraceState.transmitted),
+                reason: this.spotlightTraceState.reason ?? null,
+                anomalyId: this.spotlightTraceState.anomalyId ?? null,
+                energy: this.spotlightTraceState.energy ?? 0,
+                virtualPosition: this.spotlightTraceState.presentationVirtualPosition ??
+                    this.spotlightTraceState.virtualPosition ?? null,
+                physicalVirtualPosition: this.spotlightTraceState.virtualPosition ?? null,
+                presentationOffset: this.spotlightTraceState.presentationOffset ?? null,
+                direction: this.spotlightTraceState.direction ?? null,
+                transitions: this.spotlightTraceState.trace?.transitions?.length ?? 0,
+                pathLength: this.spotlightTraceState.diagnostics?.pathLength ?? null
+            } : null,
+            receiverEnabled: Boolean(this.destinationSpotlight?.isEnabled?.()),
+            destinationRayVisible: Boolean(this.destinationSpotlightRayLine?.isVisible),
+            destinationRayLength: this.spotlightDebugRayLength ?? 0,
+            shadowGeneratorAvailable: Boolean(this.spotlightShadowGenerator),
+            shadowCasterCount: this.spotlightShadowCasters?.size ?? 0,
+            shadowCasterLimit: this.spotlightShadowCasterLimit,
+            controls: 'L toggle edit; P test light/ray on/off; WASD/arrows move X/Z; R/F move Y; U/O yaw; I/K pitch; drag mouse to aim; Shift=faster; Escape exits'
+        };
+    }
+
+    disposeOpticalSpotlight() {
+        this.clearOpticalSpotlightShadowCasters();
+        this.spotlightShadowGenerator?.dispose?.();
+        this.destinationSpotlight?.dispose?.();
+        this.destinationSpotlightRayLine?.dispose?.();
+        this.spotlightSourceLight?.dispose?.();
+        this.spotlightMarker?.dispose?.();
+        this.spotlightAimLine?.dispose?.();
+        this.spotlightMarkerMaterial?.dispose?.();
+        this.spotlightTracer = null;
+    }
+
+    handleGridKeyDown(event) {
+        if (!this.active || this.disposed || event.code !== 'KeyG' || event.repeat ||
+            event.ctrlKey || event.metaKey || event.altKey) return;
+        const tagName = String(event.target?.tagName ?? '').toUpperCase();
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tagName) || event.target?.isContentEditable) return;
+        event.preventDefault?.();
+        this.toggleGrid();
+    }
+
+    toggleCameraMode() { return this.cameraController.toggleMode(); }
+
+    updatePortalPreview() {
+        this.destinationPreviewFocus = null;
+        this.destinationPreviewDirection = null;
+        if (!this.active) return;
+        if (!Array.isArray(this.portalPairs)) return updateLegacyPortalPreview(this);
+
+        const viewSliceId = this.cameraController.getViewSliceId();
+        const viewerWorld = this.getWorld(viewSliceId);
+        const playerController = this.traversalController.getActiveController?.();
+        const playerTransit = playerController?.state === 'transit' ? playerController : null;
+        const cameraTransit = this.cameraController.getFreeTransitState();
+        const transit = this.cameraController.mode === 'free' ? cameraTransit : playerTransit;
+        const transitAnomaly = transit?.type === SLICE_TRANSITION_ANOMALY ||
+            transit?.corridor?.type === SLICE_TRANSITION_ANOMALY ||
+            transit?.anomaly?.type === SLICE_TRANSITION_ANOMALY;
+        const transitCorridorId = transit?.corridorId ?? transit?.corridor?.id ??
+            transit?.anomaly?.id ?? playerController?.corridor?.id ?? null;
+        const transitTargetSliceId = transit?.targetWorld?.slice?.id ??
+            transit?.target?.slice?.id ?? transit?.toSliceId ?? null;
+        this.destinationApproachState = null;
+
+        const passagePair = transitAnomaly
+            ? this.portalPairs.find((entry) => entry.corridor.id === transitCorridorId)
+            : null;
+        for (const pair of this.portalPairs) {
+            if (pair !== passagePair) {
+                pair.passagePresentation?.deactivate(this.camera, viewerWorld.layerMask);
+            }
+        }
+
+        if (transitAnomaly) {
+            const presentation = passagePair?.passagePresentation;
+            const startWorld = transit?.startWorld ?? this.getWorld(viewSliceId);
+            const targetWorld = transit?.targetWorld ?? transit?.target ??
+                (transitTargetSliceId ? this.getWorld(transitTargetSliceId) : null);
+            if (presentation && startWorld && targetWorld) {
+                const progress = clamp(transit.progress ?? 0, 0, 1);
+                const viewerPresentationPosition = passagePair.presentationEndpointsBySlice?.[startWorld.slice.id];
+                const exitPose = mapAnomalyCameraPose({
+                    camera: this.camera, viewerWorld: startWorld, remoteWorld: targetWorld,
+                    anomaly: passagePair.corridor, approachProgress: progress,
+                    viewerEndpoint: viewerPresentationPosition
+                        ? { sliceId: startWorld.slice.id, position: viewerPresentationPosition }
+                        : null
+                });
+                for (const pair of this.portalPairs) {
+                    pair.sourcePortal.setVisible(false);
+                    pair.destinationPortal.setVisible(false);
+                }
+                const presentationDirection = this.cameraController.mode === 'follow' &&
+                    Number.isFinite(this.player?.yaw)
+                    ? { x: Math.sin(this.player.yaw), y: 0, z: Math.cos(this.player.yaw) }
+                    : null;
+                const passageState = presentation.update({
+                    camera: this.camera, startWorld, targetWorld, progress,
+                    exitCameraPose: exitPose, presentationDirection
+                });
+                this.destinationApproachState = {
+                    anomalyId: passagePair.corridor.id, progress,
+                    entryScale: passageState.entry.scale, exitScale: passageState.exit.scale,
+                    mouthSeparation: passageState.separation,
+                    cameraConvergence: exitPose?.approachEase ?? null,
+                    remoteEyeLocalPosition: exitPose?.remoteLocalPosition ?? null
+                };
+                if (targetWorld.slice.id === this.destination.slice.id && exitPose?.remoteLocalPosition) {
+                    this.destinationPreviewFocus = { ...exitPose.remoteLocalPosition };
+                    const horizontalLength = Math.hypot(exitPose.direction.x, exitPose.direction.z);
+                    this.destinationPreviewDirection = horizontalLength > 1e-6
+                        ? { x: exitPose.direction.x / horizontalLength, z: exitPose.direction.z / horizontalLength }
+                        : { x: 0, z: 1 };
+                }
+                return;
+            }
+        }
+
+        for (const pair of this.portalPairs) {
+            const viewingFromSource = viewSliceId === pair.sourceSliceId;
+            const viewingFromDestination = viewSliceId === pair.destinationSliceId;
+            if (!viewingFromSource && !viewingFromDestination) continue;
+
+            const portal = viewingFromSource ? pair.sourcePortal : pair.destinationPortal;
+            const remoteSliceId = viewingFromSource ? pair.destinationSliceId : pair.sourceSliceId;
+            const remoteWorld = this.getWorld(remoteSliceId);
+            const approachProgress = transitAnomaly && transitCorridorId === pair.corridor.id &&
+                transitTargetSliceId === remoteSliceId
+                ? clamp(transit.progress ?? 0, 0, 1) : null;
+            const viewConfig = pair.corridor.view ?? {
+                enabled: true, mapping: 'endpoint-frame', apertureShape: 'circle',
+                crossSection: 'constant', centerNormalOffset: 0
+            };
+            if (viewConfig.enabled === false) {
+                portal.setVisible?.(false);
+                continue;
+            }
+
+            if (viewConfig.mapping === 'endpoint-frame') {
+                const viewerPresentationPosition = pair.presentationEndpointsBySlice?.[viewSliceId];
+                const pose = mapAnomalyCameraPose({
+                    camera: this.camera,
+                    viewerWorld,
+                    remoteWorld,
+                    anomaly: pair.corridor,
+                    approachProgress,
+                    viewerEndpoint: viewerPresentationPosition
+                        ? { sliceId: viewSliceId, position: viewerPresentationPosition }
+                        : null
+                });
+                if (!pose) {
+                    portal.setVisible?.(false);
+                    continue;
+                }
+                portal.setCameraPose?.(pose.position, pose.target, pose.up, this.camera.fov);
+                if (approachProgress !== null) {
+                    this.destinationApproachState = {
+                        anomalyId: pair.corridor.id,
+                        progress: approachProgress,
+                        cameraConvergence: pose.approachEase,
+                        remoteEyeLocalPosition: { ...pose.remoteLocalPosition }
+                    };
+                }
+                if (remoteSliceId === this.destination.slice.id) {
+                    this.destinationPreviewFocus = { ...pose.remoteLocalPosition };
+                    const horizontalLength = Math.hypot(pose.direction.x, pose.direction.z);
+                    this.destinationPreviewDirection = horizontalLength > 1e-6
+                        ? { x: pose.direction.x / horizontalLength, z: pose.direction.z / horizontalLength }
+                        : { x: 0, z: 1 };
+                }
+            }
+
+            const apertureScale = calculateAnomalyApertureScale({
+                anomaly: pair.corridor,
+                viewerWorld,
+                viewConfig,
+                approachProgress,
+                viewingFromSource,
+                viewerNormalOffset: this.getViewerNormalOffset(viewerWorld)
+            });
+            portal.setApertureScale?.(apertureScale);
+            if (approachProgress !== null && this.destinationApproachState?.anomalyId === pair.corridor.id) {
+                this.destinationApproachState.apertureScale = apertureScale;
+            }
+        }
+
+        // Cubic Bezier corridors retain their established moving look-ahead
+        // preview. Slice-transition anomalies instead expose a fixed 4D mouth
+        // whose remote camera and visible aperture now converge smoothly as
+        // the observer advances toward the far mouth.
+        if (transitAnomaly) return;
+
+        if (!transit) {
+            for (const pair of this.portalPairs) {
+                pair.passagePresentation?.deactivate(
+                    this.camera, this.getWorld(viewSliceId).layerMask
+                );
+            }
+            for (const pair of this.portalPairs) {
+                if (pair.corridor.type !== SLICE_TRANSITION_ANOMALY) {
+                    pair.sourcePortal.resetPose();
+                    pair.destinationPortal.resetPose();
+                }
+            }
+            return;
+        }
+
+        const corridorId = transit.corridorId ?? transit.corridor?.id ?? playerController?.corridor.id;
+        const pair = this.portalPairs.find(function findPair(entry) { return entry.corridor.id === corridorId; });
+        if (!pair) return;
+        const length = transit.corridorLength ?? playerController?.corridorLength ?? 1;
+        const lead = clamp(14 / Math.max(1, length), 0.08, 0.22);
+        const progress = clamp(transit.progress ?? 0, 0, 1);
+        const previewProgress = Math.min(0.995, progress + lead);
+        const t = transit.direction > 0 ? previewProgress : 1 - previewProgress;
+        const renderer = transit.activeRenderer ?? transit.renderer;
+        const sample = renderer?.getDisplaySample?.(t);
+        if (!sample) return;
+        const portal = transit.direction > 0 ? pair.sourcePortal : pair.destinationPortal;
+        portal.setPose(sample.position, scaleVector(sample.tangent, transit.direction));
+        portal.setVisible(true);
+        for (const other of this.portalPairs) {
+            if (other === pair || other.corridor.type === SLICE_TRANSITION_ANOMALY) continue;
+            other.sourcePortal.setVisible(false);
+            other.destinationPortal.setVisible(false);
+        }
+    }
+
+    getViewerNormalOffset(viewerWorld) {
+        let position4D = null;
+        if (this.cameraController.mode === 'free') {
+            position4D = this.cameraController.getFreeAmbientPosition?.();
+        } else {
+            position4D = this.traversalController.getAmbientPlayerPosition?.();
+        }
+        if (!position4D) return this.cameraController.mode === 'free'
+            ? (this.cameraController.getFreeW?.() ?? 0) : 0;
+        return ambientToSlice(viewerWorld.slice.frame, position4D).normalOffset;
+    }
+
+    getDiagnostics() {
+        return {
+            defaultSlice: this.hypercubeSlice.id,
+            sourceSlice: this.sourceSlice.id,
+            destinationSlice: this.destination.slice.id,
+            corridors: this.portalPairs.map(function describePair(pair) {
+                return { id: pair.corridor.id, type: pair.corridor.type, source: pair.sourceSliceId, destination: pair.destinationSliceId };
+            }),
+            hypercube: this.hypercubeRenderer.getInfo(),
+            chunkGraph: this.chunkGraph.getStats(),
+            destinationChunking: this.destinationWorldManager?.getStats() ?? null,
+            traversal: this.traversalController.getState(),
+            camera: this.cameraController.getModeInfo(),
+            viewSliceId: this.cameraController.getViewSliceId(),

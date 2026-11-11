@@ -1,3 +1,17 @@
+                throw new Error('Optically reachable chunk candidates require a SpatialChunkGraph.');
+            }
+            return chunkGraph.getOpticallyReachableChunkCandidates(sourceSliceId, position4, reachabilityOptions);
+        },
+        clearCache() {
+            sliceFieldCache.clear();
+            anomalyFieldCache.clear();
+        }
+    });
+}
+
+function findApertureEntry(segment, candidates, binding) {
+    const start = ambientToSlice(binding.slice.frame, segment.startPosition).position;
+    const end = ambientToSlice(binding.slice.frame, segment.endPosition).position;
     let best = null;
     for (const { neighbor, anomaly } of candidates) {
         const side = neighbor.entrySide;
@@ -284,17 +298,3 @@ function decomposeCovector3(momentum, apertureConormal, cometric) {
     const coefficient = dot3(apertureConormal, metricMomentum) / normalNormSquared;
     const tangential = subtract3(momentum, scale3(apertureConormal, coefficient));
     return { coefficient, tangential, normalNormSquared };
-}
-
-function resolveEndpoint(anomaly, sliceId) {
-    if (anomaly.source.sliceId === sliceId) return anomaly.source;
-    if (anomaly.destination.sliceId === sliceId) return anomaly.destination;
-    throw new Error(`Slice ${sliceId} is not an endpoint of anomaly ${anomaly.id}.`);
-}
-
-function validateAnomaly(anomaly, { requireEnabled = true } = {}) {
-    if (!anomaly || anomaly.type !== SLICE_TRANSITION_ANOMALY) {
-        throw new TypeError('Phase 16C optical transport currently requires a slice-transition anomaly.');
-    }
-    if (requireEnabled && !anomaly.optics?.enabled) {
-        throw new RangeError(`Anomaly ${anomaly.id} is not optically enabled.`);

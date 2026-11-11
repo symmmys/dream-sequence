@@ -69,7 +69,7 @@ flowchart TD
 
 ## Dependency Statistics
 
-- JavaScript files analyzed: 123
+- JavaScript files analyzed: 128
 - Source directories analyzed: 19
 - Cross-directory dependency relationships: 38
 

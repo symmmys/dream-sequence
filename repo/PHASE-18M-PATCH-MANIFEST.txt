@@ -1,0 +1,57 @@
+SOMNIUM PHASE 18M — PATCH MANIFEST
+
+Base archive: Somnium_Geometry_Phase_18L_W_Dimension_and_Editor_Hotkeys.zip
+Patch archive applies by extracting over the Phase 18L project root.
+No files are deleted. All changed and added files are listed below.
+The manifest lists all other changes; this manifest is included in the patch.
+
+Changed/added files (excluding this manifest): 43
+
+GEOMETRY-PHASE-18M-TEST-RESULTS.txt ADDED
+GEOMETRY-PHASE-18M-W-SLICE-PLAYTEST-AND-TRAVERSAL.md ADDED
+INSTALLATION-GEOMETRY-PHASE-18M.txt ADDED
+PHASE-18M-FULL-TEST-OUTPUT.txt ADDED
+index.html MODIFIED
+src/demo/corridor-traversal-network.js MODIFIED
+src/demo/geometry-demo-camera-controller.js MODIFIED
+src/demo/geometry-demo-topology.js MODIFIED
+src/demo/geometry-demo-world.js MODIFIED
+src/demo/hypercube-4d-renderer.js MODIFIED
+src/editor/building-editor.js MODIFIED
+src/editor/plane-editor.js MODIFIED
+src/editor/plane-object-renderer.js MODIFIED
+src/main.js MODIFIED
+src/scene/create-scene.js MODIFIED
+src/ui/main-menu.js MODIFIED
+src/world/fields/geometry/anomaly-boundary-renderer.js MODIFIED
+src/world/fields/geometry/anomaly-influence-field.js MODIFIED
+src/world/fields/geometry/anomaly-view-transform.js MODIFIED
+src/world/fields/geometry/hypercube-4d.js MODIFIED
+src/world/fields/geometry/optical-anomaly-tracer.js MODIFIED
+src/world/fields/geometry/optical-contracts.js MODIFIED
+src/world/fields/geometry/optical-debug-renderer.js MODIFIED
+src/world/fields/geometry/optical-light-source.js MODIFIED
+src/world/fields/geometry/optical-metric.js MODIFIED
+src/world/fields/geometry/optical-ray-integrator.js MODIFIED
+src/world/fields/geometry/optical-scene-registry.js MODIFIED
+src/world/fields/geometry/optical-slice-tracer.js MODIFIED
+src/world/fields/geometry/slice-transition-traversal-controller.js MODIFIED
+src/world/fields/geometry/spatial-anomaly.js MODIFIED
+src/world/fields/geometry/spatial-corridor.js MODIFIED
+src/world/fields/geometry/spatial-transform.js MODIFIED
+src/world/fields/geometry/world-topology.js MODIFIED
+src/world/spatial-chunk-graph.js MODIFIED
+src/world/world-manager.js MODIFIED
+tests/corridor-traversal-network.test.mjs MODIFIED
+tests/geometry-demo-camera-controller.test.mjs MODIFIED
+tests/geometry-demo-topology.test.mjs MODIFIED
+tests/main-menu-spotlight-controls.test.mjs MODIFIED
+tests/plane-object-editor.test.mjs MODIFIED
+tests/slice-transition-anomaly.test.mjs MODIFIED
+tests/spatial-transform-chart-boundary.test.mjs MODIFIED
+tests/world-manager-visibility.test.mjs MODIFIED
+
+Compatibility:
+- No IndexedDB schema migration.
+- Do not clear browser storage.
+- The patch is specifically based on the Phase 18L full archive.

@@ -1,6 +1,6 @@
 SOMNIUM — CURRENT PROJECT STATE
-Last updated: November 8, 2026
-Current baseline: Geometry Phase 16D — View-Dependent Anomaly Aperture Rendering
+Last updated: November 9, 2026
+Current baseline: Geometry Phase 17I — Bidirectional Spherical Anomaly Passage
 
 1. PROJECT OVERVIEW
 
@@ -58,6 +58,64 @@ Phase 16D — View-Dependent Anomaly Aperture Rendering:
 - Destination chunk focus follows the mapped remote camera direction/position; portal diagnostics expose camera pose, shape, scale, and remote render-list size.
 - Existing world lighting and atmospheric response are intentionally unchanged. Optional anomaly-driven sky glow is deferred as an artistic feature.
 
+
+Phase 17A — Movable Anomaly-Fed Spotlight Prototype:
+- Adds an engine-independent, validated spotlight source contract in slice-local coordinates.
+- Places a visible, editable spotlight in the Hypercube chamber, with separate XYZ movement and yaw/pitch controls.
+- Traces a deterministic central ray through only the explicitly selected Hypercube-to-Main-World optical anomaly.
+- Stops the optical trace at the first successful anomaly exit when a receiver needs the outgoing state, avoiding an unnecessary long destination-slice tail.
+- Derives a destination-slice virtual spotlight from the outgoing aperture position and canonical momentum, then converts its position and direction through the Main World SpatialTransform.
+- Creates a receiving-side Babylon spotlight and a bounded shadow map with nearby Main World terrain and scene meshes; caster membership is refreshed as streamed geometry changes.
+- Adds trace, receiver, and shadow-caster diagnostics.
+- Preserves existing scene lighting and leaves point lights, multiple light sources, soft-shadow sampling, and fully per-surface optical shadow rays for later increments.
+
+Phase 17B — Main World Optical Ray and Portal Readability:
+- Adds the receiving-side optical ray to the destination portal preview render lists.
+- Improves the direct Main World anomaly display size and spacing as a presentation-only adjustment.
+- Keeps canonical anomaly endpoints separate from displayed portal positions.
+
+Phase 17C — Main World Re-entry and Light Controls:
+- Adds an explicit mapping between displayed Main World portal positions and canonical anomaly endpoint positions.
+- Applies the mapping consistently to anomaly entry/re-entry, slice activation, chunk reachability, and portal preview presentation.
+- Adds independent light-edit and test-ray controls.
+
+Phase 17D — Open 4D Hypercube Boundary:
+- Renders six 3D side cells of an open 4D hypercube boundary, with both W-facing end cells omitted.
+- Updates the displayed boundary from the active W-slice while leaving traversal/collision geometry unchanged.
+- Adds clickable light-edit and test-ray HUD controls synchronized with their keyboard shortcuts.
+
+Phase 17E — Tapered 4D Cylinder Boundary:
+- Replaces the demo open-hypercube boundary with a W-aligned 4D cylinder.
+- Renders its 3D spherical cross-section in each active W-slice.
+- Uses endpoint radii and quintic smootherstep interpolation to make the section expand from the Hypercube side toward the Main World.
+
+Phase 17F — Destination Approach and Mouth Continuity:
+- Progressively converges the destination preview camera toward the far anomaly endpoint while preserving screen-up clearance.
+- Establishes diagnostics for approach progress and mapped remote camera position.
+- Its additional portal-mesh aperture scale curve is superseded in Phase 17G for tapered cylinders because it competed with the live cylinder cross-section and could create a visible reversal at endpoint handoff.
+
+Phase 17G — Spherical Anomaly Mouth and Stable Cylinder Aperture:
+- Makes the tapered cylinder boundary the single source of mouth-diameter progression; the preview surface scale stays fixed at its authored endpoint size across forward/reverse transit and endpoint handoff.
+- Phase 17G historically introduced the optional shallow spherical-cap preview. Phase 17H supersedes that preview path with a complete closed sphere; the legacy cap deformation helper remains exported for compatibility.
+- The flat disc remains available with `previewSurface: 'flat'`.
+- Removes the legacy torus mouth rim by default. `showRim: true` remains an explicit compatibility opt-in.
+- Keeps canonical anomaly endpoints, traversal, optical transport, and the underlying destination world unchanged.
+
+Phase 17H — Complete Destination Sphere and Inner-Mouth Growth:
+- Replaces the shallow spherical-cap preview with a complete closed Babylon sphere using front-orthographic destination-image UVs; the flat-disc option remains available.
+- Adds a separately configurable inner destination-sphere growth curve (start scale 0.08, exponent 0.55) that grows faster than the tapered outer tube.
+- Normalizes progress from the current viewer's entry endpoint and swaps endpoint radii for reverse travel; clamps the inner sphere to the current outer section and matches the far-mouth radius at the endpoint.
+- Allows destination preview mesh scales greater than one where the far aperture is wider than the entry aperture.
+- Leaves the outer cylinder, canonical endpoints, W-slice traversal, and anomaly editor unchanged.
+
+Phase 17I — Bidirectional Spherical Anomaly Passage:
+- Replaces the single remote-aperture transit presentation with simultaneous source entrance and destination exit mouths, each rendered as an independent complete 3D sphere.
+- Places the entrance behind and the exit ahead along a configurable display-space depth axis. A stable frame is captured at transit start; the camera can orbit and translate to inspect the passage from different angles.
+- Advances the presentation camera along the display axis with normalized traversal progress so perspective naturally makes the entrance appear smaller and the exit appear larger.
+- Renders the starting world into the entrance mouth and the destination world into the exit mouth, reusing existing endpoint render lists and world ownership.
+- Uses a dedicated rendering layer and black scene background during transit; restores ordinary scene presentation at the endpoint handoff.
+- Keeps canonical 4D anomaly geometry, collision, topology, W traversal, and chunk ownership unchanged. Reverse traversal swaps endpoint roles and radii.
+
 4. CURRENT OPTICAL MODULES
 
 - src/world/fields/geometry/optical-contracts.js
@@ -67,9 +125,12 @@ Phase 16D — View-Dependent Anomaly Aperture Rendering:
 - src/world/fields/geometry/optical-slice-tracer.js
 - src/world/fields/geometry/optical-anomaly-tracer.js
 - src/world/fields/geometry/optical-debug-renderer.js
+- src/world/fields/geometry/optical-light-source.js
 - src/world/fields/geometry/babylon-geometry-adapter.js
 - src/world/fields/geometry/anomaly-view-transform.js
 - src/world/fields/geometry/portal-preview-renderer.js
+- src/world/fields/geometry/anomaly-boundary-renderer.js
+- src/demo/anomaly-passage-presentation.js
 
 The scene creates one optical registry shared by the geometry demo and Main World. Resident Main World chunks register analytic heightfields and unregister them when mesh resources are disposed. Eligible demo meshes and the dynamic tesseract cross-section register slice-local triangle geometry. Scene metadata exposes the registry, stats, debug renderer, and factories for slice-native and topology-aware anomaly tracers.
 
@@ -80,9 +141,11 @@ The anomaly tracer uses only explicit optical topology. It traces a 3D slice seg
 Command:
   node --test tests/*.test.mjs
 
-Latest Phase 16D-2 verification:
-  267 tests passed
+Latest Phase 17I verification:
+  322 tests passed
   0 failures
+
+The suite includes focused optical spotlight, portal camera, tapered cylinder, complete-sphere destination preview, inner-mouth growth, dual-mouth passage layout, travel-heading presentation orientation, reverse traversal, endpoint-world assignment, and transitional render-state regressions. Static syntax/import checks and extracted-archive verification are recorded in GEOMETRY-PHASE-17I-TEST-RESULTS.txt.
 
 Focused optics tests:
   anomaly-view-transform.test.mjs
@@ -94,7 +157,7 @@ Focused optics tests:
   optical-anomaly-tracing.test.mjs
   optical-demo-transport.test.mjs
 
-Static verification also checks JavaScript syntax and relative module references. See GEOMETRY-PHASE-16D-TEST-RESULTS.txt.
+Static verification also checks JavaScript syntax and relative module references. See GEOMETRY-PHASE-17G-TEST-RESULTS.txt.
 
 6. CURRENT LIMITATIONS / NEXT WORK
 
@@ -102,10 +165,14 @@ The Phase 16A–16C ray transport engine remains a CPU reference for topology-aw
 - Intersect arbitrary 4D mesh geometry placed inside anomaly interiors; the current 4D bridge traces the optical metric and aperture/horizon/region events.
 - Render anomaly-interior R4 ray segments as a 3D/4D diagnostic visualization. Current debug rendering draws slice-native segments only; R4 samples remain available in trace results.
 - Apply reflection, refraction, or total internal reflection at optical surfaces. The current aperture interface is an idealized momentum-transfer boundary, not a dielectric Fresnel/Snell model.
-- Validate the aperture camera mapping and portal composition in a live browser/WebGL session across camera orbit, observer movement, and both travel directions. Automated tests cover camera transport and live render-target configuration.
-- Implement custom anomaly-view mappings and cross-section evaluators beyond the initial endpoint-frame mapping and the constant/Euclidean-4D-ball cross-section profiles. Circle, ellipse, and rectangle aperture surfaces are currently supported.
-- Generate sunlight rays, material response, or Babylon direct-light integration (Phase 16E).
-- Produce cross-slice shadows, multiple-bounce global illumination, or diffraction.
+- Validate the aperture camera mapping, complete-sphere destination surface, front-orthographic texture projection, transparency/depth ordering, and Main World endpoint handoff in a live browser/WebGL session across camera orbit, observer movement, and both travel directions. Automated tests cover sphere geometry construction, UV projection, radius progression, camera transport, and render-target configuration, but not final visual quality.
+- Implement custom anomaly-view mappings and cross-section evaluators beyond the initial endpoint-frame mapping and the constant/Euclidean-4D-ball cross-section profiles. Circle, ellipse, and rectangle aperture shapes are supported; complete-sphere and legacy spherical-cap preview surfaces support circle/ellipse only.
+- Generalize the tapered 4D cylinder boundary beyond W-aligned axes and test its visible spherical cross-section under arbitrary 4D slice-frame orientations.
+- Validate that the complete spherical destination preview reads as a 3D opening in the live browser, including front-orthographic UV distortion at off-axis viewpoints, nonlinear Poincare projection, and transparency/depth-sort interactions. The flat circular preview remains the fallback option.
+- Consider a distinct in-tube destination aperture surface if camera parallax and the spherical mouth still do not communicate apparent destination approach convincingly. It must not add a second competing mouth-scale curve.
+- Generalize from one deterministic centre-ray spotlight to multiple point/spot sources and beam sampling.
+- Implement fully per-surface optical visibility/shadow rays through anomaly bridges; the initial receiver-side shadow map is a bounded virtual-light approximation.
+- Implement soft shadows, multiple-bounce global illumination, or diffraction.
 - Add optional anomaly-driven atmospheric glow/sky-colour response as a later artistic layer.
 - Use a GPU/optimized optics backend and production ray budgets (Phase 16F).
 
@@ -117,7 +184,7 @@ The triangle BVH is currently per mesh registration and tagged with chunk identi
 
 Curved ray/triangle intersection uses short chords between adaptive integration samples. The maximum integration step controls the approximation. Terrain intersections sample at density derived from the source raster's independent X/Z world spans and refine detected crossings by bisection.
 
-A live browser/WebGL visual validation has not been completed in the automated environment. In particular, actual visible sunlight, shadow behavior, and an anomaly-interior R4 debug display remain future work.
+A live browser/WebGL visual validation has not been completed in the automated environment. The Phase 17A receiving spotlight/shadow appearance, Phase 17H complete-sphere portal projection, and Phase 17I dual-mouth passage composition, off-axis UV behavior, render-target performance, and endpoint handoff still require manual browser validation. A dedicated anomaly-interior R4 debug display also remains future work.
 
 7. DEVELOPMENT COMMANDS
 
@@ -138,14 +205,34 @@ Open:
 - GEOMETRY-PHASE-16C-ANOMALY-OPTICAL-BRIDGES.md
 - GEOMETRY-PHASE-16C-TEST-RESULTS.txt
 - GEOMETRY-PHASE-16D-ANOMALY-APERTURE-VIEW-RENDERING.md
-- GEOMETRY-PHASE-16D-ANOMALY-APERTURE-VIEW-RENDERING.md
 - GEOMETRY-PHASE-16D-TEST-RESULTS.txt
-- INSTALLATION-GEOMETRY-PHASE-16D.txt
 - INSTALLATION-GEOMETRY-PHASE-16D.txt
 - docs/decisions/ADR-0011-optical-metric-and-cpu-reference-rays.md
 - docs/decisions/ADR-0012-slice-native-optical-intersections.md
 - docs/decisions/ADR-0013-four-dimensional-anomaly-optical-bridges.md
+- GEOMETRY-PHASE-17A-ANOMALY-FED-SPOTLIGHT-PROTOTYPE.md
+- GEOMETRY-PHASE-17A-TEST-RESULTS.txt
+- INSTALLATION-GEOMETRY-PHASE-17A.txt
+- GEOMETRY-PHASE-17B-MAIN-WORLD-OPTICAL-RAY-AND-PORTAL-READABILITY.md
+- GEOMETRY-PHASE-17C-MAIN-WORLD-REENTRY-AND-LIGHT-CONTROLS.md
+- GEOMETRY-PHASE-17D-OPEN-4D-HYPERCUBE-ANOMALY-BOUNDARIES.md
+- GEOMETRY-PHASE-17E-TAPERED-4D-CYLINDER-ANOMALY-BOUNDARIES.md
+- GEOMETRY-PHASE-17F-DESTINATION-APPROACH-AND-MOUTH-CONTINUITY.md
+- GEOMETRY-PHASE-17G-SPHERICAL-MOUTH-AND-STABLE-CYLINDER-APERTURE.md
+- GEOMETRY-PHASE-17G-TEST-RESULTS.txt
+- INSTALLATION-GEOMETRY-PHASE-17G.txt
+- GEOMETRY-PHASE-17H-COMPLETE-DESTINATION-SPHERE-GROWTH.md
+- GEOMETRY-PHASE-17H-TEST-RESULTS.txt
+- INSTALLATION-GEOMETRY-PHASE-17H.txt
+- GEOMETRY-PHASE-17I-BIDIRECTIONAL-SPHERICAL-PASSAGE.md
+- GEOMETRY-PHASE-17I-TEST-RESULTS.txt
+- INSTALLATION-GEOMETRY-PHASE-17I.txt
+- docs/decisions/ADR-0018-bidirectional-spherical-anomaly-passage.md
+- docs/decisions/ADR-0017-complete-sphere-destination-aperture.md
+- docs/IMPLEMENTATION-PLANNING.md
 - docs/decisions/ADR-0014-view-dependent-anomaly-apertures.md
+- docs/decisions/ADR-0015-anomaly-fed-virtual-spotlight.md
+- docs/decisions/ADR-0016-spherical-mouth-and-cylinder-aperture-continuity.md
 - docs/DEPENDENCY-GRAPH.md
 - docs/STYLE-GUIDE.txt
 - docs/STYLE-CONFORMANCE.md

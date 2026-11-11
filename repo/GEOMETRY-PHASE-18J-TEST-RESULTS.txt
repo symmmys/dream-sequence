@@ -1,0 +1,53 @@
+SOMNIUM GEOMETRY — PHASE 18J TEST RESULTS
+Plane Background Persistence & Editor Navigation Finalization
+
+AUTOMATED REGRESSION SUITE
+Command: node --test tests/*.test.mjs
+Result: PASS
+Tests: 397
+Passed: 397
+Failed: 0
+Skipped: 0
+Duration: 23.58 seconds
+
+STATIC JAVASCRIPT SYNTAX CHECKS
+- Source JavaScript modules checked with node --check: 136
+- Test modules checked with node --check: 45
+- Result: all passed
+
+RELATIVE IMPORT VALIDATION
+- JavaScript/test files inspected: 181
+- Relative imports checked: 364
+- Missing relative imports: 0
+- Result: all passed
+
+CACHE-BUSTING VALIDATION
+- New build identifier: somnium-20261110-phase18j-editor-finalization-1
+- References in index.html, src, and tests: 84
+- Stale Phase 18I build identifier references: 0
+
+PATCH REPRODUCTION TEST
+- Base: freshly extracted Phase 18I full project archive
+- Phase 18J patch: applied to a clean copy of that base
+- Missing files after application: 0
+- Differing files after application: 0
+- Unexpected files after application: 0
+- Result: exact project-tree match
+
+ARCHIVE INTEGRITY
+- Full project ZIP: unzip -t passed; SHA-256 verified
+- Incremental patch ZIP: unzip -t passed; SHA-256 verified
+
+FOCUSED PHASE 18J COVERAGE
+- Runtime backgrounds select the saved color and opacity for the active Plane.
+- Saving an active Plane refreshes its in-memory runtime definition.
+- Switching Plane backgrounds and restoring the default scene background are covered.
+- Leaving Plane editing reapplies the saved background for the active runtime Plane.
+- Top-level Level Builder tabs are Planes and Object Editor.
+- Plane Editor and Anomalies are nested subtabs within Planes.
+- Ctrl+S invokes Plane save even when a Plane form control is focused.
+- Object Editor retains the floor-plan-to-building workflow and no longer exposes standalone box placement as a second build tool.
+- Existing anomaly CRUD, endpoint placement, aperture gizmo, object transforms, materials, and camera zoom regressions remain covered by the full suite.
+
+LIMITATIONS
+A live browser/WebGL session was not available for this run. Actual rendered backgrounds, input focus behavior, menu interaction, object manipulation, and anomaly traversal should still be verified in the browser using the checklist in GEOMETRY-PHASE-18J-EDITOR-FINALIZATION.md.

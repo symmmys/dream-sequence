@@ -1,0 +1,49 @@
+SOMNIUM PHASE 18L — PATCH MANIFEST
+
+Base archive: Somnium_Geometry_Phase_18K_Anomaly_Plane_Runtime_and_Preview_Repair.zip
+
+Changed files: 33
+  index.html
+  src/demo/geometry-demo-camera-controller.js
+  src/demo/geometry-demo-topology.js
+  src/demo/geometry-demo-world.js
+  src/demo/hypercube-4d-renderer.js
+  src/editor/building-editor.js
+  src/editor/plane-editor.js
+  src/editor/plane-object-renderer.js
+  src/main.js
+  src/scene/create-scene.js
+  src/world/fields/geometry/anomaly-boundary-renderer.js
+  src/world/fields/geometry/anomaly-influence-field.js
+  src/world/fields/geometry/anomaly-view-transform.js
+  src/world/fields/geometry/hypercube-4d.js
+  src/world/fields/geometry/optical-anomaly-tracer.js
+  src/world/fields/geometry/optical-contracts.js
+  src/world/fields/geometry/optical-debug-renderer.js
+  src/world/fields/geometry/optical-light-source.js
+  src/world/fields/geometry/optical-metric.js
+  src/world/fields/geometry/optical-ray-integrator.js
+  src/world/fields/geometry/optical-scene-registry.js
+  src/world/fields/geometry/optical-slice-tracer.js
+  src/world/fields/geometry/slice-transition-traversal-controller.js
+  src/world/fields/geometry/spatial-anomaly.js
+  src/world/fields/geometry/spatial-corridor.js
+  src/world/fields/geometry/world-topology.js
+  src/world/spatial-chunk-graph.js
+  src/world/world-manager.js
+  tests/geometry-demo-camera-controller.test.mjs
+  tests/geometry-demo-topology.test.mjs
+  tests/phase18k-anomaly-plane-runtime-preview.test.mjs
+  tests/plane-object-editor.test.mjs
+  tests/world-manager-visibility.test.mjs
+
+Added files: 5
+  GEOMETRY-PHASE-18L-TEST-RESULTS.txt
+  GEOMETRY-PHASE-18L-W-DIMENSION-AND-EDITOR-INPUTS.md
+  INSTALLATION-GEOMETRY-PHASE-18L.txt
+  PHASE-18L-FULL-TEST-OUTPUT.txt
+  PHASE-18L-PATCH-MANIFEST.txt
+
+Removed files: 0
+
+Apply this patch over the Phase 18K project root. No IndexedDB migration is required.

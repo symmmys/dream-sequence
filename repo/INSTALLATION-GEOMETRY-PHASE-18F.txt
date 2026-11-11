@@ -1,0 +1,27 @@
+SOMNIUM GEOMETRY PHASE 18F — INSTALLATION
+=========================================
+
+1. Extract the complete ZIP archive.
+2. Open a terminal in the extracted project directory containing index.html.
+3. Start the local server:
+
+       python3 -m http.server 8081
+
+4. Open:
+
+       http://127.0.0.1:8081/
+
+5. Hard-refresh the browser once after installing, to ensure the Phase 18F
+   cache-busting identifier is loaded.
+
+Keyboard shortcuts:
+  B              Enter/exit Building Editor from menu/editor
+  1              Buildings tab
+  2              Anomalies tab
+  Ctrl+Enter     Save/place selected anomaly
+
+Numpad 1 and Numpad 2 also switch editor tabs.
+
+The anomaly runtime dynamically constructs portal/traversal pairs for placed
+anomalies connecting the currently live demo Planes. A future Plane Editor
+phase will be needed before user-created Planes can be rendered as destinations.

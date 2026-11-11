@@ -1,0 +1,24 @@
+SOMNIUM — GEOMETRY PHASE 18G3 TEST RESULTS
+Build: somnium-20261110-phase18g3-gizmo-fixes-box-building-1
+Baseline: Phase 18G2 — Plane Container Editor
+
+FULL AUTOMATED REGRESSION SUITE
+41 test modules executed individually in bounded batches.
+365 passed, 0 failed.
+
+FOCUSED REGRESSION RERUN AFTER FINAL EDITOR/MODEL INTEGRATION
+18 passed, 0 failed.
+
+NEW COVERAGE
+- Building scale defaults to identity.
+- Building scale survives serialization/deserialization.
+- Legacy building records without scale deserialize to identity scale.
+- Existing Building/Anomaly/Plane editor regression coverage remains passing.
+
+STATIC VERIFICATION
+- All source JavaScript modules passed `node --check`.
+- All test MJS modules passed `node --check`.
+- Active cache-busting build identifier updated to `somnium-20261110-phase18g3-gizmo-fixes-box-building-1`.
+
+BROWSER / WEBGL
+No live browser/WebGL session was available. Babylon GizmoManager interaction, axis feel, scaling visuals, and pointer/camera ergonomics require manual browser validation.

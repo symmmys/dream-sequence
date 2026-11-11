@@ -1,0 +1,13 @@
+SOMNIUM GEOMETRY — PHASE 18G2 TEST RESULTS
+
+Automated tests: 362 passed, 0 failed.
+Source JavaScript syntax checks: passed.
+Test JavaScript syntax checks: passed.
+Relative import resolution: all targets resolved.
+Browser/WebGL smoke test: not performed in this environment.
+
+New tests cover:
+- New 4D Plane container definition creation.
+- Independent W center and W thickness.
+- Preservation of existing Plane frame orientation and object records on edit.
+- Validation of positive dimensions and normalized appearance values.

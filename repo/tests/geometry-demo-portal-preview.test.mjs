@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { GeometryDemoWorld } from '../src/demo/geometry-demo-world.js';
+import { GeometryDemoWorld, getDestinationPreviewRenderList, getMainWorldAnomalyPortalLayout } from '../src/demo/geometry-demo-world.js';
 
 function createPortal() {
     return {
@@ -249,4 +249,42 @@ test('camera presentation activates only the grid belonging to the current slice
         { id: 'hypercube', value: false },
         { id: 'main', value: true }
     ]);
+});
+
+
+test('Main World anomaly preview portals are large and spread apart without moving physical anomaly endpoints', () => {
+    const anchor = { x: 125, y: 8, z: -40 };
+    const layout = getMainWorldAnomalyPortalLayout(anchor);
+    const left = layout.mainWorldCorridor;
+    const right = layout.hypercubeMainWorld;
+
+    assert.equal(left.width, 72);
+    assert.equal(left.height, 72);
+    assert.equal(right.width, 72);
+    assert.equal(right.height, 72);
+    assert.equal(left.rimDiameter, 80);
+    assert.equal(right.rimDiameter, 80);
+    assert.equal(left.position.x, anchor.x - 260);
+    assert.equal(right.position.x, anchor.x + 260);
+    assert.equal(right.position.x - left.position.x, 520);
+    assert.equal(left.position.y, anchor.y + 35);
+    assert.equal(right.position.y, anchor.y + 35);
+    assert.deepEqual(anchor, { x: 125, y: 8, z: -40 });
+});
+
+test('Main World anomaly portal layout validates its world anchor', () => {
+    assert.throws(() => getMainWorldAnomalyPortalLayout(null), /finite anchor/);
+    assert.throws(() => getMainWorldAnomalyPortalLayout({ x: 0, y: NaN, z: 0 }), /finite anchor/);
+});
+
+
+test('destination portal previews include the visible transmitted optical ray', () => {
+    const terrain = { name: 'main-world-terrain' };
+    const tree = { name: 'main-world-tree' };
+    const ray = { name: 'transmitted-ray', isVisible: true };
+    const renderList = getDestinationPreviewRenderList([terrain, tree], ray);
+    assert.deepEqual(renderList, [terrain, tree, ray]);
+    assert.deepEqual(getDestinationPreviewRenderList([terrain, ray], ray), [terrain, ray]);
+    ray.isVisible = false;
+    assert.deepEqual(getDestinationPreviewRenderList([terrain, tree], ray), [terrain, tree]);
 });

@@ -1,0 +1,23 @@
+SOMNIUM GEOMETRY — PHASE 18G1
+PLANE DATA FOUNDATION
+
+This is an incremental source/data-foundation release. It does not yet add the Plane Editor interface; that begins in Phase 18G2.
+
+INSTALLATION
+1. Extract the complete ZIP archive.
+2. Open a terminal in the project directory containing index.html.
+3. Run: python3 -m http.server 8081
+4. Open: http://127.0.0.1:8081/
+5. Hard-refresh the browser once so the Phase 18G1 cache identifier is loaded.
+
+PERSISTENCE NOTE
+The separate somnium-planes IndexedDB database is upgraded from version 1 to version 2. Existing Plane records are migrated additively to the Plane schema v2. Existing Plane IDs, anomaly records, and anomaly IDs are preserved. Do not clear browser storage; it is not necessary for this migration.
+
+SCHEMA
+Plane definitions now include an explicit ambient W coordinate, a 4D box container with W/X/Y/Z dimensions, optional boundary styling, background color/opacity, and a serializable object collection. Object definitions support box, sphere, cylinder, torus, label, and procedural hypercube4d types.
+
+VERIFICATION
+Run tests from the project root:
+  node --experimental-default-type=module --test tests/*.test.mjs
+
+Phase 18G1 validation was performed with Node.js automated tests, source/test syntax checks, and relative-import resolution checks. No live browser/WebGL Plane Editor test is applicable yet because the UI is scheduled for Phase 18G2.

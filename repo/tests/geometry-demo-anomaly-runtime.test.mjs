@@ -107,8 +107,8 @@ function createRuntimeFixture() {
     };
 
     return {
-        topologyData, player, movement, controllers, network,
-        mainWorld, mainProfile
+        topologyData, player, movement, camera, controllers, network,
+        hypercubeWorld, poincareWorld, mainWorld, mainProfile
     };
 }
 
@@ -192,3 +192,64 @@ test('Main World HUD reports active W freedom when its connected ambient field i
     }
 });
 
+
+test('mouth orientations rotate the player heading into the destination mouth frame', function mouthOrientationHandoff() {
+    const fixture = createRuntimeFixture();
+    try {
+        const controller = fixture.controllers[1];
+        controller.corridor.source.orientation = { x: 0, y: 0, z: 0, w: 1 };
+        controller.corridor.destination.orientation = { x: 0, y: Math.SQRT1_2, z: 0, w: Math.SQRT1_2 };
+        fixture.player.yaw = 0.25;
+        controller.applyEndpointOrientation(fixture.hypercubeWorld, fixture.mainWorld);
+        assert.ok(Math.abs(fixture.player.yaw - (0.25 + Math.PI / 2)) < 1e-10);
+        controller.applyEndpointOrientation(fixture.mainWorld, fixture.hypercubeWorld);
+        assert.ok(Math.abs(fixture.player.yaw - 0.25) < 1e-10);
+    } finally {
+        disposeRuntime(fixture);
+    }
+});
+
+test('a saved custom anomaly can be registered as a new live portal traversal route', function dynamicRuntimeRoute() {
+    const fixture = createRuntimeFixture();
+    try {
+        const custom = {
+            ...fixture.topologyData.corridor,
+            id: 'user-authored-anomaly-link',
+            revision: 1,
+            region: { min: { x: -100, y: -100, z: -100, w: -100 }, max: { x: 100, y: 200, z: 100, w: 200 } },
+            source: { ...fixture.topologyData.corridor.source, position: { x: 12, y: 2.5, z: 12 } },
+            destination: { ...fixture.topologyData.corridor.destination, position: { x: 28, y: 137, z: 18 } },
+            visible: true,
+            traversable: true,
+            bidirectional: true
+        };
+        fixture.topologyData.topology.registerCorridor(custom);
+        const chunk = fixture.topologyData.chunkGraph.registerCorridor(custom.id);
+        const controller = new SliceTransitionTraversalController({
+            player: fixture.player,
+            movementController: fixture.movement,
+            cameraController: fixture.camera,
+            topology: fixture.topologyData.topology,
+            anomaly: fixture.topologyData.topology.getCorridor(custom.id),
+            chunkGraph: fixture.topologyData.chunkGraph,
+            corridorChunk: chunk,
+            source: fixture.poincareWorld,
+            destination: fixture.mainWorld,
+            initialSliceId: fixture.network.currentSliceId
+        });
+        fixture.network.addController(controller);
+        const route = fixture.network.getRouteForSlice(
+            fixture.topologyData.sourceSlice.id,
+            custom.id
+        );
+        assert.ok(route);
+        assert.equal(route.controller, controller);
+        assert.equal(route.corridor.destination.sliceId, fixture.topologyData.mainSlice.id);
+        assert.equal(fixture.topologyData.chunkGraph.getCorridorChunk(custom.id).id, custom.id);
+        assert.equal(fixture.network.removeController(custom.id), true);
+        fixture.topologyData.chunkGraph.removeCorridor(custom.id);
+        fixture.topologyData.topology.removeCorridor(custom.id);
+    } finally {
+        disposeRuntime(fixture);
+    }
+});

@@ -594,15 +594,15 @@ if (camera) {
             this.elapsed
         );
 
-        // Nighttime fallback clear color.
-
-        this.scene.clearColor =
-            new BABYLON.Color4(
-                0.003,
-                0.006,
-                0.022,
-                1
-            );
+        // Plane Editor can temporarily override the scene background. Keep
+        // honoring that override here because this system refreshes clearColor
+        // every frame as part of its normal sky update.
+        const planeBackground = this.scene.metadata?.somniumPlaneBackground;
+        this.scene.clearColor = planeBackground?.clone?.() ??
+            (planeBackground ? new BABYLON.Color4(
+                planeBackground.r ?? 0, planeBackground.g ?? 0,
+                planeBackground.b ?? 0, planeBackground.a ?? 1
+            ) : new BABYLON.Color4(0.003, 0.006, 0.022, 1));
     }
 
     // -----------------------------------------

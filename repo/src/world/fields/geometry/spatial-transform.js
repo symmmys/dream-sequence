@@ -219,9 +219,9 @@ class SpatialTransform {
     }
 
     /**
-     * Keep free-camera coordinates inside the active chart before attempting
-     * an inverse projection. The Poincare chart is an open ball, so camera
-     * movement must never be allowed to step onto or beyond its boundary.
+     * Keep render-space picks inside the active chart before attempting an
+     * inverse projection. Poincare charts have an open-ball boundary;
+     * spherical exponential charts end at their antipodal limit.
      *
      * This is intentionally a render-space constraint; authoritative world
      * positions and the strict projection validation remain unchanged.
@@ -229,7 +229,7 @@ class SpatialTransform {
     constrainRenderPosition(position, options = {}) {
         validateRenderPosition(position);
 
-        if (!this.enabled || this.geometryName !== "poincare") {
+        if (!this.enabled || !["poincare", "spherical"].includes(this.geometryName)) {
             return copyPosition(position);
         }
 
@@ -242,7 +242,13 @@ class SpatialTransform {
             throw new RangeError("Render chart boundary margin must be between zero and one.");
         }
 
-        const renderRadius = this.projection.radius * this.renderScale;
+        // The Poincare chart occupies an open ball of radius R. The spherical
+        // exponential chart is valid only before the antipode at pi*R. Clamp
+        // render-space interaction points just inside either chart boundary.
+        const chartRadius = this.geometryName === "spherical"
+            ? Math.PI * this.projection.radius
+            : this.projection.radius;
+        const renderRadius = chartRadius * this.renderScale;
         const maximumRadius = renderRadius * (1 - margin);
         const distance = Math.hypot(position.x, position.y, position.z);
         if (distance <= maximumRadius || distance === 0) {

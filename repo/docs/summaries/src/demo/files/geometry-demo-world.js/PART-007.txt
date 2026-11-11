@@ -1,0 +1,135 @@
+        rim.metadata = { sliceId, geometryPortalRim: true };
+        rim.layerMask = options.layerMask;
+        adapter.applyMesh(rim, sliceId);
+        rim.layerMask = options.layerMask;
+        portal.rim = rim;
+    }
+    portal.setHomePose();
+    return portal;
+}
+
+
+function getDestinationPreviewRenderList(meshes, opticalRayLine) {
+    const renderList = Array.isArray(meshes) ? [...meshes] : [];
+    if (opticalRayLine?.isVisible && !renderList.includes(opticalRayLine)) {
+        renderList.push(opticalRayLine);
+    }
+    return renderList;
+}
+
+const MAIN_WORLD_ANOMALY_PORTAL_SPACING = 260;
+const MAIN_WORLD_ANOMALY_PORTAL_SIZE = 72;
+
+function getMainWorldAnomalyPortalLayout(anchor) {
+    if (!anchor || !['x', 'y', 'z'].every((axis) => Number.isFinite(anchor[axis]))) {
+        throw new TypeError('Main World anomaly portal layout requires a finite anchor.');
+    }
+    const makePortal = (side) => ({
+        position: {
+            x: anchor.x + side * MAIN_WORLD_ANOMALY_PORTAL_SPACING,
+            y: anchor.y + 35,
+            z: anchor.z - 2
+        },
+        width: MAIN_WORLD_ANOMALY_PORTAL_SIZE,
+        height: MAIN_WORLD_ANOMALY_PORTAL_SIZE,
+        rimDiameter: 80,
+        rimThickness: 1.6
+    });
+    return {
+        mainWorldCorridor: makePortal(-1),
+        hypercubeMainWorld: makePortal(1),
+        spacing: MAIN_WORLD_ANOMALY_PORTAL_SPACING * 2
+    };
+}
+
+function createDestinationPortal(scene, sliceId, adapter, sourceMeshes, anchor, viewConfig = {}, layout = {}) {
+    const position = layout.position ?? { x: anchor.x, y: anchor.y + 35, z: anchor.z - 2 };
+    return createPortal(scene, sliceId, adapter, sourceMeshes, {
+        position,
+        width: layout.width ?? 72,
+        height: layout.height ?? 72,
+        rimDiameter: layout.rimDiameter ?? 80,
+        rimThickness: layout.rimThickness ?? 1.6,
+        apertureShape: viewConfig.apertureShape ?? 'circle',
+        previewSurface: viewConfig.previewSurface ?? 'flat',
+        showRim: viewConfig.showRim ?? false,
+        layerMask: MAIN_WORLD_LAYER,
+        renderLayerMask: SOURCE_LAYER,
+        rimName: 'geometryDestinationPortalRim',
+        camera: { x: 0, y: 28, z: 48, targetY: 2, targetZ: 0, fov: 0.95 }
+    });
+}
+
+function createRoomMovementSurface() {
+    return {
+        min: { x: -21.5, y: 0, z: -27.5 },
+        max: { x: 21.5, y: 0, z: 28 },
+        sampleAt: sampleRoomElevation
+    };
+}
+
+function sampleRoomElevation(x, z) {
+    if (x < -21.5 || x > 21.5 || z < -27.5 || z > 28) return null;
+    return { x, y: 0, z };
+}
+
+function createDemoCamera(scene) {
+    const camera = new BABYLON.FreeCamera('geometryDemoThirdPersonCamera', BABYLON.Vector3.Zero(), scene);
+    camera.minZ = 0.08;
+    camera.maxZ = 1000;
+    camera.fov = 0.82;
+    return camera;
+}
+
+function endpointForSlice(anomaly, sliceId) {
+    if (anomaly?.source?.sliceId === sliceId) return anomaly.source;
+    if (anomaly?.destination?.sliceId === sliceId) return anomaly.destination;
+    return null;
+}
+
+function toBabylonVector3(vector) {
+    return new BABYLON.Vector3(vector.x, vector.y, vector.z);
+}
+
+function add3(left, right) {
+    return { x: left.x + right.x, y: left.y + right.y, z: left.z + right.z };
+}
+
+function subtract3(left, right) {
+    return { x: left.x - right.x, y: left.y - right.y, z: left.z - right.z };
+}
+
+function scale3(vector, amount) {
+    return { x: vector.x * amount, y: vector.y * amount, z: vector.z * amount };
+}
+
+function distance3(left, right) {
+    return Math.hypot(left.x - right.x, left.y - right.y, left.z - right.z);
+}
+
+function normalize3(vector) {
+    const length = Math.hypot(vector.x, vector.y, vector.z);
+    if (!Number.isFinite(length) || length <= 1e-10) {
+        throw new RangeError('Cannot normalize a zero or invalid 3D direction.');
+    }
+    return { x: vector.x / length, y: vector.y / length, z: vector.z / length };
+}
+
+function scaleVector(vector, amount) {
+    return { x: vector.x * amount, y: vector.y * amount, z: vector.z * amount };
+}
+
+function clamp(value, minimum, maximum) {
+    return Math.min(maximum, Math.max(minimum, value));
+}
+
+function disposeMeshes(meshes) {
+    for (const mesh of meshes) {
+        const material = mesh.material;
+        if (mesh.metadata?.demoLabel) material?.diffuseTexture?.dispose();
+        mesh.dispose(false, false);
+        if (material && !material.isDisposed()) material.dispose();
+    }
+}
+
+export { GeometryDemoWorld, createGeometryDemoWorld, getDestinationPreviewRenderList, getMainWorldAnomalyPortalLayout, MAIN_WORLD_SLICE_ID };

@@ -1,0 +1,33 @@
+SOMNIUM — PHASE 18K INSTALLATION
+Anomaly Plane Runtime Registration and Preview Repair
+
+RECOMMENDED: FULL PROJECT ZIP
+1. Stop the local Somnium development server.
+2. Keep a backup copy of your current project folder.
+3. Extract Somnium_Geometry_Phase_18K_Anomaly_Plane_Runtime_and_Preview_Repair.zip into a new project directory (or replace the code files in your working project from the archive).
+4. Start your normal local HTTP server from the directory that contains index.html.
+5. Open/reload Somnium. A hard reload may be useful to ensure the Phase 18K cache-busting identifiers are fetched.
+
+INCREMENTAL PATCH ZIP
+The patch is based on the exact Phase 18J Editor Finalization full project archive.
+1. Extract your Phase 18J project into a backup/new working directory.
+2. Extract the Phase 18K patch ZIP over that Phase 18J project root, preserving the directory structure and allowing files to be overwritten.
+3. Start the local server from the directory that contains index.html.
+
+IMPORTANT STORAGE NOTES
+- No IndexedDB schema migration or reset is required.
+- Do NOT clear browser storage or delete the somnium-planes database.
+- Existing Plane, anomaly, and World data should remain intact.
+
+BROWSER VALIDATION CHECKLIST
+1. Switch between the Poincaré Room and 4D Room. Confirm each Plane's saved background color remains visible outside the editor.
+2. Open Planes > Plane Editor, change a background, leave the editor, and verify the color persists. Repeat for both built-in demo Planes.
+3. Select a Plane and press Ctrl+S. Confirm the saved indicator/behavior and that edits survive reload.
+4. Confirm the top-level tabs are Planes and Object Editor; inside Planes confirm Plane Editor and Anomalies subtabs. Confirm Create Building from Floor Plan still works in Object Editor.
+5. Create and save a new Plane. Open Planes > Anomalies and confirm the new Plane is available independently for Mouth A and Mouth B. Select it and save an anomaly connection.
+6. Look through anomaly previews in third-person and other available camera modes. Confirm the destination Plane shows its Poincaré primitives/labels, tesseract surface/edges/vertices, and newly created Plane objects as applicable.
+7. Mark a Plane object hidden and verify it remains hidden in the anomaly preview. Confirm portal/mouth meshes are not duplicated inside the preview.
+8. Traverse a custom Plane through an anomaly and verify the destination Plane's movement and geometry remain available.
+9. Confirm B opens/closes the build menu, V cycles zoom speed through 1x/10x/100x, and Ctrl+Enter retains its anomaly commit behavior.
+
+The automated suite and static checks do not replace live browser/WebGL validation. Report any console error with its complete stack trace and the action that triggered it.

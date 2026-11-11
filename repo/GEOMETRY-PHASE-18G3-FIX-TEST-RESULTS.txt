@@ -1,0 +1,28 @@
+SOMNIUM — PHASE 18G3 GIZMO FIXES AND BOX BUILDING
+Build: somnium-20261110-phase18g3-gizmo-fixes-box-building-1
+Date: November 10, 2026
+
+FULL AUTOMATED REGRESSION SUITE
+Command: node --experimental-default-type=module --test tests/*.test.mjs
+Result: 369 passed, 0 failed.
+
+FOCUSED REGRESSIONS
+- Scale gizmo axis drag observables are subscribed and forwarded to the Building adapter.
+- Rotation gizmo does not attempt to match the attached node's orientation when that node may have non-uniform scaling.
+- Buildings panel exposes ADD BOX BUILDING and creates a 2 x 2 x 2 box component.
+- Box building preview is initialized and can use the existing place/commit action.
+- Preview outline applies persisted building scale to local offsets and component dimensions.
+- Existing Building scale serialization and validation regressions pass.
+
+STATIC VERIFICATION
+- All source JavaScript files passed node --check.
+- All test modules passed node --check.
+- Relative source imports checked: 226.
+- Missing relative imports: 0.
+- Cache-busting build identifier is consistent across index.html, src, and tests.
+
+ARCHIVE VERIFICATION
+Pending final ZIP integrity check; see delivery checksum.
+
+BROWSER / WEBGL VERIFICATION
+No live browser/WebGL session was available in this environment. The changes address the missing scale event subscriptions and Babylon's unsupported rotation-gizmo orientation matching with non-uniform scaling, but manual desktop-browser interaction testing remains required.

@@ -3,16 +3,16 @@ SOMNIUM — INDIVIDUAL SOURCE FILE INDEX
 
 Source file: src/demo/corridor-traversal-network.js
 Source directory: src/demo/
-Generated: 2026-11-09T03:15:29
-Total source lines: 232
+Generated: 2026-11-09T22:26:25
+Total source lines: 239
 Maximum chunk size: 300 lines
 Number of parts: 1
 
 SOURCE PARTS
 ----------------------------------------------------------------
 Part: PART-001.txt
-Original lines: 1-232
-Lines in part: 232
+Original lines: 1-239
+Lines in part: 239
 
 READING INSTRUCTIONS
 ----------------------------------------------------------------

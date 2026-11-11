@@ -2,9 +2,9 @@
 
 import { createSliceAddress, getSliceAddressKey } from './fields/geometry/world-slice.js';
 import { CorridorChunk } from './corridor-chunk.js';
-import { ambientToSlice, dot4, subtract4 } from './fields/geometry/spatial-4d.js?v=somnium-20261108-phase16c-anomaly-optics-2';
-import { evaluateAnomalyInfluence, evaluateChunkReachability } from './fields/geometry/anomaly-influence-field.js?v=somnium-20261108-phase16c-anomaly-optics-2';
-import { evaluateOpticalAnomalyCoupling } from './fields/geometry/optical-contracts.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { ambientToSlice, dot4, subtract4 } from './fields/geometry/spatial-4d.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
+import { evaluateAnomalyInfluence, evaluateChunkReachability } from './fields/geometry/anomaly-influence-field.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
+import { evaluateOpticalAnomalyCoupling } from './fields/geometry/optical-contracts.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 
 class SpatialChunkGraph {
     constructor(topology) {

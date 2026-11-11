@@ -2,7 +2,7 @@
 
 import {
     createHypercubeEdges, createHypercubeSlice, createHypercubeVertices
-} from '../world/fields/geometry/hypercube-4d.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+} from '../world/fields/geometry/hypercube-4d.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 
 const MAX_SECTION_VERTICES = 32;
 const MAX_SECTION_EDGES = 64;

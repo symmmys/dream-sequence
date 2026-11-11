@@ -1,3 +1,110 @@
+
+    const controllers = [
+        createAnomalyTraversalController({
+            player, movementController: playerController, cameraController,
+            anomaly: hypercubeCorridor, topology, getInfluenceModifiers,
+            corridorRenderers: new Map([
+                [hypercubeSlice.id, hypercubeSourceRenderer],
+                [sourceSlice.id, hypercubeDestinationRenderer]
+            ]),
+            chunkGraph, corridorChunk: hypercubeCorridorChunk,
+            source: hypercubeWorld, destination: sourceExitWorld,
+            initialSliceId: hypercubeSlice.id,
+            traversal: { speed: 12, sprintSpeed: 18, entitySpeed: 10 }
+        }),
+        createAnomalyTraversalController({
+            player, movementController: playerController, cameraController,
+            anomaly: hypercubeMainCorridor, topology, getInfluenceModifiers,
+            corridorRenderers: new Map(),
+            chunkGraph, corridorChunk: hypercubeMainCorridorChunk,
+            source: hypercubeWorld, destination: destinationWorld,
+            initialSliceId: hypercubeSlice.id,
+            traversal: {
+                speed: 12, sprintSpeed: 18, entitySpeed: 10,
+                triggerDistanceBySlice: { [mainSlice.id]: 30 },
+                presentationEndpointsBySlice: hypercubeMainPresentationEndpoints
+            }
+        }),
+        createAnomalyTraversalController({
+            player, movementController: playerController, cameraController,
+            anomaly: corridor, topology, getInfluenceModifiers,
+            corridorRenderers: new Map([
+                [sourceSlice.id, mainSourceRenderer],
+                [mainSlice.id, mainDestinationRenderer]
+            ]),
+            chunkGraph, corridorChunk,
+            source: sourceWorld, destination: destinationWorld,
+            initialSliceId: hypercubeSlice.id,
+            traversal: {
+                speed: 12, sprintSpeed: 18, entitySpeed: 10,
+                triggerDistanceBySlice: { [mainSlice.id]: 30 },
+                presentationEndpointsBySlice: mainCorridorPresentationEndpoints
+            }
+        })
+    ];
+    world.traversalController = new CorridorTraversalNetwork({
+        topology,
+        worlds: new Map([
+            [hypercubeSlice.id, hypercubeWorld],
+            [sourceSlice.id, sourceWorld],
+            [mainSlice.id, destinationWorld]
+        ]),
+        controllers,
+        initialSliceId: hypercubeSlice.id,
+        onSliceChanged: world.activateSlice.bind(world)
+    });
+    cameraController.setTraversalController(world.traversalController);
+    return world;
+}
+
+function createAnomalyBoundaryRenderers(scene, portalPairs, registry, layerMasks) {
+    const entries = [];
+    for (const pair of portalPairs) {
+        if (!['open-4d-hypercube', 'open-4d-cylinder'].includes(pair.corridor.view?.interiorBoundary)) continue;
+        for (const sliceId of [pair.sourceSliceId, pair.destinationSliceId]) {
+            const binding = registry.require(sliceId);
+            const endpoint = pair.corridor.source.sliceId === sliceId
+                ? pair.corridor.source : pair.corridor.destination;
+            const endpointAmbient = sliceToAmbient(binding.slice.frame, endpoint.position);
+            const sourceBinding = registry.require(pair.corridor.source.sliceId);
+            const destinationBinding = registry.require(pair.corridor.destination.sliceId);
+            const sourceAmbient = sliceToAmbient(sourceBinding.slice.frame, pair.corridor.source.position);
+            const destinationAmbient = sliceToAmbient(
+                destinationBinding.slice.frame, pair.corridor.destination.position
+            );
+            const renderer = new AnomalyBoundaryRenderer(
+                scene,
+                pair.corridor,
+                binding.slice,
+                binding.spatialTransform,
+                {
+                    layerMask: layerMasks.get(sliceId),
+                    presentationEndpoint: pair.presentationEndpointsBySlice?.[sliceId] ?? null,
+                    sourceAmbient,
+                    destinationAmbient,
+                    gridSegments: 5,
+                    opacity: 0.11,
+                    edgeAlpha: 0.72
+                }
+            );
+            entries.push({
+                anomaly: pair.corridor,
+                corridorId: pair.corridor.id,
+                sliceId,
+                endpointW: endpointAmbient.w,
+                renderer
+            });
+        }
+    }
+    return entries;
+}
+
+function createAnomalyTraversalController(options) {
+    const { anomaly, corridorRenderers, ...rest } = options;
+    if (anomaly.type === SLICE_TRANSITION_ANOMALY) {
+        return new SliceTransitionTraversalController({
+            ...rest,
+            anomaly,
             corridor: anomaly,
             corridorRenderers
         });
@@ -62,6 +169,7 @@ class GeometryDemoWorld {
         ]);
         this.onGridKeyDown = this.handleGridKeyDown.bind(this);
         if (typeof window !== 'undefined') window.addEventListener('keydown', this.onGridKeyDown);
+        this.initializeOpticalSpotlight();
         this.corridorRenderers = [
             [this.sourceSlice.id, this.mainSourceRenderer],
             [this.destination.slice.id, this.mainDestinationRenderer],
@@ -79,17 +187,29 @@ class GeometryDemoWorld {
         this.player.root.setEnabled(this.active && this.cameraController.mode !== 'free');
         this.traversalController?.setActive(this.active);
         for (const entry of this.corridorRenderers) entry.renderer.mesh.isVisible = this.active;
+        for (const entry of this.anomalyBoundaryRenderers ?? []) {
+            entry.renderer.setVisible(this.active && entry.anomaly.visible);
+        }
         for (const pair of this.portalPairs) {
             pair.sourcePortal.setVisible(false);
             pair.destinationPortal.setVisible(false);
-            pair.sourcePortal.rim.isVisible = false;
-            pair.destinationPortal.rim.isVisible = false;
+            pair.passagePresentation?.deactivate(this.camera, this.getWorld(this.cameraController.getViewSliceId()).layerMask);
         }
         if (!this.active) {
             for (const grid of this.grids.values()) grid.setActive(false);
+            this.spotlightSourceLight?.setEnabled(false);
+            this.spotlightMarker && (this.spotlightMarker.isVisible = false);
+            this.spotlightAimLine && (this.spotlightAimLine.isVisible = false);
+            this.destinationSpotlight?.setEnabled(false);
+            if (this.destinationSpotlightRayLine) this.destinationSpotlightRayLine.isVisible = false;
+            this.clearOpticalSpotlightShadowCasters();
             return;
         }
         if (this.cameraController.mode !== 'follow') this.cameraController.setMode('follow');
+        this.spotlightSourceLight?.setEnabled(Boolean(this.spotlightTestRayEnabled));
+        this.spotlightMarker && (this.spotlightMarker.isVisible = true);
+        this.spotlightAimLine && (this.spotlightAimLine.isVisible = true);
+        this.spotlightNeedsTrace = true;
         this.didStart = true;
         const transitioning = this.traversalController?.state === 'transit';
         this.activateSlice(this.currentSliceId, {
@@ -119,6 +239,14 @@ class GeometryDemoWorld {
 
     update(deltaSeconds) {
         if (!this.active || this.disposed) return;
+        // A follow camera smooths from its previous position. Remove the
+        // passage's temporary display-space translation before letting that
+        // controller calculate its next authoritative camera pose; otherwise
+        // the follow-camera lerp would absorb the visual offset and make it
+        // accumulate or drift across frames.
+        for (const pair of this.portalPairs ?? []) {
+            pair.passagePresentation?.restoreCameraPoseForControllerUpdate(this.camera);
+        }
         this.playerController.update(deltaSeconds);
         this.traversalController.update(deltaSeconds);
         this.cameraController.update(deltaSeconds);
@@ -126,6 +254,7 @@ class GeometryDemoWorld {
         const ambientPosition4D = this.cameraController.mode === 'free'
             ? this.cameraController.getFreeAmbientPosition()
             : this.traversalController.getAmbientPlayerPosition?.();
+        this.updateAnomalyBoundaryRenderers(viewSliceId, ambientPosition4D);
         let viewerW = 0;
         if (viewSliceId === this.hypercubeSlice.id) {
             if (this.cameraController.mode === 'free') {
@@ -139,7 +268,9 @@ class GeometryDemoWorld {
         this.updateCameraPresentation();
         this.updatePortalPreview();
         this.updatePortalLists();
+        this.updateOpticalSpotlight(deltaSeconds);
         const focus = this.getDestinationFocus();
+        const focusDirection = this.destinationPreviewDirection ?? { x: 0, z: 1 };
         const reachabilityContext = ambientPosition4D ? {
             sourceSliceId: this.cameraController.mode === 'free'
                 ? this.cameraController.freeSliceId : this.traversalController.currentSliceId,
@@ -147,10 +278,14 @@ class GeometryDemoWorld {
             influenceOptions: this.playerController.getAnomalyInfluenceModifiers?.() ??
                 this.playerController.anomalyInfluenceModifiers ?? {}
         } : null;
-        this.destinationWorldManager?.update(focus, { x: 0, z: 1 }, reachabilityContext);
+        this.destinationWorldManager?.update(focus, focusDirection, reachabilityContext);
         const destinationMeshes = this.destinationWorldManager?.getMeshes() ?? [];
-        this.mainSourcePortal.setRenderList(destinationMeshes);
-        this.hypercubeMainPortal.setRenderList(destinationMeshes);
+        const destinationPreviewMeshes = getDestinationPreviewRenderList(
+            [...destinationMeshes, ...this.getAnomalyBoundaryMeshes(this.destination.slice.id)],
+            this.destinationSpotlightRayLine
+        );
+        this.mainSourcePortal.setRenderList(destinationPreviewMeshes);
+        this.hypercubeMainPortal.setRenderList(destinationPreviewMeshes);
     }
 
     updateHypercubeSliceHud() {
@@ -163,138 +298,3 @@ class GeometryDemoWorld {
             const availableFields = position4D ? routes.map((route) => ({
                 route,
                 influence: route.controller?.getAnomalyInfluence?.(position4D)
-            })).filter((entry) => Number(entry.influence?.wMovementScale) > 0) : [];
-            availableFields.sort((left, right) =>
-                right.influence.wMovementScale - left.influence.wMovementScale
-            );
-            const best = availableFields[0] ?? null;
-            const freedomPercent = best
-                ? Math.round(best.influence.wMovementScale * 100) : 0;
-            const label = best
-                ? `W FREEDOM ACTIVE · ${freedomPercent}%`
-                : 'W SLICE INACTIVE';
-            if (label !== this.lastHypercubeSliceLabel) {
-                this.lastHypercubeSliceLabel = label;
-                this.onSliceInfoChanged?.(label, best ? {
-                    anomalyId: best.route.corridorId,
-                    freedom: best.influence.freedom,
-                    wMovementScale: best.influence.wMovementScale,
-                    wReach: best.influence.wReach,
-                    position4D: { ...position4D }
-                } : null);
-            }
-            return;
-        }
-        const info = this.hypercubeRenderer.getInfo();
-        const active = this.cameraController.mode === 'free'
-            ? this.cameraController.getFreeTransitState()
-            : this.traversalController.getActiveController?.();
-        const inAnomaly = (active?.state === 'transit' || active?.type === SLICE_TRANSITION_ANOMALY) &&
-            active.startWorld?.slice.id === this.hypercubeSlice.id &&
-            (active.spatialPosition4D || active.position4D);
-        const label = inAnomaly
-            ? `ANOMALY W ${info.viewerW.toFixed(2)} · ${info.sliceVertexCount} VERTICES · ${info.sliceFaceCount} FACES`
-            : `W ${info.viewerW.toFixed(2)} · ${info.sliceVertexCount} VERTICES · ${info.sliceFaceCount} FACES`;
-        if (label === this.lastHypercubeSliceLabel) return;
-        this.lastHypercubeSliceLabel = label;
-        this.onSliceInfoChanged?.(label, info);
-    }
-
-    updateCameraPresentation() {
-        if (!this.corridorRenderers) return updateLegacyCameraPresentation(this);
-        const viewSliceId = this.cameraController.getViewSliceId();
-        const world = this.getWorld(viewSliceId);
-        this.camera.layerMask = world.layerMask;
-        for (const entry of this.corridorRenderers) {
-            entry.renderer.mesh.isVisible = this.active && entry.sliceId === viewSliceId;
-        }
-        for (const [sliceId, grid] of this.grids) {
-            grid.setActive(this.active && sliceId === viewSliceId);
-        }
-        for (const pair of this.portalPairs) {
-            const sourceActive = pair.sourceSliceId === viewSliceId;
-            const destinationActive = pair.destinationSliceId === viewSliceId;
-            pair.sourcePortal.setVisible(this.active && sourceActive);
-            pair.destinationPortal.setVisible(this.active && destinationActive);
-            pair.sourcePortal.rim.isVisible = this.active && sourceActive;
-            pair.destinationPortal.rim.isVisible = this.active && destinationActive;
-        }
-        this.onViewChanged?.(viewSliceId);
-    }
-
-    updatePortalLists() {
-        const poincareMeshes = [
-            ...this.sourceMeshes,
-            this.mainSourceRenderer?.mesh,
-            this.hypercubeDestinationRenderer?.mesh
-        ].filter(Boolean);
-        const hypercubeMeshes = [
-            ...this.hypercubeMeshes,
-            this.hypercubeSourceRenderer?.mesh
-        ].filter(Boolean);
-        this.mainDestinationPortal.setRenderList(poincareMeshes);
-        this.hypercubeSourcePortal.setRenderList(poincareMeshes);
-        this.hypercubeDestinationPortal.setRenderList(hypercubeMeshes);
-        this.hypercubeMainDestinationPortal.setRenderList(hypercubeMeshes);
-    }
-
-    getDestinationFocus() {
-        if (this.cameraController.mode === 'free' &&
-            this.cameraController.freeSliceId === this.destination.slice.id) {
-            return this.cameraController.getFreeWorldPosition() ?? this.mainAnchor;
-        }
-        return this.currentSliceId === this.destination.slice.id
-            ? this.player.worldPosition : this.mainAnchor;
-    }
-
-    beginEntityTransit(entity, fromSliceId = entity?.sliceId) {
-        return this.traversalController.beginEntityTransit(entity, fromSliceId);
-    }
-
-    tryBeginEntityTransit(entity, fromSliceId = entity?.sliceId) {
-        return this.traversalController.tryBeginEntityTransit(entity, fromSliceId);
-    }
-
-    toggleGrid() {
-        const sliceId = this.cameraController.getViewSliceId();
-        if (!this.grids.has(sliceId)) return false;
-        this.gridEnabled = !this.gridEnabled;
-        for (const grid of this.grids.values()) grid.setVisible(this.gridEnabled);
-        this.updateCameraPresentation();
-        return this.gridEnabled;
-    }
-
-    handleGridKeyDown(event) {
-        if (!this.active || this.disposed || event.code !== 'KeyG' || event.repeat ||
-            event.ctrlKey || event.metaKey || event.altKey) return;
-        const tagName = String(event.target?.tagName ?? '').toUpperCase();
-        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tagName) || event.target?.isContentEditable) return;
-        event.preventDefault?.();
-        this.toggleGrid();
-    }
-
-    toggleCameraMode() { return this.cameraController.toggleMode(); }
-
-    updatePortalPreview() {
-        if (!this.active) return;
-        if (!Array.isArray(this.portalPairs)) return updateLegacyPortalPreview(this);
-        const playerController = this.traversalController.getActiveController?.();
-        const playerTransit = playerController?.state === 'transit' ? playerController : null;
-        const cameraTransit = this.cameraController.getFreeTransitState();
-        const transit = this.cameraController.mode === 'free' ? cameraTransit : playerTransit;
-        if (transit?.type === SLICE_TRANSITION_ANOMALY || transit?.corridor?.type === SLICE_TRANSITION_ANOMALY) {
-            for (const pair of this.portalPairs) {
-                pair.sourcePortal.resetPose();
-                pair.destinationPortal.resetPose();
-            }
-            return;
-        }
-        if (!transit) {
-            for (const pair of this.portalPairs) {
-                pair.sourcePortal.resetPose();
-                pair.destinationPortal.resetPose();
-            }
-            return;
-        }
-        const corridorId = transit.corridorId ?? transit.corridor?.id ?? playerController?.corridor.id;
-        const pair = this.portalPairs.find(function findPair(entry) { return entry.corridor.id === corridorId; });

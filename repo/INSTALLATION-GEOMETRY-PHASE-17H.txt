@@ -1,0 +1,23 @@
+SOMNIUM — GEOMETRY PHASE 17H INSTALLATION
+
+1. Extract the complete Phase 17H archive into a clean project directory.
+2. Serve from the directory containing index.html (not the outer ZIP wrapper directory).
+3. Start the local server:
+
+   python3 -m http.server 8081
+
+4. Open:
+
+   http://127.0.0.1:8081/
+
+5. Hard-refresh the browser after replacing a previous Phase 17 build. The application entry chain uses this cache-busting identifier:
+
+   somnium-20261109-phase17h-complete-sphere-inner-mouth-1
+
+Phase 17H replaces the shallow spherical-cap preview with a closed sphere mesh. The destination render-target image uses a front-orthographic projection over the sphere's visible hemisphere. For open-4D-cylinder anomalies, the inner destination sphere begins at 8% of the entry-mouth radius and grows with exponent 0.55, faster than the outer tube cross-section. The flat disc remains available with view.previewSurface='flat'.
+
+Run the complete automated suite from the extracted project directory:
+
+   node --test tests/*.test.mjs
+
+The current suite contains 313 tests. Automated tests do not replace live browser/WebGL verification of sphere appearance, UV behavior at oblique angles, and perceived angular growth during actual traversal.

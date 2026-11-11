@@ -1,10 +1,13 @@
 class MainMenu {
-    constructor(gameManager, onDnD = null, onGeometryDemo = null, onGeometryGridToggle = null, onGeometryCameraToggle = null) {
+    constructor(gameManager, onDnD = null, onGeometryDemo = null, onGeometryGridToggle = null, onGeometryCameraToggle = null, onGeometrySpotlightEditorToggle = null, onGeometrySpotlightPowerToggle = null, onGeometryWMovementToggle = null) {
         this.gameManager = gameManager;
         this.onDnD = onDnD;
         this.onGeometryDemo = onGeometryDemo;
         this.onGeometryGridToggle = onGeometryGridToggle;
         this.onGeometryCameraToggle = onGeometryCameraToggle;
+        this.onGeometrySpotlightEditorToggle = onGeometrySpotlightEditorToggle;
+        this.onGeometrySpotlightPowerToggle = onGeometrySpotlightPowerToggle;
+        this.onGeometryWMovementToggle = onGeometryWMovementToggle;
         this.container = null;
         this.listeners = [];
         this.unsubscribe = gameManager.onModeChanged(this.update.bind(this));
@@ -30,7 +33,15 @@ class MainMenu {
         this.geometryControls = this.container.querySelector('#somnium-geometry-controls');
         this.geometryCameraMode = 'follow';
         this.geometryVisible = false;
+        this.geometrySpotlightEditorActive = false;
+        this.geometrySpotlightTestRayEnabled = true;
         this.geometryCameraButton = this.container.querySelector('#somnium-demo-camera');
+        this.geometrySpotlightEditorButton = this.container.querySelector('#somnium-demo-spotlight-edit');
+        this.geometrySpotlightPowerButton = this.container.querySelector('#somnium-demo-test-ray');
+        this.geometryWMovementButton = this.container.querySelector('#somnium-demo-w-movement');
+        this.geometryWReadout = this.container.querySelector('#somnium-w-dimension-readout');
+        this.geometryWReadoutVisible = true;
+        this.geometrySpotlightControls = this.container.querySelector('#somnium-spotlight-controls');
         this.bindButton('#somnium-play-character', this.startThirdPerson);
         this.bindButton('#somnium-play-flight', this.startFlight);
         this.bindButton('#somnium-play-editor', this.startEditor);
@@ -40,9 +51,20 @@ class MainMenu {
         this.bindButton('#somnium-pause-button', this.pause);
         this.bindButton('#somnium-demo-grid', this.toggleGeometryGrid);
         this.bindButton('#somnium-demo-camera', this.toggleGeometryCamera);
+        this.bindButton('#somnium-demo-spotlight-edit', this.toggleGeometrySpotlightEditor);
+        this.bindButton('#somnium-demo-test-ray', this.toggleGeometrySpotlightPower);
+        this.bindButton('#somnium-demo-w-movement', this.toggleGeometryWMovement);
         this.bindButton('#somnium-demo-pause', this.pause);
         this.bindButton('#somnium-resume', this.resume);
         this.bindButton('#somnium-return', this.returnToMenu);
+        this.onGeometryHudKeyDown = event => {
+            if (!this.geometryVisible || event.code !== 'KeyH' || event.ctrlKey || event.altKey || event.metaKey || event.repeat) return;
+            const target = event.target;
+            if (target?.matches?.('input, textarea, select, [contenteditable="true"]')) return;
+            event.preventDefault();
+            this.setGeometryWReadoutVisible(!this.geometryWReadoutVisible);
+        };
+        globalThis.window?.addEventListener?.('keydown', this.onGeometryHudKeyDown);
     }
 
     getMarkup() {
@@ -55,9 +77,10 @@ class MainMenu {
                 .somnium-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-top:28px; }
                 .somnium-options button { min-height:106px; }
                 .somnium-options small { display:block; margin-top:9px; color:#b5c5d3; }
-                #somnium-hud,#somnium-geometry-hud { position:absolute; top:18px; right:18px; display:none; gap:8px; pointer-events:auto; align-items:center; }
+                #somnium-hud,#somnium-geometry-hud { position:absolute; top:18px; right:18px; display:none; gap:8px; pointer-events:auto; align-items:center; flex-wrap:wrap; justify-content:flex-end; max-width:calc(100% - 36px); }
                 #somnium-geometry-hud span { color:#b5ddec; font:12px monospace; background:rgba(5,12,20,.75); padding:9px 12px; border-radius:5px; }
-                #somnium-geometry-controls { position:absolute; left:18px; bottom:18px; color:#d8e7f2; font:12px/1.6 monospace; background:rgba(5,12,20,.72); padding:10px 13px; border-radius:5px; pointer-events:none; }
+                #somnium-geometry-controls,#somnium-spotlight-controls { position:absolute; left:18px; bottom:18px; color:#d8e7f2; font:12px/1.6 monospace; background:rgba(5,12,20,.78); padding:10px 13px; border-radius:5px; pointer-events:none; max-width:min(560px,calc(100% - 62px)); }
+                #somnium-spotlight-controls { bottom:18px; border-left:3px solid #ffc36b; }
                 @media(max-width:520px) { .somnium-options { grid-template-columns:1fr; } }
             </style>
             <div id="somnium-menu" class="somnium-overlay">
@@ -69,7 +92,7 @@ class MainMenu {
                         <button id="somnium-play-geometry"><strong>4D GEOMETRY DEMO</strong><small>Explore a rotating hypercube and linked anomaly chambers</small></button>
                         <button id="somnium-play-dnd"><strong>D&amp;D MODE</strong><small>Build tactical battlefields and play encounters</small></button>
                         <button id="somnium-play-flight"><strong>FLIGHT SIMULATOR</strong><small>Explore freely from above</small></button>
-                        <button id="somnium-play-editor"><strong>BUILDING EDITOR</strong><small>Design and position architecture</small></button>
+                        <button id="somnium-play-editor"><strong>BUILDING EDITOR (B)</strong><small>Design and position architecture</small></button>
                     </div>
                 </div>
             </div>
@@ -77,8 +100,9 @@ class MainMenu {
                 <div class="somnium-panel"><h1>PAUSED</h1><button id="somnium-resume">RESUME</button><button id="somnium-return">MAIN MENU</button></div>
             </div>
             <div id="somnium-hud"><button id="somnium-switch">SWITCH VIEW (V)</button><button id="somnium-pause-button">PAUSE (ESC)</button></div>
-            <div id="somnium-geometry-hud"><span id="somnium-geometry-view-label">4D HYPERCUBE CHAMBER · LIVE 3D W-SLICE</span><span id="somnium-geometry-slice-label">W 0.00 · 12 VERTICES · 8 FACES</span><button id="somnium-demo-camera">FREE CAMERA (C)</button><button id="somnium-demo-grid">METRIC GRID (G)</button><button id="somnium-demo-pause">PAUSE (ESC)</button></div>
-            <div id="somnium-geometry-controls" style="display:none">FOLLOW: WASD move · mouse drag look · Space jump<br>FREE CAMERA: WASD move · R/F vertical · E/Q W axis locked outside anomalies<br>ANOMALY: WASD X/Z · R/F Y · E/Q W (four independent axes)<br>Mouse drag look · wheel speed · Shift faster · C follow/free · G grid</div>
+            <div id="somnium-geometry-hud"><span id="somnium-geometry-view-label">4D HYPERCUBE CHAMBER · LIVE 3D W-SLICE</span><span id="somnium-geometry-slice-label">W 0.00 · 12 VERTICES · 8 FACES</span><span id="somnium-w-dimension-readout">W COORD 0.00 · FREEDOM 0%</span><button id="somnium-demo-w-movement" aria-pressed="false">E/Q W MOVEMENT: OFF</button><button id="somnium-demo-camera">FREE CAMERA (C)</button><button id="somnium-demo-spotlight-edit" aria-pressed="false" title="Toggle spotlight editing. Hotkey: L">EDIT LIGHT (L)</button><button id="somnium-demo-test-ray" aria-pressed="true" title="Toggle the test light and optical ray. Hotkey: P">TEST RAY: ON (P)</button><button id="somnium-demo-grid">METRIC GRID (G)</button><button id="somnium-demo-pause">PAUSE (ESC)</button></div>
+            <div id="somnium-geometry-controls" style="display:none">FOLLOW: WASD move · mouse drag look · Space jump<br>FREE CAMERA: WASD move · R/F vertical · E/Q W axis (toggle E/Q W movement above)<br>FOLLOW / ANOMALY: WASD X/Z · R/F Y · E/Q W (four independent axes)<br>W READOUT: coordinate + anomaly freedom · H show/hide · Shift faster · C follow/free · G grid</div>
+            <div id="somnium-spotlight-controls" style="display:none">LIGHT EDIT: WASD / arrows move X/Z · R/F move Y · U/O yaw · I/K pitch<br>Mouse drag aims the light · Shift moves/rotates faster · L exits editing · P toggles test ray</div>
         `;
     }
 
@@ -104,6 +128,16 @@ class MainMenu {
         if (mode) this.setGeometryCameraMode(mode);
     }
 
+    toggleGeometrySpotlightEditor() {
+        const active = this.onGeometrySpotlightEditorToggle?.();
+        if (typeof active === 'boolean') this.setSpotlightEditorState(active);
+    }
+
+    toggleGeometrySpotlightPower() {
+        const enabled = this.onGeometrySpotlightPowerToggle?.();
+        if (typeof enabled === 'boolean') this.setSpotlightTestRayState(enabled);
+    }
+
     setGeometryViewLabel(label) {
         if (this.geometryViewLabel) this.geometryViewLabel.textContent = label;
     }
@@ -112,14 +146,71 @@ class MainMenu {
         if (this.geometrySliceLabel) this.geometrySliceLabel.textContent = label;
     }
 
+    setSpotlightEditorState(active) {
+        const enabled = Boolean(active);
+        this.geometrySpotlightEditorActive = enabled;
+        if (this.geometrySpotlightEditorButton) {
+            this.geometrySpotlightEditorButton.textContent = enabled ? 'STOP EDITING LIGHT (L)' : 'EDIT LIGHT (L)';
+            this.geometrySpotlightEditorButton.setAttribute('aria-pressed', String(enabled));
+        }
+        this.updateGeometryControlHelp();
+    }
+
+    setSpotlightTestRayState(enabled) {
+        const active = Boolean(enabled);
+        this.geometrySpotlightTestRayEnabled = active;
+        if (this.geometrySpotlightPowerButton) {
+            this.geometrySpotlightPowerButton.textContent = `TEST RAY: ${active ? 'ON' : 'OFF'} (P)`;
+            this.geometrySpotlightPowerButton.setAttribute('aria-pressed', String(active));
+        }
+    }
+
+    updateGeometryControlHelp() {
+        if (this.geometryControls) {
+            this.geometryControls.style.display = this.geometryVisible &&
+                this.geometryCameraMode === 'free' && !this.geometrySpotlightEditorActive ? 'block' : 'none';
+        }
+        if (this.geometrySpotlightControls) {
+            this.geometrySpotlightControls.style.display = this.geometryVisible &&
+                this.geometrySpotlightEditorActive ? 'block' : 'none';
+        }
+    }
+
+    toggleGeometryWMovement() {
+        const enabled = this.onGeometryWMovementToggle?.();
+        if (typeof enabled === 'boolean') this.setGeometryWMovementEnabled(enabled);
+    }
+
+    setGeometryWMovementEnabled(enabled) {
+        const active = Boolean(enabled);
+        if (this.geometryWMovementButton) {
+            this.geometryWMovementButton.textContent = `E/Q W MOVEMENT: ${active ? 'ON' : 'OFF'}`;
+            this.geometryWMovementButton.setAttribute('aria-pressed', String(active));
+            this.geometryWMovementButton.title = active
+                ? 'E/Q ignores anomaly W-freedom while respecting Plane thickness.'
+                : 'E/Q obeys the current anomaly W-freedom.';
+        }
+    }
+
+    setGeometryWState(state = {}) {
+        if (!this.geometryWReadout) return;
+        const coordinate = Number.isFinite(state.coordinate) ? state.coordinate : 0;
+        const freedom = Number.isFinite(state.freedomPercent) ? state.freedomPercent : 0;
+        this.geometryWReadout.textContent = `W COORD ${coordinate.toFixed(2)} · FREEDOM ${freedom}%${state.movementEnabled ? ' · OVERRIDE ON' : ''}${state.inTransit ? ' · IN PASSAGE: E/Q TO TRAVERSE' : ''}`;
+    }
+
+    setGeometryWReadoutVisible(visible) {
+        this.geometryWReadoutVisible = Boolean(visible);
+        if (this.geometryWReadout) this.geometryWReadout.style.display = this.geometryWReadoutVisible ? '' : 'none';
+        return this.geometryWReadoutVisible;
+    }
+
     setGeometryCameraMode(mode) {
         this.geometryCameraMode = mode;
         if (this.geometryCameraButton) {
             this.geometryCameraButton.textContent = mode === 'free' ? 'FOLLOW PLAYER (C)' : 'FREE CAMERA (C)';
         }
-        if (this.geometryControls) {
-            this.geometryControls.style.display = this.geometryVisible && mode === 'free' ? 'block' : 'none';
-        }
+        this.updateGeometryControlHelp();
     }
 
     update(mode) {
@@ -128,13 +219,12 @@ class MainMenu {
         this.hud.style.display = mode === 'flight' || mode === 'thirdPerson' ? 'flex' : 'none';
         this.geometryHud.style.display = mode === 'geometryDemo' ? 'flex' : 'none';
         this.geometryVisible = mode === 'geometryDemo';
-        if (this.geometryControls) {
-            this.geometryControls.style.display = this.geometryVisible && this.geometryCameraMode === 'free' ? 'block' : 'none';
-        }
+        this.updateGeometryControlHelp();
     }
 
     dispose() {
         this.unsubscribe?.();
+        globalThis.window?.removeEventListener?.('keydown', this.onGeometryHudKeyDown);
         for (const listener of this.listeners) {
             listener.button.removeEventListener('click', listener.handler);
         }

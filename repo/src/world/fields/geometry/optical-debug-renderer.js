@@ -1,6 +1,6 @@
 /** Render-space-only visualization for authoritative slice optical paths. */
 
-import { ambientToSlice } from './spatial-4d.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+import { ambientToSlice } from './spatial-4d.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
 
 class OpticalDebugRenderer {
     constructor(scene, options = {}) {

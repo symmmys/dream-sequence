@@ -2,7 +2,7 @@ SOMNIUM — DIRECTORY SUMMARY
 ================================================================
 
 Directory: src/world/fields/geometry/
-Generated: 2026-11-09T03:15:29
+Generated: 2026-11-09T22:26:25
 
 PURPOSE
 ----------------------------------------------------------------
@@ -11,8 +11,14 @@ See individual modules for detailed responsibilities.
 
 SOURCE FILES (DIRECT CHILDREN)
 ----------------------------------------------------------------
+- anomaly-boundary-renderer.js
+  Exports: AnomalyBoundaryRenderer, BOUNDARY_FACE_DEFINITIONS, buildAnomalyBoundaryGeometry, buildAnomalyCylinderGeometry, isWAlignedSlice, resolveAnomalyCylinderRadius
 - anomaly-influence-field.js
   Exports: evaluateAnomalyInfluence, evaluateChunkReachability, resolveAnomalyInfluence, smootherstep
+- anomaly-mouth-profile.js
+  Exports: DEFAULT_GROWTH_EXPONENT, DEFAULT_INITIAL_RADIUS_RATIO, calculatePerspectiveMouthGrowth
+- anomaly-view-transform.js
+  Exports: calculateAnomalyApertureScale, euclidean4DApertureSectionRadius, mapAnomalyCameraPose, resolveAnomalyViewCenterNormalOffset
 - babylon-geometry-adapter.js
   Exports: BabylonGeometryAdapter
 - corridor-renderer.js
@@ -41,6 +47,8 @@ SOURCE FILES (DIRECT CHILDREN)
   Exports: ANOMALY_OPTICS_SCHEMA_VERSION, OPTICAL_MATERIAL_SCHEMA_VERSION, createAnomalyOptics, createOpticalMaterial, evaluateOpticalAnomalyCoupling, smootherstep
 - optical-debug-renderer.js
   Exports: OpticalDebugRenderer
+- optical-light-source.js
+  Exports: aimOpticalSpotlightSource, createOpticalSpotlightSource, moveOpticalSpotlightSource, projectOpticalSpotlightExitRay, rotateOpticalSpotlightSource, traceOpticalSpotlightSource
 - optical-metric.js
   Exports: blendPositiveDefiniteMetrics3, blendScaledPositiveDefiniteMetrics3, createOpticalMetricField, geometricMeanMetricScale3, spatialTransformMetricProvider
 - optical-ray-integrator.js
@@ -58,13 +66,13 @@ SOURCE FILES (DIRECT CHILDREN)
 - poincare-visual-scale.js
   Exports: calculatePoincareMetricFactor, calculatePoincareVisualScale
 - portal-preview-renderer.js
-  Exports: PortalPreviewRenderer
+  Exports: PortalPreviewRenderer, applySphericalCapGeometry, applySphericalProjectionUvs
 - slice-transition-traversal-controller.js
   Exports: SliceTransitionTraversalController
 - spatial-4d.js
   Exports: add4, ambientToSlice, assertVector4, createCanonicalSliceFrame, createPerpendicularFrame, createPosition3, createSliceFrame, createVector4, dot4, interpolate4, norm4, normalize4, rotate4, scale4, sliceToAmbient, subtract4, transportPerpendicularFrame
 - spatial-anomaly.js
-  Exports: BEZIER_CORRIDOR_ANOMALY, SLICE_TRANSITION_ANOMALY, SPATIAL_ANOMALY_SCHEMA_VERSION, containsAmbientPoint, createSliceTransitionAnomaly, createSpatialAnomaly
+  Exports: BEZIER_CORRIDOR_ANOMALY, SLICE_TRANSITION_ANOMALY, SPATIAL_ANOMALY_SCHEMA_VERSION, containsAmbientPoint, createAnomalyViewConfig, createSliceTransitionAnomaly, createSpatialAnomaly
 - spatial-corridor.js
   Exports: SPATIAL_CORRIDOR_SCHEMA_VERSION, createSpatialCorridor, cubicBezier, cubicBezierTangent, sampleRadiusProfile, sampleSpatialCorridor, sampleSpatialCorridorFrames
 - spatial-transform.js
@@ -82,6 +90,7 @@ DIRECT DEPENDENCIES
 
 DEPENDENTS
 ----------------------------------------------------------------
+- src/demo/anomaly-passage-presentation.js
 - src/demo/geometry-demo-camera-controller.js
 - src/demo/geometry-demo-topology.js
 - src/demo/geometry-demo-world.js
@@ -97,18 +106,38 @@ INDIVIDUAL SOURCE FILE MANIFEST
 
 Documentation root: docs/summaries/src/world/fields/geometry/files/
 Maximum chunk size: 300 lines
-Text files documented: 32
+Text files documented: 36
 Binary/unreadable files skipped: 0
 
 Each source file has its own documentation directory.
 INDEX.txt identifies the original file and maps every
 numbered part to its exact original source line range.
 
+SOURCE: src/world/fields/geometry/anomaly-boundary-renderer.js
+  Lines: 560
+  Parts: 2
+  Index: docs/summaries/src/world/fields/geometry/files/anomaly-boundary-renderer.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/anomaly-boundary-renderer.js/PART-001.txt
+    docs/summaries/src/world/fields/geometry/files/anomaly-boundary-renderer.js/PART-002.txt
+
 SOURCE: src/world/fields/geometry/anomaly-influence-field.js
   Lines: 178
   Parts: 1
   Index: docs/summaries/src/world/fields/geometry/files/anomaly-influence-field.js/INDEX.txt
     docs/summaries/src/world/fields/geometry/files/anomaly-influence-field.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/anomaly-mouth-profile.js
+  Lines: 30
+  Parts: 1
+  Index: docs/summaries/src/world/fields/geometry/files/anomaly-mouth-profile.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/anomaly-mouth-profile.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/anomaly-view-transform.js
+  Lines: 311
+  Parts: 2
+  Index: docs/summaries/src/world/fields/geometry/files/anomaly-view-transform.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/anomaly-view-transform.js/PART-001.txt
+    docs/summaries/src/world/fields/geometry/files/anomaly-view-transform.js/PART-002.txt
 
 SOURCE: src/world/fields/geometry/babylon-geometry-adapter.js
   Lines: 124
@@ -180,7 +209,7 @@ SOURCE: src/world/fields/geometry/hypercube-4d.js
     docs/summaries/src/world/fields/geometry/files/hypercube-4d.js/PART-001.txt
 
 SOURCE: src/world/fields/geometry/optical-anomaly-tracer.js
-  Lines: 1101
+  Lines: 1115
   Parts: 4
   Index: docs/summaries/src/world/fields/geometry/files/optical-anomaly-tracer.js/INDEX.txt
     docs/summaries/src/world/fields/geometry/files/optical-anomaly-tracer.js/PART-001.txt
@@ -199,6 +228,13 @@ SOURCE: src/world/fields/geometry/optical-debug-renderer.js
   Parts: 1
   Index: docs/summaries/src/world/fields/geometry/files/optical-debug-renderer.js/INDEX.txt
     docs/summaries/src/world/fields/geometry/files/optical-debug-renderer.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/optical-light-source.js
+  Lines: 301
+  Parts: 2
+  Index: docs/summaries/src/world/fields/geometry/files/optical-light-source.js/INDEX.txt
+    docs/summaries/src/world/fields/geometry/files/optical-light-source.js/PART-001.txt
+    docs/summaries/src/world/fields/geometry/files/optical-light-source.js/PART-002.txt
 
 SOURCE: src/world/fields/geometry/optical-metric.js
   Lines: 390
@@ -255,13 +291,14 @@ SOURCE: src/world/fields/geometry/poincare-visual-scale.js
     docs/summaries/src/world/fields/geometry/files/poincare-visual-scale.js/PART-001.txt
 
 SOURCE: src/world/fields/geometry/portal-preview-renderer.js
-  Lines: 163
-  Parts: 1
+  Lines: 354
+  Parts: 2
   Index: docs/summaries/src/world/fields/geometry/files/portal-preview-renderer.js/INDEX.txt
     docs/summaries/src/world/fields/geometry/files/portal-preview-renderer.js/PART-001.txt
+    docs/summaries/src/world/fields/geometry/files/portal-preview-renderer.js/PART-002.txt
 
 SOURCE: src/world/fields/geometry/slice-transition-traversal-controller.js
-  Lines: 617
+  Lines: 719
   Parts: 3
   Index: docs/summaries/src/world/fields/geometry/files/slice-transition-traversal-controller.js/INDEX.txt
     docs/summaries/src/world/fields/geometry/files/slice-transition-traversal-controller.js/PART-001.txt
@@ -275,7 +312,7 @@ SOURCE: src/world/fields/geometry/spatial-4d.js
     docs/summaries/src/world/fields/geometry/files/spatial-4d.js/PART-001.txt
 
 SOURCE: src/world/fields/geometry/spatial-anomaly.js
-  Lines: 160
+  Lines: 226
   Parts: 1
   Index: docs/summaries/src/world/fields/geometry/files/spatial-anomaly.js/INDEX.txt
     docs/summaries/src/world/fields/geometry/files/spatial-anomaly.js/PART-001.txt

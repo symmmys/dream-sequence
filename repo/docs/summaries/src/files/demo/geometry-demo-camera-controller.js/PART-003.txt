@@ -1,3 +1,9 @@
+        return applyAmbientOffsets(this.getFreeCorridorSample(transit), transit);
+    }
+
+    getForwardVector() {
+        const horizontal = Math.cos(this.freePitch);
+        return {
             x: Math.sin(this.freeYaw) * horizontal,
             y: Math.sin(this.freePitch),
             z: Math.cos(this.freeYaw) * horizontal

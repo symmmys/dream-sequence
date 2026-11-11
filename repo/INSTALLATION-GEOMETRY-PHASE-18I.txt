@@ -1,0 +1,28 @@
+SOMNIUM GEOMETRY — PHASE 18I INSTALLATION
+Plane-Contained Build & Anomaly Tools
+
+RECOMMENDED: FULL PROJECT ARCHIVE
+1. Make a backup copy of the Somnium project directory you are currently serving.
+2. Extract Somnium_Geometry_Phase_18I_Plane_Contained_Build_and_Anomaly_Tools.zip.
+3. Move/copy the extracted project contents into your project directory, preserving the archive's directory structure and replacing files when prompted.
+4. Start your local server from the directory containing index.html (or use your existing project-root server script).
+5. Hard-refresh the browser tab so it requests the new cache-busted JavaScript modules.
+
+PATCH ALTERNATIVE
+The patch archive is intended to be applied on top of the complete Phase 18H Editor Stability Repair project (the Phase 18H full ZIP). Extract the patch into the existing project root and allow it to overwrite the included files. It is not a standalone project and must not be applied directly to an earlier Phase 18G4 archive.
+
+DATA / BROWSER STORAGE
+- Do not clear IndexedDB or local browser storage.
+- No database schema upgrade or destructive migration is part of Phase 18I.
+- Existing Planes, Plane objects, and Anomaly definitions remain in the somnium-planes database.
+
+NEW / RETAINED CONTROLS
+- B: open/close the Level Builder from navigable gameplay modes; ignored while typing.
+- Level Builder tabs: Buildings (1), Planes (2).
+- Planes → ANOMALIES · PLACE CONNECTIONS: anomaly editor submenu.
+- Scale gizmo on Mouth A: adjust the shared aperture radius of the selected anomaly.
+- PLACE MOUTH A / PLACE MOUTH B: arm the selected endpoint, then click in the target Plane.
+- Ctrl+Enter: SAVE & PLACE ANOMALY while the nested anomaly editor is open.
+- V: cycle mouse-wheel zoom speed 1× / 10× / 100× in the Planes workflow.
+
+The full project includes source, tests, previous phase documentation, and Phase 18I notes. The patch contains only files changed or added relative to Phase 18H.

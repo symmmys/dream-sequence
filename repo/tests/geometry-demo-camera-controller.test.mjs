@@ -666,3 +666,85 @@ test('switching from third-person to free camera constrains the inherited Poinca
         fixture.restore();
     }
 });
+
+
+test('free camera resolves an enlarged Main World portal mouth to its canonical anomaly endpoint', function freeCameraPresentationEndpointRebase() {
+    const world = {
+        slice: createWorldSlice({ id: 'main', w: 80 }),
+        transform: {
+            renderToWorld(position) { return { ...position }; },
+            constrainRenderPosition(position) { return position; }
+        }
+    };
+    const endpointController = {
+        isNearPresentationPortal(sliceId, position) {
+            return sliceId === 'main' && Math.hypot(position.x - 260, position.z + 2) < 30;
+        },
+        getPhysicalEndpointLocalPosition(_world, position) {
+            return {
+                x: 18 + (position.x - 260),
+                y: 2.5,
+                z: position.z + 2
+            };
+        }
+    };
+    const controller = Object.create(GeometryDemoCameraController.prototype);
+    Object.assign(controller, {
+        mode: 'free',
+        freePosition: { x: 260, y: 4, z: -2 },
+        freeSliceId: 'main',
+        freeW: 0,
+        traversal: {
+            worlds: new Map([['main', world]]),
+            getRoutesForSlice() { return [{ controller: endpointController }]; }
+        }
+    });
+
+    assert.deepEqual(controller.getFreeAmbientPosition(), {
+        x: 18, y: 2.5, z: 0, w: 80
+    });
+});
+
+
+test('user-defined Plane E/Q movement obeys the playtest toggle and Plane W bounds', function userPlaneWThicknessNavigation() {
+    const fixture = createFixture();
+    try {
+        const world = fixture.traversal.worlds.get('room');
+        world.isUserDefinedPlane = true;
+        world.fourDimensionalRegion = true;
+        world.wBounds = { min: -1.5, max: 1.5 };
+        fixture.controller.setEnabled(true);
+        fixture.controller.setMode('free');
+        fixture.keyDown('KeyE');
+        fixture.controller.update(0.1);
+        assert.equal(fixture.controller.getFreeW(), 0, 'W movement remains off until explicitly enabled');
+        fixture.controller.setWMovementEnabled(true);
+        fixture.keyDown('KeyE');
+        fixture.controller.update(0.1);
+        assert.equal(fixture.controller.getFreeW(), 1.5, 'positive W motion clamps to the Plane half-thickness');
+        fixture.keyUp('KeyE');
+        fixture.keyDown('KeyQ');
+        fixture.controller.update(0.1);
+        assert.equal(fixture.controller.getFreeW(), -0.5, 'negative W motion moves back through the Plane');
+    } finally {
+        fixture.restore();
+    }
+});
+
+
+test('W-axis playtest toggle enables free-camera E/Q movement on a zero-thickness demo slice', function freeWMovementToggle() {
+    const fixture = createFixture();
+    try {
+        fixture.controller.setEnabled(true);
+        fixture.controller.setMode('free');
+        assert.equal(fixture.controller.wMovementEnabled, false);
+        fixture.controller.setWMovementEnabled(true);
+        fixture.keyDown('KeyE');
+        fixture.controller.update(0.1);
+        assert.ok(fixture.controller.freeW > 0);
+        fixture.controller.setWMovementEnabled(false);
+        assert.equal(fixture.controller.wMovementEnabled, false);
+    } finally {
+        fixture.restore();
+    }
+});

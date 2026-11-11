@@ -1,0 +1,22 @@
+SOMNIUM — GEOMETRY PHASE 17F INSTALLATION
+
+1. Extract the complete Phase 17F archive into a clean project directory.
+2. Serve from the directory containing index.html (not the outer ZIP wrapper directory).
+3. Start the local server:
+
+   python3 -m http.server 8081
+
+4. Open:
+
+   http://127.0.0.1:8081/
+
+5. Hard-refresh the browser after replacing a previous Phase 17 build. The application entry chain uses the Phase 17F cache-busting identifier:
+   somnium-20261109-phase17f-destination-approach-1
+
+Phase 17F adds progressive destination preview camera convergence and tapered-cylinder exit-mouth continuity. It does not move canonical endpoints, alter traversal physics, or move the remote world. Live browser/WebGL inspection is still required.
+
+Run the complete automated suite from the extracted project directory:
+
+   node --test tests/*.test.mjs
+
+See GEOMETRY-PHASE-17F-DESTINATION-APPROACH-AND-MOUTH-CONTINUITY.md for details.

@@ -2,7 +2,7 @@ SOMNIUM — DIRECTORY SUMMARY
 ================================================================
 
 Directory: src/world/
-Generated: 2026-11-09T03:15:29
+Generated: 2026-11-09T22:26:25
 
 PURPOSE
 ----------------------------------------------------------------
@@ -68,7 +68,7 @@ INDIVIDUAL SOURCE FILE MANIFEST
 
 Documentation root: docs/summaries/src/world/files/
 Maximum chunk size: 300 lines
-Text files documented: 58
+Text files documented: 62
 Binary/unreadable files skipped: 0
 
 Each source file has its own documentation directory.
@@ -123,11 +123,31 @@ SOURCE: src/world/fields/field-sampler.js
   Index: docs/summaries/src/world/files/fields/field-sampler.js/INDEX.txt
     docs/summaries/src/world/files/fields/field-sampler.js/PART-001.txt
 
+SOURCE: src/world/fields/geometry/anomaly-boundary-renderer.js
+  Lines: 560
+  Parts: 2
+  Index: docs/summaries/src/world/files/fields/geometry/anomaly-boundary-renderer.js/INDEX.txt
+    docs/summaries/src/world/files/fields/geometry/anomaly-boundary-renderer.js/PART-001.txt
+    docs/summaries/src/world/files/fields/geometry/anomaly-boundary-renderer.js/PART-002.txt
+
 SOURCE: src/world/fields/geometry/anomaly-influence-field.js
   Lines: 178
   Parts: 1
   Index: docs/summaries/src/world/files/fields/geometry/anomaly-influence-field.js/INDEX.txt
     docs/summaries/src/world/files/fields/geometry/anomaly-influence-field.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/anomaly-mouth-profile.js
+  Lines: 30
+  Parts: 1
+  Index: docs/summaries/src/world/files/fields/geometry/anomaly-mouth-profile.js/INDEX.txt
+    docs/summaries/src/world/files/fields/geometry/anomaly-mouth-profile.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/anomaly-view-transform.js
+  Lines: 311
+  Parts: 2
+  Index: docs/summaries/src/world/files/fields/geometry/anomaly-view-transform.js/INDEX.txt
+    docs/summaries/src/world/files/fields/geometry/anomaly-view-transform.js/PART-001.txt
+    docs/summaries/src/world/files/fields/geometry/anomaly-view-transform.js/PART-002.txt
 
 SOURCE: src/world/fields/geometry/babylon-geometry-adapter.js
   Lines: 124
@@ -199,7 +219,7 @@ SOURCE: src/world/fields/geometry/hypercube-4d.js
     docs/summaries/src/world/files/fields/geometry/hypercube-4d.js/PART-001.txt
 
 SOURCE: src/world/fields/geometry/optical-anomaly-tracer.js
-  Lines: 1101
+  Lines: 1115
   Parts: 4
   Index: docs/summaries/src/world/files/fields/geometry/optical-anomaly-tracer.js/INDEX.txt
     docs/summaries/src/world/files/fields/geometry/optical-anomaly-tracer.js/PART-001.txt
@@ -218,6 +238,13 @@ SOURCE: src/world/fields/geometry/optical-debug-renderer.js
   Parts: 1
   Index: docs/summaries/src/world/files/fields/geometry/optical-debug-renderer.js/INDEX.txt
     docs/summaries/src/world/files/fields/geometry/optical-debug-renderer.js/PART-001.txt
+
+SOURCE: src/world/fields/geometry/optical-light-source.js
+  Lines: 301
+  Parts: 2
+  Index: docs/summaries/src/world/files/fields/geometry/optical-light-source.js/INDEX.txt
+    docs/summaries/src/world/files/fields/geometry/optical-light-source.js/PART-001.txt
+    docs/summaries/src/world/files/fields/geometry/optical-light-source.js/PART-002.txt
 
 SOURCE: src/world/fields/geometry/optical-metric.js
   Lines: 390
@@ -274,13 +301,14 @@ SOURCE: src/world/fields/geometry/poincare-visual-scale.js
     docs/summaries/src/world/files/fields/geometry/poincare-visual-scale.js/PART-001.txt
 
 SOURCE: src/world/fields/geometry/portal-preview-renderer.js
-  Lines: 163
-  Parts: 1
+  Lines: 354
+  Parts: 2
   Index: docs/summaries/src/world/files/fields/geometry/portal-preview-renderer.js/INDEX.txt
     docs/summaries/src/world/files/fields/geometry/portal-preview-renderer.js/PART-001.txt
+    docs/summaries/src/world/files/fields/geometry/portal-preview-renderer.js/PART-002.txt
 
 SOURCE: src/world/fields/geometry/slice-transition-traversal-controller.js
-  Lines: 617
+  Lines: 719
   Parts: 3
   Index: docs/summaries/src/world/files/fields/geometry/slice-transition-traversal-controller.js/INDEX.txt
     docs/summaries/src/world/files/fields/geometry/slice-transition-traversal-controller.js/PART-001.txt
@@ -294,7 +322,7 @@ SOURCE: src/world/fields/geometry/spatial-4d.js
     docs/summaries/src/world/files/fields/geometry/spatial-4d.js/PART-001.txt
 
 SOURCE: src/world/fields/geometry/spatial-anomaly.js
-  Lines: 160
+  Lines: 226
   Parts: 1
   Index: docs/summaries/src/world/files/fields/geometry/spatial-anomaly.js/INDEX.txt
     docs/summaries/src/world/files/fields/geometry/spatial-anomaly.js/PART-001.txt

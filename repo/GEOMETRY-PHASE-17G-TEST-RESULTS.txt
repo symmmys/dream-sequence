@@ -1,0 +1,38 @@
+SOMNIUM — GEOMETRY PHASE 17G TEST RESULTS
+Build: somnium-20261109-phase17g-spherical-mouth-continuity-2
+Date: November 9, 2026
+Baseline: Phase 17F Destination Approach and Mouth Continuity
+
+FULL AUTOMATED REGRESSION SUITE
+Command: node --test tests/*.test.mjs
+Result: 312 passed, 0 failed.
+
+STATIC VERIFICATION
+- Source JavaScript syntax: 126/126 passed.
+- Test module syntax: 32/32 passed.
+- Relative module references checked: 329.
+- Missing relative module references: 0.
+- Cache-busting build identifier: consistent.
+- Stale Phase 17F/17E cache identifiers in index.html, src, tests: 0.
+
+FOCUSED PHASE 17G COVERAGE
+- Tapered-cylinder preview scale is invariant during forward transit.
+- Tapered-cylinder preview scale does not reverse during reverse transit or after endpoint handoff.
+- The cylinder's own W-dependent cross-section remains the sole diameter progression.
+- Main World endpoint section radius is clamped at full destination size beyond the handoff.
+- Spherical portal cap vertices satisfy the defining sphere equation.
+- The spherical cap centre recedes inward while the rim stays at the aperture plane.
+- Spherical-cap deformation preserves render-target UV coordinates.
+- Spherical preview scaling remains depth-aware.
+- Flat circular preview remains available and remains planar.
+- Invalid preview surfaces and unsupported rectangular spherical caps are rejected.
+- Direct Hypercube-to-Main-World anomaly selects spherical preview and disables the legacy rim.
+- Legacy 4D spherical aperture behavior remains covered for non-cylinder anomalies.
+
+ARCHIVE VERIFICATION
+- ZIP integrity: passed.
+- Full regression suite from extracted archive: 312 passed, 0 failed.
+- Source syntax and import checks repeated from extracted archive.
+
+VISUAL VERIFICATION
+No live browser/WebGL session was available. The actual spherical-cap appearance, nonlinear Poincare projection, transparency/depth ordering, and in-browser exit-mouth continuity require manual browser validation.

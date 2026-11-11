@@ -1,0 +1,39 @@
+SOMNIUM PHASE 18K — TEST RESULTS
+
+Automated test command:
+  node --test tests/*.test.mjs
+
+Result:
+  Tests:       407
+  Passed:      407
+  Failed:      0
+  Cancelled:   0
+  Skipped:     0
+  Todo:        0
+
+Static syntax checks:
+  JavaScript source and test files inspected: 182
+  node --check failures: 0
+
+Relative import audit:
+  JavaScript source/test files inspected: 182
+  Relative imports checked: 372
+  Missing relative imports: 0
+
+Build/cache identifier:
+  somnium-20261110-phase18k-anomaly-plane-runtime-preview-1
+  Previous Phase 18J identifier occurrences in index.html/src/tests: 0
+
+Scope of automated regression coverage includes:
+- runtime registration of newly persisted Plane definitions and idempotence
+- topology, slice registry, geometry adapter, chunk graph, movement, and traversal wiring
+- fallback behavior for partial/background-only GeometryDemoWorld fixtures
+- anomaly endpoint menu promotion and actual endpoint selection of saved custom Planes
+- portal preview list identity across Plane object `planeId`/`sliceId` metadata
+- context-hidden versus authored-hidden object visibility
+- Plane-local object preview metadata and tesseract mesh Plane identity
+- render-target temporary visibility restoration
+- materialization/refresh ordering before anomaly preview-list updates
+- previous Plane editor organization, background behavior, and save controls
+
+Live browser/WebGL testing was not performed during this packaging pass.

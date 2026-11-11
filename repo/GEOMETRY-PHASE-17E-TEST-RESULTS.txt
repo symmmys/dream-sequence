@@ -1,0 +1,33 @@
+SOMNIUM — GEOMETRY PHASE 17E TEST RESULTS
+Build: somnium-20261109-phase17e-tapered-4d-cylinder-1
+Baseline: Phase 17D
+
+FULL AUTOMATED SUITE
+Command: node --test tests/*.test.mjs
+Result: 305 passed, 0 failed.
+
+STATIC VERIFICATION
+- JavaScript source and test modules: 158 syntax checks passed.
+- Relative import references checked: 322.
+- Missing relative imports: 0.
+- Runtime ESM smoke import: anomaly-boundary-renderer and geometry-demo-world passed.
+- Stale Phase 17D cache identifiers in src, tests, and index.html: none.
+- Application cache-busting build identifier consistency: passed.
+
+NEW PHASE 17E COVERAGE
+- Tapered 4D cylinder cross-section has the configured source radius.
+- Tapered 4D cylinder cross-section has the configured destination radius.
+- Quintic smootherstep produces a smooth midpoint radius.
+- Radius mapping works when destination W is less than source W.
+- Radius clamps outside the endpoint interval.
+- Sphere surface vertex, triangle, and grid-line topology is deterministic.
+- Presentation endpoint offsets are applied without mutating canonical endpoints.
+- Oblique tube axes are reported as unsupported.
+- Boundary renderer updates radius as W changes and disposes all Babylon resources.
+- Anomaly view configuration validates both endpoint radii.
+- All three demo anomalies use open-4d-cylinder boundary configuration.
+- Direct Hypercube-to-Main-World anomaly uses source radius 2.8 and destination radius 7.0.
+- Legacy open-4d-hypercube configuration remains supported for compatibility.
+
+VISUAL VERIFICATION
+No live browser/WebGL session was available. The actual spherical wall appearance, transparency ordering, portal preview composition, and traversal comfort require browser validation.

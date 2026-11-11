@@ -1,0 +1,32 @@
+SOMNIUM GEOMETRY — PHASE 18J INSTALLATION
+Plane Background Persistence & Editor Navigation Finalization
+
+RECOMMENDED: FULL PROJECT ARCHIVE
+1. Back up the currently served Somnium project directory.
+2. Extract Somnium_Geometry_Phase_18J_Editor_Finalization.zip.
+3. Copy the extracted project contents into the existing project root, preserving directories and replacing files when prompted.
+4. Keep the folder containing index.html as the local HTTP server root.
+5. Hard-refresh the browser so all Phase 18J cache-busted modules are fetched.
+
+PATCH ALTERNATIVE
+The incremental patch archive is intended to be applied over the complete Phase 18I Plane-Contained Build & Anomaly Tools project. Extract the patch into that project root and allow included files to overwrite existing files. The patch is not a standalone project and must not be applied to Phase 18H or earlier.
+
+DATA / BROWSER STORAGE
+- Do not clear IndexedDB or browser local storage.
+- There is no IndexedDB schema change or destructive migration in Phase 18J.
+- Existing Planes, Plane-local objects, and Anomaly definitions remain in `somnium-planes`.
+
+EDITOR NAVIGATION
+- Top-level tabs: Planes (1), Object Editor (2).
+- Plane subtabs: Plane Editor, Anomalies.
+- Object Editor currently contains the existing create-building-from-floor-plan workflow.
+
+HOTKEYS
+- B: open/close Level Builder.
+- 1: Planes.
+- 2: Object Editor.
+- V: cycle mouse-wheel zoom speed 1× / 10× / 100× while in Planes.
+- Ctrl+S: save Plane and Plane-local objects while on the Plane Editor subtab (works while a form field is focused).
+- Ctrl+Enter: save/place anomaly while the Anomalies subtab is active.
+
+See `GEOMETRY-PHASE-18J-EDITOR-FINALIZATION.md` for the implementation summary and browser validation checklist.

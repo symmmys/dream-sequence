@@ -1,0 +1,38 @@
+SOMNIUM — GEOMETRY PHASE 17H TEST RESULTS
+Build: somnium-20261109-phase17h-complete-sphere-inner-mouth-1
+Date: November 9, 2026
+Baseline: Phase 17G — Spherical Mouth and Stable Cylinder Aperture
+
+FULL AUTOMATED REGRESSION SUITE
+Command: node --test tests/*.test.mjs
+Result: 313 passed, 0 failed.
+
+FOCUSED REGRESSIONS
+- Complete closed sphere is used for spherical destination previews.
+- Sphere geometry contains positive and negative local-Z hemispheres.
+- Destination render-target image retains front-orthographic UV projection.
+- Flat circular/elliptical disc preview remains available and planar.
+- Sphere depth scales together with its width and height.
+- Aperture renderer accepts the 2.5x scale needed by the direct 2.8 -> 7.0 radius taper.
+- Destination sphere starts at 8% of entry-mouth radius.
+- Inner sphere grows monotonically and faster than the outer tapered tube.
+- Reverse traversal swaps source/destination radii and applies the same physical growth rule.
+- At either endpoint, the inner sphere's physical radius matches the local tube radius.
+- Flat cylinder previews do not receive the inner-sphere growth curve.
+- GeometryDemoWorld explicitly supplies traversal orientation to the aperture-scale calculation.
+
+STATIC VERIFICATION
+- Source JavaScript syntax: 127/127 passed.
+- Test module syntax: 32/32 passed.
+- Relative module references checked: 322.
+- Missing relative module references: 0.
+- Cache-busting build identifier: consistent (`somnium-20261109-phase17h-complete-sphere-inner-mouth-1`).
+- Stale Phase 17G cache identifiers in index.html, src, tests: 0.
+
+ARCHIVE VERIFICATION
+- ZIP integrity: passed.
+- Full regression suite from extracted archive: 313 passed, 0 failed.
+- Source syntax and relative import checks repeated from extracted archive.
+
+VISUAL VERIFICATION
+No live browser/WebGL session was available in this environment. The actual full-sphere appearance, front-projection UV behavior at off-axis camera angles, transparency/depth ordering, and apparent angular growth require manual browser validation.

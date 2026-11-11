@@ -1,0 +1,9 @@
+PATCH MANIFEST — PHASE 18G4 EDITOR STABILITY REPAIR
+Base archive:
+  Somnium_Geometry_Phase_18G4_Quaternion_Matrix_API_Startup_Repair.zip
+
+This patch contains the files changed by the editor stability repair and its new regression coverage, plus repair documentation and installation notes. Apply it to the extracted root of the base archive.
+
+The full archive is self-contained and is the recommended installation for users who prefer replacing the project directory.
+
+No IndexedDB schema migration or storage reset is included.

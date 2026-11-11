@@ -1,0 +1,50 @@
+SOMNIUM — GEOMETRY PHASE 17B TEST RESULTS
+Date: November 9, 2026
+Build: somnium-20261109-phase17b-mainworld-exit-1
+
+AUTOMATED REGRESSION SUITE
+All 30 test modules were executed in seven batches to keep long-running
+live-metric anomaly fixtures within the command execution window.
+
+Batch 1: 52 passed, 0 failed
+Batch 2: 50 passed, 0 failed
+Batch 3a: 35 passed, 0 failed
+Batch 3b: 17 passed, 0 failed
+Batch 3c: 7 passed, 0 failed
+Batch 4: 64 passed, 0 failed
+Batch 5: 56 passed, 0 failed
+
+TOTAL: 281 passed, 0 failed.
+
+FOCUSED PHASE 17B TESTS
+Command:
+  node --test tests/optical-light-source.test.mjs \
+    tests/geometry-demo-portal-preview.test.mjs \
+    tests/geometry-demo-topology.test.mjs
+Result: 33 passed, 0 failed.
+
+STATIC VERIFICATION
+- Source JavaScript syntax: 125/125 passed.
+- Test module syntax: 30/30 passed.
+- Static relative import references checked: 323.
+- Missing relative imports: 0.
+- Build/cache-busting identifier: consistent across entry point and versioned imports.
+
+PHASE 17B REGRESSION COVERAGE
+- A default spotlight ray crosses the authorized direct +5-W anomaly and exits
+  above the destination terrain plane.
+- The outgoing ray is projected into destination render coordinates.
+- GeometryDemoWorld creates/updates a receiving-side ray mesh on MAIN_WORLD_LAYER.
+- Visible ray meshes are included in both destination portal preview render lists;
+  hidden rays are excluded and duplicate entries are prevented.
+- Main World preview portals are 72 x 72 world units, with 520 units between
+  their centers and 80-unit rims.
+- Main World layout validation rejects invalid anchors and does not mutate them.
+- Existing optical topology, movement, anomaly traversal, rendering and geometry
+  regression tests continue to pass.
+
+VISUAL VERIFICATION
+No live browser/WebGL session was available in this environment. The automated
+checks validate ray transport, coordinate projection, render-list wiring and
+portal layout. Final visual confirmation of the ray within the portal previews,
+Main World lighting and portal scale/spacing must be performed in the browser.

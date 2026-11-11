@@ -3,8 +3,8 @@ SOMNIUM — INDIVIDUAL SOURCE FILE INDEX
 
 Source file: src/world/fields/geometry/optical-anomaly-tracer.js
 Source directory: src/world/fields/
-Generated: 2026-11-09T03:15:29
-Total source lines: 1101
+Generated: 2026-11-09T22:26:25
+Total source lines: 1115
 Maximum chunk size: 300 lines
 Number of parts: 4
 
@@ -23,8 +23,8 @@ Original lines: 601-900
 Lines in part: 300
 
 Part: PART-004.txt
-Original lines: 901-1101
-Lines in part: 201
+Original lines: 901-1115
+Lines in part: 215
 
 READING INSTRUCTIONS
 ----------------------------------------------------------------

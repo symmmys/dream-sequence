@@ -15,7 +15,8 @@ class GameManager {
         if (!this.flightCamera) throw new Error('Flight camera is required.');
         this.flightCamera.detachControl();
         this.onKeyDown = this.handleKeyDown.bind(this);
-        window.addEventListener('keydown', this.onKeyDown);
+        // Capture the global build shortcut before mode-specific viewport handlers.
+        window.addEventListener('keydown', this.onKeyDown, true);
     }
 
     registerThirdPerson(camera, controller, cameraController) {
@@ -139,6 +140,18 @@ class GameManager {
 
     handleKeyDown(event) {
         if (event.repeat) return;
+        const target = event.target;
+        const editingText = target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+        // The build shortcut must also work while exploring registered spatial
+        // modes such as geometryDemo. Those modes are navigable and are retained
+        // as resumeMode by setMode('editor'), so B can safely return to them.
+        if (!editingText && event.code === 'KeyB' &&
+            (this.mode === 'menu' || this.mode === 'editor' || this.isNavigableMode(this.mode))) {
+            event.preventDefault();
+            if (this.mode === 'editor') this.exitEditor();
+            else this.startEditor();
+            return;
+        }
         if (event.code === 'KeyV' && (this.mode === 'flight' || this.mode === 'thirdPerson')) {
             this.togglePerspective();
         }
@@ -153,7 +166,7 @@ class GameManager {
     dispose() {
         if (this.disposed) return;
         this.disposed = true;
-        window.removeEventListener('keydown', this.onKeyDown);
+        window.removeEventListener('keydown', this.onKeyDown, true);
         this.flightCamera.detachControl();
         this.thirdPersonCamera?.detachControl();
         this.editorCamera?.detachControl();

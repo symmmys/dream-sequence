@@ -1,0 +1,32 @@
+SOMNIUM PHASE 18L — TEST RESULTS
+
+Targeted suites:
+  node --test tests/plane-object-editor.test.mjs tests/phase18k-anomaly-plane-runtime-preview.test.mjs tests/geometry-demo-camera-controller.test.mjs
+  Tests: 45
+  Passed: 45
+  Failed: 0
+  Skipped: 0
+
+New regression coverage:
+- Plane frame adapter exposes GeometryRenderer's getInfo diagnostics contract.
+- New runtime Planes derive W bounds from full saved W thickness.
+- Existing runtime Planes update W bounds after a thickness edit.
+- Saved Plane selection promotes the runtime slice before resolving editor camera context.
+- Plane camera focus radius follows Plane dimensions and metric visual scale.
+- G/R/S transform mode hotkeys and Alt+1/Alt+2 Plane subtabs.
+- Keyboard shortcuts are suppressed in editable form controls.
+- Newly authored hypercubes are not hidden as duplicates of the original demo tesseract.
+- User-defined Plane free-camera E/Q movement is clamped to its W thickness.
+
+Complete suite:
+  node --test tests/*.test.mjs
+  Tests: 411
+  Passed: 411
+  Failed: 0
+  Cancelled: 0
+  Skipped: 0
+  Duration: 36.5 seconds
+
+Static syntax and relative-import audits are performed before packaging.
+
+No live browser/WebGL test was performed by the packaging environment.

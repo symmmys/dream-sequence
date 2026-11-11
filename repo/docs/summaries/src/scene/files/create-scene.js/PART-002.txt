@@ -28,6 +28,14 @@
         return geometryDemo.toggleCameraMode();
     }
 
+    function toggleGeometryDemoSpotlightEditor() {
+        return geometryDemo.toggleSpotlightEditor();
+    }
+
+    function toggleGeometryDemoTestRay() {
+        return geometryDemo.toggleSpotlightTestRay();
+    }
+
     let mainMenu = null;
     geometryDemo.cameraController.onModeChanged = function updateGeometryCameraHud(mode) {
         mainMenu?.setGeometryCameraMode(mode);
@@ -37,8 +45,14 @@
         startDnDMode,
         startGeometryDemoMode,
         toggleGeometryDemoGrid,
-        toggleGeometryDemoCamera
+        toggleGeometryDemoCamera,
+        toggleGeometryDemoSpotlightEditor,
+        toggleGeometryDemoTestRay
     );
+    geometryDemo.onSpotlightEditorStateChanged = (active) => mainMenu?.setSpotlightEditorState(active);
+    geometryDemo.onSpotlightTestRayStateChanged = (enabled) => mainMenu?.setSpotlightTestRayState(enabled);
+    mainMenu.setSpotlightEditorState(geometryDemo.spotlightEditorActive);
+    mainMenu.setSpotlightTestRayState(geometryDemo.spotlightTestRayEnabled);
     geometryDemo.onViewChanged = function updateGeometryViewLabel(sliceId) {
         const label = sliceId === geometryDemo.hypercubeSlice.id
             ? '4D HYPERCUBE CHAMBER · LIVE 3D W-SLICE'
@@ -284,17 +298,3 @@ onLoad: async world => {
     clouds.activeChunks.clear();
     clouds.renderer.clear();
     clouds.renderer.update();
-
-    ecology.renderDirty = true;
-
-    console.log("[World] Loaded:", world.metadata.name, result);
-},
-
-onCapture: async world => {
-    worldSession.capture(world, simulationElapsed);
-    buildingSystem.captureWorld(world);
-}
-
-
-    }
-);

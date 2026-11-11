@@ -1,70 +1,300 @@
-    portal.setRenderList(renderMeshes);
-
-    const rim = BABYLON.MeshBuilder.CreateTorus(options.rimName ?? `geometryPortalRim_${sliceId}`, {
-        diameter: rimDiameter, thickness: rimThickness, tessellation: 64
-    }, scene);
-    rim.position.set(position.x, position.y, position.z - 0.03);
-    rim.material = makeMaterial(scene, `${options.rimName ?? 'geometryPortal'}Material`, '#69d8f0', '#286d8b');
-    rim.metadata = { sliceId, geometryPortalRim: true };
-    rim.layerMask = options.layerMask;
-    adapter.applyMesh(rim, sliceId);
-    rim.layerMask = options.layerMask;
-    portal.rim = rim;
-    portal.setHomePose();
-    return portal;
-}
-
-function createDestinationPortal(scene, sliceId, adapter, sourceMeshes, anchor) {
-    const position = { x: anchor.x, y: anchor.y + 35, z: anchor.z - 2 };
-    return createPortal(scene, sliceId, adapter, sourceMeshes, {
-        position,
-        width: 76,
-        height: 88,
-        rimDiameter: 94,
-        rimThickness: 4,
-        layerMask: MAIN_WORLD_LAYER,
-        renderLayerMask: SOURCE_LAYER,
-        rimName: 'geometryDestinationPortalRim',
-        camera: { x: 0, y: 28, z: 48, targetY: 2, targetZ: 0, fov: 0.95 }
-    });
-}
-
-function createRoomMovementSurface() {
-    return {
-        min: { x: -21.5, y: 0, z: -27.5 },
-        max: { x: 21.5, y: 0, z: 28 },
-        sampleAt: sampleRoomElevation
-    };
-}
-
-function sampleRoomElevation(x, z) {
-    if (x < -21.5 || x > 21.5 || z < -27.5 || z > 28) return null;
-    return { x, y: 0, z };
-}
-
-function createDemoCamera(scene) {
-    const camera = new BABYLON.FreeCamera('geometryDemoThirdPersonCamera', BABYLON.Vector3.Zero(), scene);
-    camera.minZ = 0.08;
-    camera.maxZ = 1000;
-    camera.fov = 0.82;
-    return camera;
-}
-
-function scaleVector(vector, amount) {
-    return { x: vector.x * amount, y: vector.y * amount, z: vector.z * amount };
-}
-
-function clamp(value, minimum, maximum) {
-    return Math.min(maximum, Math.max(minimum, value));
-}
-
-function disposeMeshes(meshes) {
-    for (const mesh of meshes) {
-        const material = mesh.material;
-        if (mesh.metadata?.demoLabel) material?.diffuseTexture?.dispose();
-        mesh.dispose(false, false);
-        if (material && !material.isDisposed()) material.dispose();
     }
-}
 
-export { GeometryDemoWorld, createGeometryDemoWorld, MAIN_WORLD_SLICE_ID };
+    syncSpotlightSourcePresentation() {
+        if (!this.spotlightSource || !this.spotlightSourceLight || typeof BABYLON === 'undefined') return;
+        const transform = this.hypercubeWorld.transform;
+        const sourcePosition = transform.worldToRender(this.spotlightSource.position);
+        const sourceTarget = transform.worldToRender(add3(
+            this.spotlightSource.position,
+            scale3(this.spotlightSource.direction, 12)
+        ));
+        const direction = normalize3(subtract3(sourceTarget, sourcePosition));
+        this.spotlightSourceLight.position.copyFrom(toBabylonVector3(sourcePosition));
+        this.spotlightSourceLight.direction.copyFrom(toBabylonVector3(direction));
+        this.spotlightSourceLight.angle = this.spotlightSource.coneAngle;
+        this.spotlightSourceLight.exponent = this.spotlightSource.exponent;
+        this.spotlightSourceLight.intensity = this.spotlightSource.intensity;
+        this.spotlightSourceLight.range = distance3(sourcePosition, sourceTarget) + 8;
+        this.spotlightMarker?.position.copyFrom(toBabylonVector3(sourcePosition));
+        if (this.spotlightAimLine) {
+            this.spotlightAimLine = BABYLON.MeshBuilder.CreateLines(
+                'geometryDemoOpticalSpotlightAim', {
+                    points: [toBabylonVector3(sourcePosition), toBabylonVector3(sourceTarget)],
+                    instance: this.spotlightAimLine
+                }, this.scene
+            );
+        }
+    }
+
+    handleSpotlightEditorKeyDown(event) {
+        if (!this.active || this.disposed || event.ctrlKey || event.metaKey || event.altKey) return;
+        const tagName = String(event.target?.tagName ?? '').toUpperCase();
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tagName) || event.target?.isContentEditable) return;
+        if (event.code === 'KeyP' && !event.repeat) {
+            event.preventDefault?.();
+            event.stopImmediatePropagation?.();
+            this.setSpotlightTestRayEnabled(!this.spotlightTestRayEnabled);
+            console.info(`[OpticalSpotlight] Test light/ray ${this.spotlightTestRayEnabled ? 'ON' : 'OFF'}.`);
+            return;
+        }
+        if (event.code === 'KeyL' && !event.repeat) {
+            event.preventDefault?.();
+            event.stopImmediatePropagation?.();
+            this.setSpotlightEditorEnabled(!this.spotlightEditorActive);
+            console.info(this.spotlightEditorActive
+                ? '[OpticalSpotlight] Edit mode ON: WASD/arrows move X/Z, R/F move Y, U/O yaw, I/K pitch; drag mouse to aim; Esc exits.'
+                : '[OpticalSpotlight] Edit mode OFF.');
+            return;
+        }
+        if (!this.spotlightEditorActive) return;
+        if (event.code === 'Escape') {
+            event.preventDefault?.();
+            event.stopImmediatePropagation?.();
+            this.setSpotlightEditorEnabled(false);
+            console.info('[OpticalSpotlight] Edit mode OFF.');
+            return;
+        }
+        const step = event.shiftKey ? 2 : 0.5;
+        const angle = event.shiftKey ? Math.PI / 12 : Math.PI / 36;
+        const movement = {
+            ArrowLeft: { x: -step, y: 0, z: 0 }, KeyA: { x: -step, y: 0, z: 0 },
+            ArrowRight: { x: step, y: 0, z: 0 }, KeyD: { x: step, y: 0, z: 0 },
+            ArrowUp: { x: 0, y: 0, z: step }, KeyW: { x: 0, y: 0, z: step },
+            ArrowDown: { x: 0, y: 0, z: -step }, KeyS: { x: 0, y: 0, z: -step },
+            KeyR: { x: 0, y: step, z: 0 }, KeyF: { x: 0, y: -step, z: 0 }
+        }[event.code];
+        const rotations = {
+            KeyU: [-angle, 0], KeyO: [angle, 0],
+            KeyI: [0, angle], KeyK: [0, -angle]
+        }[event.code];
+        if (!movement && !rotations) return;
+        event.preventDefault?.();
+        event.stopImmediatePropagation?.();
+        this.spotlightSource = movement
+            ? moveOpticalSpotlightSource(this.spotlightSource, movement)
+            : rotateOpticalSpotlightSource(this.spotlightSource, rotations[0], rotations[1]);
+        this.syncSpotlightSourcePresentation();
+        this.spotlightNeedsTrace = true;
+    }
+
+    handleSpotlightPointerDown(event) {
+        if (!this.active || this.disposed || !this.spotlightEditorActive || event.button !== 0) return;
+        const canvas = this.scene?.getEngine?.()?.getRenderingCanvas?.();
+        if (canvas && event.target !== canvas && !canvas.contains?.(event.target)) return;
+        this.spotlightPointerDragging = true;
+        this.spotlightPreviousPointer = { x: event.clientX, y: event.clientY };
+        event.preventDefault?.();
+        event.stopImmediatePropagation?.();
+    }
+
+    handleSpotlightPointerMove(event) {
+        if (!this.spotlightPointerDragging || !this.active || !this.spotlightEditorActive || this.disposed) return;
+        const yaw = (event.clientX - this.spotlightPreviousPointer.x) * this.spotlightPointerSensitivity;
+        const pitch = -(event.clientY - this.spotlightPreviousPointer.y) * this.spotlightPointerSensitivity;
+        this.spotlightPreviousPointer = { x: event.clientX, y: event.clientY };
+        if (Math.abs(yaw) + Math.abs(pitch) <= 1e-9) return;
+        this.spotlightSource = rotateOpticalSpotlightSource(this.spotlightSource, yaw, pitch);
+        this.syncSpotlightSourcePresentation();
+        this.spotlightNeedsTrace = true;
+        event.preventDefault?.();
+        event.stopImmediatePropagation?.();
+    }
+
+    handleSpotlightPointerUp() {
+        this.spotlightPointerDragging = false;
+    }
+
+    setSpotlightTestRayEnabled(enabled) {
+        this.spotlightTestRayEnabled = Boolean(enabled);
+        if (this.spotlightSource) this.spotlightSource.enabled = this.spotlightTestRayEnabled;
+        this.onSpotlightTestRayStateChanged?.(this.spotlightTestRayEnabled);
+        this.spotlightSourceLight?.setEnabled(this.active && this.spotlightTestRayEnabled);
+        if (!this.spotlightTestRayEnabled) {
+            this.spotlightTraceState = { transmitted: false, reason: 'test-ray-disabled' };
+            this.destinationSpotlight?.setEnabled(false);
+            if (this.destinationSpotlight) this.destinationSpotlight.intensity = 0;
+            if (this.destinationSpotlightRayLine) this.destinationSpotlightRayLine.isVisible = false;
+            this.clearOpticalSpotlightShadowCasters();
+        } else {
+            this.spotlightNeedsTrace = true;
+        }
+        return this.spotlightTestRayEnabled;
+    }
+
+    updateOpticalSpotlight(deltaSeconds = 0) {
+        if (!this.active || !this.spotlightSource) return;
+        if (this.spotlightNeedsTrace) {
+            this.spotlightNeedsTrace = false;
+            this.refreshOpticalSpotlightTrace();
+            this.spotlightShadowRefreshElapsed = Infinity;
+        }
+        if (this.destinationSpotlight?.isEnabled?.()) {
+            this.spotlightShadowRefreshElapsed += Math.max(0, deltaSeconds || 0);
+            if (this.spotlightShadowRefreshElapsed >= 0.45) {
+                this.spotlightShadowRefreshElapsed = 0;
+                this.updateSpotlightShadowCasters();
+            }
+        }
+    }
+
+    refreshOpticalSpotlightTrace() {
+        if (!this.spotlightTracer || !this.destinationSpotlight) {
+            this.spotlightTraceState = { transmitted: false, reason: 'optical-renderer-unavailable' };
+            this.destinationSpotlight?.setEnabled(false);
+            if (this.destinationSpotlightRayLine) this.destinationSpotlightRayLine.isVisible = false;
+            this.clearOpticalSpotlightShadowCasters();
+            return;
+        }
+        if (!this.spotlightTestRayEnabled || !this.spotlightSource.enabled || !this.hypercubeMainCorridor.optics?.enabled) {
+            this.spotlightTraceState = { transmitted: false, reason: 'source-or-anomaly-disabled' };
+            this.destinationSpotlight.setEnabled(false);
+            if (this.destinationSpotlightRayLine) this.destinationSpotlightRayLine.isVisible = false;
+            this.clearOpticalSpotlightShadowCasters();
+            return;
+        }
+        const sourceBinding = this.registry.require(this.spotlightSource.sliceId);
+        const destinationBinding = this.registry.require(this.destination.slice.id);
+        const result = traceOpticalSpotlightSource({
+            source: this.spotlightSource,
+            sourceBinding,
+            destinationBinding,
+            tracer: this.spotlightTracer,
+            anomalyId: this.hypercubeMainCorridor.id,
+            virtualSourceDistance: this.spotlightVirtualSourceDistance
+        });
+        if (!result.transmitted) {
+            this.spotlightTraceState = result;
+            this.destinationSpotlight.setEnabled(false);
+            this.destinationSpotlight.intensity = 0;
+            if (this.destinationSpotlightRayLine) this.destinationSpotlightRayLine.isVisible = false;
+            this.clearOpticalSpotlightShadowCasters();
+            return;
+        }
+
+        const presentationResult = this.mapOpticalSpotlightResultToPresentation(result);
+        this.spotlightTraceState = {
+            ...result,
+            presentationOffset: presentationResult.presentationOffset ?? { x: 0, z: 0 },
+            presentationVirtualPosition: { ...presentationResult.virtualPosition },
+            presentationExitPosition: { ...presentationResult.exitPosition }
+        };
+        const transform = destinationBinding.spatialTransform;
+        const lightPosition = transform.worldToRender(presentationResult.virtualPosition);
+        const directionSample = transform.worldToRender(add3(
+            presentationResult.virtualPosition, scale3(result.direction, 2)
+        ));
+        const lightDirection = normalize3(subtract3(directionSample, lightPosition));
+        const rangeSample = transform.worldToRender(add3(
+            presentationResult.virtualPosition, scale3(result.direction, this.spotlightSource.range)
+        ));
+        this.destinationSpotlight.position.copyFrom(toBabylonVector3(lightPosition));
+        this.destinationSpotlight.direction.copyFrom(toBabylonVector3(lightDirection));
+        this.destinationSpotlight.angle = this.spotlightSource.coneAngle;
+        this.destinationSpotlight.exponent = this.spotlightSource.exponent;
+        this.destinationSpotlight.range = Math.max(1, distance3(lightPosition, rangeSample));
+        this.destinationSpotlight.intensity = this.spotlightSource.intensity * result.energy;
+        this.destinationSpotlight.diffuse = BABYLON.Color3.FromArray(this.spotlightSource.color);
+        this.destinationSpotlight.specular = BABYLON.Color3.FromArray(this.spotlightSource.color);
+        this.destinationSpotlight.setEnabled(this.active);
+        this.updateDestinationSpotlightRay(presentationResult, transform);
+        this.updateSpotlightShadowCasters(true);
+    }
+
+    mapOpticalSpotlightResultToPresentation(result) {
+        const pair = this.portalPairs?.find((entry) => entry.corridor.id === result.anomalyId);
+        const presentation = pair?.presentationEndpointsBySlice?.[result.destinationSliceId];
+        const endpoint = endpointForSlice(pair?.corridor, result.destinationSliceId);
+        if (!presentation || !endpoint) return result;
+        const offset = {
+            x: presentation.x - endpoint.position.x,
+            z: presentation.z - endpoint.position.z
+        };
+        const translate = (position) => position ? {
+            ...position, x: position.x + offset.x, z: position.z + offset.z
+        } : position;
+        return {
+            ...result,
+            exitPosition: translate(result.exitPosition),
+            virtualPosition: translate(result.virtualPosition),
+            presentationOffset: offset
+        };
+    }
+
+    updateDestinationSpotlightRay(result, transform) {
+        if (!this.destinationSpotlightRayLine || !this.active) return false;
+        let projected;
+        try {
+            projected = projectOpticalSpotlightExitRay(
+                result, transform, this.spotlightDebugRayLength ?? 400
+            );
+        } catch (error) {
+            // A debug segment may extend beyond a finite destination chart even
+            // when the aperture exit itself is valid. Hide only that diagnostic.
+            if (error instanceof RangeError) {
+                this.destinationSpotlightRayLine.isVisible = false;
+                return false;
+            }
+            throw error;
+        }
+        if (!projected) {
+            this.destinationSpotlightRayLine.isVisible = false;
+            return false;
+        }
+        this.destinationSpotlightRayLine = BABYLON.MeshBuilder.CreateLines(
+            'geometryDemoTransmittedSpotlightRay', {
+                points: [
+                    toBabylonVector3(projected.startRender),
+                    toBabylonVector3(projected.endRender)
+                ],
+                instance: this.destinationSpotlightRayLine
+            }, this.scene
+        );
+        this.destinationSpotlightRayLine.layerMask = MAIN_WORLD_LAYER;
+        this.destinationSpotlightRayLine.alpha = 0.96;
+        this.destinationSpotlightRayLine.isPickable = false;
+        this.destinationSpotlightRayLine.isVisible = true;
+        this.destinationSpotlightRayLine.metadata = {
+            ...(this.destinationSpotlightRayLine.metadata || {}),
+            opticalDebugRay: true,
+            anomalyId: result.anomalyId,
+            sourceSliceId: this.hypercubeSlice.id,
+            destinationSliceId: result.destinationSliceId,
+            worldStart: projected.startWorld,
+            worldEnd: projected.endWorld
+        };
+        return true;
+    }
+
+    updateSpotlightShadowCasters(force = false) {
+        if (!this.destinationSpotlight || !this.destinationWorldManager) return;
+        const lightPosition = this.destinationSpotlight.position;
+        const sceneMeshes = this.scene?.meshes ?? [];
+        const worldMeshes = new Set([
+            ...(this.destinationWorldManager.getMeshes?.() ?? []),
+            ...sceneMeshes
+        ]);
+        const excludedName = /portal|corridor|preview|sky|cloud|water|(?:^|[-_])rain(?:[-_]|$)|debug|grid|hud|camera|geometrydemo/i;
+        const maxDistance = Math.max(1, Number(this.destinationSpotlight.range) || Infinity);
+        const candidates = [...worldMeshes]
+            .filter((mesh) => mesh && !mesh.isDisposed?.() &&
+                mesh.isEnabled?.() !== false && mesh.isVisible !== false &&
+                ((mesh.layerMask ?? MAIN_WORLD_LAYER) & MAIN_WORLD_LAYER) !== 0 &&
+                !excludedName.test(String(mesh.name ?? '')))
+            .map((mesh) => {
+                let center = mesh.position;
+                try {
+                    mesh.computeWorldMatrix?.(true);
+                    center = mesh.getBoundingInfo?.().boundingSphere?.centerWorld ?? center;
+                } catch { /* Use the mesh origin when bounds are not available yet. */ }
+                return { mesh, distance: center ? distance3(center, lightPosition) : Infinity };
+            })
+            .filter((entry) => entry.distance <= maxDistance * 1.15)
+            .sort((a, b) => a.distance - b.distance)
+            .slice(0, this.spotlightShadowCasterLimit)
+            .map((entry) => entry.mesh);
+        if (!this.spotlightShadowGenerator) {
+            this.destinationSpotlight.includedOnlyMeshes = candidates;
+            return;
+        }
+        const next = new Set(candidates);
+        if (!force && next.size === this.spotlightShadowCasters.size &&

@@ -1,0 +1,30 @@
+SOMNIUM PHASE 18O — INSTALLATION
+
+RECOMMENDED: FULL PROJECT
+1. Download Somnium_Geometry_Phase_18O_Active_Universe_W_Slice_Navigation.zip.
+2. Extract the archive.
+3. Serve the extracted project directory that contains index.html over HTTP. Do not open index.html directly from file://.
+4. Open the local URL in your browser and perform a hard refresh if an older app is still cached.
+
+INCREMENTAL PATCH
+The patch is based on the Phase 18N full project.
+1. Extract your Phase 18N project into a working directory.
+2. Extract the Phase 18O patch ZIP into that same directory, allowing it to overwrite the listed files.
+3. Serve the directory containing index.html over HTTP.
+
+BROWSER CHECKLIST
+1. Open the Level Builder and select Planes > Plane Editor.
+2. Move the universe W slider to 0. The editor camera should retarget to the Poincaré room and show its objects.
+3. Move it to 75. The camera should retarget to the 4D hypercube chamber, showing the procedural tesseract and any custom Planes intersecting W=75.
+4. Move it to 80. The camera should retarget to Somnium Main World, while retaining custom Planes that intersect W=80.
+5. Move to an unoccupied coordinate such as W=40. The previous room should disappear; the view label should say EMPTY UNIVERSE W-SLICE. Create a Plane and verify its initial W center follows the selected coordinate.
+6. Move by decimal values within one room, e.g. 75.00 to 75.25. The slice remains the same and the camera's orbit and zoom should not reset.
+7. Leave the Plane Editor. Normal gameplay view selection should be restored.
+
+DATA SAFETY
+- No IndexedDB schema migration is included.
+- Existing somnium-planes and Worlds records are preserved.
+- Do not clear browser storage.
+
+VERIFICATION LIMITATION
+Automated tests, syntax checks, import checks, and ZIP integrity checks passed. A live browser/WebGL interaction session was not available during packaging, so the visual camera transitions still require user confirmation.

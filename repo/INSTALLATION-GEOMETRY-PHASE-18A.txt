@@ -1,0 +1,15 @@
+SOMNIUM — PHASE 18A INSTALLATION
+
+1. Extract the complete ZIP archive.
+2. Enter the project root directory — the directory containing index.html.
+3. Start the local server:
+
+   python3 -m http.server 8081
+
+4. Open:
+
+   http://127.0.0.1:8081/
+
+On geometry-demo startup, Somnium creates/opens a separate IndexedDB database named `somnium-planes` and seeds the three built-in Plane records plus the three existing demo anomaly records if they are not already present. This is separate from the `somnium-worlds` save database.
+
+To inspect the new database in Firefox, open Developer Tools → Storage → IndexedDB → somnium-planes. The database contains `planes`, `anomalies`, and `bootstrap` object stores.

@@ -1,0 +1,32 @@
+SOMNIUM — PHASE 18G3 GIZMO ATTACHMENT AND BOX PREVIEW REPAIR
+Build: somnium-20261110-phase18g3-gizmo-attachment-box-preview-2
+Date: November 10, 2026
+
+FULL AUTOMATED REGRESSION SUITE
+Command: node --experimental-default-type=module --test tests/*.test.mjs
+Result: 372 passed, 0 failed.
+
+FOCUSED REGRESSIONS
+- All three Babylon gizmos are instantiated before event subscriptions are registered.
+- Position, rotation, and scale axis drag and drag-end events are subscribed.
+- Rotation and translation attach to the unit-scaled pose proxy.
+- Scale mode attaches to the independent scale proxy.
+- Rotation remains Y-only for the yaw-only Building model.
+- Gizmos remain detached when no Building is selected.
+- A 2 x 2 x 2 box component generates into the BuildingRenderer's furniture bucket.
+- The provisional preview includes a filled translucent box mesh and a bright outline.
+- Solid and outline preview matrices share the same projection transform.
+
+STATIC VERIFICATION
+- All source JavaScript files passed node --check.
+- All test modules passed node --check.
+- Relative source imports checked: 226.
+- Missing relative source imports: 0.
+- Cache-busting identifier: somnium-20261110-phase18g3-gizmo-attachment-box-preview-2.
+- No stale Phase 18G3 corrective build identifiers remain in executable source paths.
+
+BROWSER / WEBGL VERIFICATION
+No live browser/WebGL session was available to this run. Actual gizmo pointer interaction and on-screen final rendering still require manual browser validation.
+
+ARCHIVE VERIFICATION
+See final SHA-256 sidecar files and ZIP integrity checks for the packaged full project and patch.

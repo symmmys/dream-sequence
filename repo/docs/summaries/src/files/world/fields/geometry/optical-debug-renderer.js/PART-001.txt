@@ -1,6 +1,6 @@
 /** Render-space-only visualization for authoritative slice optical paths. */
 
-import { ambientToSlice } from './spatial-4d.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { ambientToSlice } from './spatial-4d.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 
 class OpticalDebugRenderer {
     constructor(scene, options = {}) {

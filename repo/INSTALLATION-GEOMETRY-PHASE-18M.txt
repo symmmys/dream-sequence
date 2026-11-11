@@ -1,0 +1,32 @@
+SOMNIUM GEOMETRY — PHASE 18M INSTALLATION
+
+RECOMMENDED: FULL PROJECT
+1. Download Somnium_Geometry_Phase_18M_W_Slice_Inspection_Playtest_and_Traversal_Repair.zip.
+2. Extract the archive into a clean project directory.
+3. Serve the directory containing index.html using the same local web-server workflow used for Phase 18L.
+4. Open the project in the browser and verify the build banner/cache ID is Phase 18M.
+
+PATCH OPTION
+1. Start with the Phase 18L full project archive:
+   Somnium_Geometry_Phase_18L_W_Dimension_and_Editor_Hotkeys.zip
+2. Extract it into the existing project root.
+3. Extract the Phase 18M patch archive over that same root, allowing files to be replaced.
+4. Serve the directory containing index.html.
+
+STORAGE
+- No IndexedDB migration is required.
+- Do not clear browser storage.
+- Existing somnium-planes Plane and anomaly definitions are preserved.
+
+BROWSER CHECKLIST
+1. Open the Plane Editor and create a new Plane. Change its W center (for example 2.25) and confirm the editor follows that W slice. Save the Plane, select it again, and confirm it opens at its center W.
+2. Change W thickness and inspect the W-Slice Inspector. The slider advances in integer increments and the numeric coordinate field accepts decimal values (for example 2.25 or 2.75). Confirm the displayed range matches center ± half-thickness.
+3. Select a Plane containing a 4D hypercube and move the W-slice slider. Confirm its cross-section updates in the viewport.
+4. Enter Geometry Demo follow/third-person view. Toggle E/Q W MOVEMENT ON and move with E/Q; confirm the player moves through W while respecting Plane bounds. Toggle it OFF and confirm ambient movement obeys W-freedom again.
+5. Switch to free camera (C) and repeat the W movement check. The same HUD button should control movement.
+6. Press H to hide and show the W coordinate/freedom readout. Approach and enter an anomaly; while inside, the readout should indicate `IN PASSAGE: E/Q TO TRAVERSE`.
+7. Enter a slice-transition anomaly by moving forward through its mouth. Once inside, use E or Q along the W axis toward the destination. WASD/XYZ remains independent; it does not replace W traversal.
+8. Create/select a spherical-geometry Plane and place each anomaly mouth with the mouse, including positions near the edge of the visible chart. Confirm no antipodal-limit exception occurs and the mouth saves correctly.
+9. Revisit the Phase 18K checks: newly created Planes remain available in anomaly mouth menus, and their Plane-owned objects remain visible in anomaly previews.
+
+The automated suite and static checks passed, but the browser/WebGL checks above still need hands-on confirmation.

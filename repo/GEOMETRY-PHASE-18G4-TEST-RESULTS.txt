@@ -1,0 +1,48 @@
+SOMNIUM — PHASE 18G4 PLANE OBJECT EDITING
+AUTOMATED VERIFICATION REPORT
+
+Build identifier:
+  somnium-20261110-phase18g4-plane-object-editor-3
+
+Regression suite:
+  Command: node --experimental-default-type=module --test tests/*.test.mjs
+  Result: 383 tests passed, 0 failed, 0 skipped
+
+Focused new/updated coverage:
+  - Plane object schema normalization for local position, Euler rotation,
+    dimensions, visibility, material color, and label billboard defaults.
+  - Plane frame axes and normal preserved when object records are edited.
+  - Executable local XYZ -> ambient frame -> geometry render -> local XYZ
+    coordinate round trips, including non-identity tangent axes and origin.
+  - Singular XYZ projection detection and deterministic non-destructive preview
+    fallback while preserving the saved 4D frame.
+  - Construction and use of a real SpatialTransform for a custom Plane whose
+    geometry differs from the fallback chart.
+  - Plane Editor object controls, creation types, numeric fields, shared gizmo
+    modes, all-axis rotation, and drag-end phase handling.
+  - Plane-object renderer local/render conversion, pick metadata, primitive/
+    hypercube paths, label billboarding, and visibility state.
+  - Additive one-time migration for four Poincare primitives, five labels,
+    and the 4D procedural hypercube.
+  - Saved Plane records drive runtime room and hypercube rendering.
+  - Scene initialization awaits Plane-object renderer/persistence setup.
+  - Hypercube object center, dimensions, orientation, color, and visibility
+    are applied by its runtime renderer.
+
+Syntax:
+  - All src/**/*.js files passed node --check.
+  - All tests/**/*.mjs files passed node --check.
+
+Relative imports:
+  - 230 source imports checked; 0 missing.
+  - 133 test imports checked; 0 missing.
+  - 363 total relative imports checked; 0 missing.
+
+Build/cache identifier:
+  - 84 occurrences of somnium-20261110-phase18g4-plane-object-editor-3.
+  - No stale G4 -1 or -2 cache identifiers remain in index.html, src/, or tests/.
+
+Browser/WebGL:
+  Not executed by the packager. Desktop-browser interaction and visual checks
+  remain required; automated tests include mathematical/unit tests, source
+  contract tests, and Babylon test doubles, not a live GPU/browser session.

@@ -3,8 +3,8 @@ SOMNIUM — INDIVIDUAL SOURCE FILE INDEX
 
 Source file: src/demo/geometry-demo-camera-controller.js
 Source directory: src/demo/
-Generated: 2026-11-09T03:15:29
-Total source lines: 768
+Generated: 2026-11-09T22:26:25
+Total source lines: 774
 Maximum chunk size: 300 lines
 Number of parts: 3
 
@@ -19,8 +19,8 @@ Original lines: 301-600
 Lines in part: 300
 
 Part: PART-003.txt
-Original lines: 601-768
-Lines in part: 168
+Original lines: 601-774
+Lines in part: 174
 
 READING INSTRUCTIONS
 ----------------------------------------------------------------

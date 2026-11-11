@@ -1,6 +1,6 @@
 /** Shared continuous W-freedom field and generalized chunk reachability math. */
 
-import { norm4, subtract4 } from './spatial-4d.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+import { norm4, subtract4 } from './spatial-4d.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
 
 const AXES = ['x', 'y', 'z', 'w'];
 const EPSILON = 1e-9;

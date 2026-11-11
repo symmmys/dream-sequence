@@ -3,7 +3,7 @@ SOMNIUM — INDIVIDUAL SOURCE FILE INDEX
 
 Source file: src/world/spatial-chunk-graph.js
 Source directory: src/world/
-Generated: 2026-11-09T03:15:29
+Generated: 2026-11-09T22:26:25
 Total source lines: 515
 Maximum chunk size: 300 lines
 Number of parts: 2

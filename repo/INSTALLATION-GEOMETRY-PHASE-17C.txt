@@ -1,0 +1,41 @@
+SOMNIUM — GEOMETRY PHASE 17C INSTALLATION
+
+1. Extract the complete Phase 17C archive into a clean project directory.
+2. Ensure you are serving the directory that contains index.html (the project root, not an outer ZIP wrapper directory).
+3. From that directory, start the local server:
+
+   python3 -m http.server 8081
+
+4. Open:
+
+   http://127.0.0.1:8081/
+
+5. Hard-refresh the browser after replacing the Phase 17B build. The application uses this cache-busting identifier:
+
+   somnium-20261109-phase17c-mainworld-endpoint-rebase-2
+
+SPOTLIGHT CONTROLS
+
+- Press L to toggle spotlight editing.
+- Press P to turn the optical test source and diagnostic ray on/off.
+- WASD / Arrow keys: move in X/Z while editing.
+- R / F: move vertically.
+- U / O: rotate yaw.
+- I / K: rotate pitch.
+- Shift: larger movement increments.
+- Drag the mouse on the canvas to aim while editing.
+- Escape: exit spotlight editing.
+
+MAIN WORLD ANOMALY RE-ENTRY
+
+- The enlarged and widely separated Main World portal mouths remain in place.
+- Approach a visible anomaly mouth and face toward its centre to enter.
+- The visible portal mouth is explicitly mapped to the original compact 4D endpoint. This preserves the authoritative anomaly geometry while allowing re-entry and W influence to work from the display location.
+- The same presentation mapping is used by the free camera.
+
+Run the complete automated regression suite from the extracted project directory:
+
+   node --test tests/*.test.mjs
+
+See GEOMETRY-PHASE-17C-MAIN-WORLD-REENTRY-AND-LIGHT-CONTROLS.md and
+GEOMETRY-PHASE-17C-TEST-RESULTS.txt for implementation details and verification.

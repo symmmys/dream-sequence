@@ -1,5 +1,5 @@
 
-import { WorldChunk } from "./world-chunk.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2";
+import { WorldChunk } from "./world-chunk.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1";
 
 export class WorldManager {
     constructor(scene, terrain, options = {}) {

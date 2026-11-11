@@ -1,0 +1,36 @@
+SOMNIUM GEOMETRY — PHASE 18I TEST RESULTS
+Plane-Contained Build & Anomaly Tools
+
+Automated regression suite:
+  Tests:    394
+  Passed:   394
+  Failed:   0
+  Skipped:  0
+  Duration: 22.35 seconds (Node test runner)
+
+Static syntax validation:
+  src JavaScript modules checked: 136
+  test modules checked:            44
+  Result: all passed node --check
+
+Relative import validation:
+  JavaScript/test files inspected: 180
+  Relative imports checked:        379
+  Missing relative imports:        0
+
+Focused Phase 18I coverage includes:
+  - B hotkey from menu, flight, and geometryDemo; return to the previous mode
+  - B shortcut capture priority and suppression while entering text
+  - Two-tab Level Builder organization with Anomalies nested under Planes
+  - Existing anomaly CRUD, endpoint selection and click-placement workflow retained
+  - Shared scale gizmo path for anomaly aperture radius editing
+  - Plane object color refresh across diffuse/emissive material channels
+  - Procedural tesseract surface and edge material color updates
+  - Plane background live override and CelestialSystem per-frame preservation
+  - Plane background color/opacity inclusion in the saved Plane definition
+  - Existing Plane transforms and 1×/10×/100× camera zoom controls
+
+Archive verification is performed after packaging and is recorded in the release manifest.
+
+Limitations:
+  A live browser/WebGL session was not available for this automated run. Actual pointer interaction, visual color changes, background transitions, and anomaly traversal still require browser validation using the checklist in GEOMETRY-PHASE-18I-PLANE-CONTAINED-ANOMALY-TOOLS.md.

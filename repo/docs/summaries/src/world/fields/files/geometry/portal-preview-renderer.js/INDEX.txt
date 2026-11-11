@@ -3,16 +3,20 @@ SOMNIUM — INDIVIDUAL SOURCE FILE INDEX
 
 Source file: src/world/fields/geometry/portal-preview-renderer.js
 Source directory: src/world/fields/
-Generated: 2026-11-09T03:15:29
-Total source lines: 163
+Generated: 2026-11-09T22:26:25
+Total source lines: 354
 Maximum chunk size: 300 lines
-Number of parts: 1
+Number of parts: 2
 
 SOURCE PARTS
 ----------------------------------------------------------------
 Part: PART-001.txt
-Original lines: 1-163
-Lines in part: 163
+Original lines: 1-300
+Lines in part: 300
+
+Part: PART-002.txt
+Original lines: 301-354
+Lines in part: 54
 
 READING INSTRUCTIONS
 ----------------------------------------------------------------

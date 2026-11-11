@@ -83,7 +83,7 @@ class CorridorTraversalNetwork {
             right.influence.movementScale - left.influence.movementScale
         );
         if (!candidates.length) return false;
-        return candidates[0].controller.advanceAmbientInfluenceMovement(deltaSeconds);
+        return candidates[0].controller.advanceAmbientInfluenceMovement(deltaSeconds, position4D);
     }
 
     getAmbientPlayerPosition() {
@@ -94,6 +94,11 @@ class CorridorTraversalNetwork {
         // Do not stop at the first synchronized controller: find the first
         // controller that owns a binding for this actual WorldSlice and can
         // resolve a finite ambient position.
+        let fallback = null;
+        // Multiple anomalies can have separate presentation mouths in one
+        // slice. Prefer the controller whose visible portal approach contains
+        // the player; otherwise an unrelated route can rebase coordinates
+        // against its own canonical endpoint and keep the correct W field off.
         for (const controller of this.controllers) {
             const ownsSlice = typeof controller.ownsSlice === 'function'
                 ? controller.ownsSlice(this.currentSliceId)
@@ -102,9 +107,11 @@ class CorridorTraversalNetwork {
                     : controller.currentSliceId === this.currentSliceId;
             if (!ownsSlice || typeof controller.getAmbientPlayerPosition !== 'function') continue;
             const position = controller.getAmbientPlayerPosition();
-            if (isFinitePosition4(position)) return { ...position };
+            if (!isFinitePosition4(position)) continue;
+            if (controller.isNearPresentationPortal?.(this.currentSliceId)) return { ...position };
+            if (!fallback) fallback = { ...position };
         }
-        return null;
+        return fallback;
     }
 
     getEntryDiagnostics() {

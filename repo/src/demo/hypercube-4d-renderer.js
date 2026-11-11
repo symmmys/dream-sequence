@@ -2,7 +2,7 @@
 
 import {
     createHypercubeEdges, createHypercubeSlice, createHypercubeVertices
-} from '../world/fields/geometry/hypercube-4d.js?v=somnium-20261108-phase16d-anomaly-aperture-views-2';
+} from '../world/fields/geometry/hypercube-4d.js?v=somnium-20261110-phase18o-active-w-slice-navigation-1';
 
 const MAX_SECTION_VERTICES = 32;
 const MAX_SECTION_EDGES = 64;
@@ -28,6 +28,11 @@ class Hypercube4DRenderer {
         this.opticalRevision = 0;
         this.opticalRegistrationId = this.opticalSliceId ? `hypercube-surface:${this.opticalSliceId}` : null;
         this.viewerW = options.viewerW ?? 0;
+        this.halfExtent = options.halfExtent ?? 4.2;
+        this.objectDimensions = { x: this.halfExtent * 2, y: this.halfExtent * 2, z: this.halfExtent * 2 };
+        this.objectRotation = { x: 0, y: 0, z: 0 };
+        this.objectRotationMatrix = BABYLON.Matrix.Identity();
+        this.objectVisible = true;
         this.disposed = false;
         this.vertices = createHypercubeVertices(options.halfExtent ?? 4.2);
         this.edges = createHypercubeEdges(this.vertices);
@@ -78,7 +83,7 @@ class Hypercube4DRenderer {
         mesh.isVisible = true;
         mesh.isPickable = false;
         mesh.alwaysSelectAsActiveMesh = true;
-        mesh.metadata = { geometryDemo: true, hypercube4D: true, ...metadata };
+        mesh.metadata = { geometryDemo: true, hypercube4D: true, sliceId: this.opticalSliceId, ...metadata };
     }
 
     createVertexMeshes() {
@@ -93,17 +98,45 @@ class Hypercube4DRenderer {
             mesh.isPickable = false;
             mesh.isVisible = false;
             mesh.alwaysSelectAsActiveMesh = true;
-            mesh.metadata = { geometryDemo: true, hypercube4DSectionVertex: index };
+            mesh.metadata = { geometryDemo: true, hypercube4DSectionVertex: index, sliceId: this.opticalSliceId };
             return mesh;
         }, this);
     }
 
     toRenderPoint(point) {
+        const local = BABYLON.Vector3.TransformCoordinates(new BABYLON.Vector3(
+            point.x * (this.objectDimensions.x / (2 * this.halfExtent)),
+            point.y * (this.objectDimensions.y / (2 * this.halfExtent)),
+            point.z * (this.objectDimensions.z / (2 * this.halfExtent))
+        ), this.objectRotationMatrix);
         return this.transform.worldToRender({
-            x: this.center.x + point.x,
-            y: this.center.y + point.y,
-            z: this.center.z + point.z
+            x: this.center.x + local.x,
+            y: this.center.y + local.y,
+            z: this.center.z + local.z
         });
+    }
+
+    setObjectDefinition(definition) {
+        if (!definition || definition.type !== 'hypercube4d') return false;
+        const parameters = definition.parameters ?? {};
+        const halfExtent = parameters.halfExtent ?? Math.max(0.1, definition.dimensions?.x / 2 ?? 4.2);
+        this.center = { ...definition.position };
+        this.halfExtent = halfExtent;
+        this.objectDimensions = { ...definition.dimensions };
+        this.objectRotation = { x: definition.rotation?.x ?? 0, y: definition.rotation?.y ?? 0, z: definition.rotation?.z ?? 0 };
+        const rotation = BABYLON.Quaternion.FromEulerAngles(this.objectRotation.x * Math.PI / 180, this.objectRotation.y * Math.PI / 180, this.objectRotation.z * Math.PI / 180);
+        this.objectRotationMatrix = rotation.toRotationMatrix(BABYLON.Matrix.Identity());
+        this.vertices = createHypercubeVertices(halfExtent);
+        this.angles = { xw: 0.42, yw: 0.36, zw: 0.32, ...(parameters.initialAngles ?? {}) };
+        this.angularSpeeds = { xw: 0.68, yw: 0.49, zw: 0.33, ...(parameters.angularSpeeds ?? {}) };
+        this.objectVisible = definition.visible !== false;
+        const objectColor = BABYLON.Color3.FromHexString(definition.material?.color ?? '#58d7f0');
+        this.surfaceMaterial.diffuseColor = new BABYLON.Color3(objectColor.r, objectColor.g, objectColor.b);
+        this.surfaceMaterial.emissiveColor = new BABYLON.Color3(objectColor.r * 0.2, objectColor.g * 0.2, objectColor.b * 0.2);
+        this.edgeMaterial.diffuseColor = new BABYLON.Color3(objectColor.r, objectColor.g, objectColor.b);
+        this.edgeMaterial.emissiveColor = new BABYLON.Color3(objectColor.r, objectColor.g, objectColor.b);
+        this.slice = createHypercubeSlice(this.vertices, this.angles, this.viewerW);
+        return true;
     }
 
     createSurfaceBuffers(section) {
@@ -169,12 +202,12 @@ class Hypercube4DRenderer {
         this.updateMesh(this.edgeMesh, edges);
         this.updateOpticalSurface(this.slice);
         const visible = this.slice.vertices.length > 0;
-        this.surfaceMesh.isVisible = visible && this.slice.faces.length > 0;
-        this.edgeMesh.isVisible = visible && this.slice.edges.length > 0;
+        this.surfaceMesh.isVisible = this.objectVisible && visible && this.slice.faces.length > 0;
+        this.edgeMesh.isVisible = this.objectVisible && visible && this.slice.edges.length > 0;
         for (let index = 0; index < this.vertexMeshes.length; index++) {
             const marker = this.vertexMeshes[index];
             const point = surface.points[index];
-            marker.isVisible = Boolean(point);
+            marker.isVisible = this.objectVisible && Boolean(point);
             if (point) marker.position.set(point.x, point.y, point.z);
         }
     }
@@ -184,9 +217,14 @@ class Hypercube4DRenderer {
         const positions = new Float64Array(section.vertices.length * 3);
         section.vertices.forEach((point, index) => {
             const offset = index * 3;
-            positions[offset] = this.center.x + point.x;
-            positions[offset + 1] = this.center.y + point.y;
-            positions[offset + 2] = this.center.z + point.z;
+            const local = BABYLON.Vector3.TransformCoordinates(new BABYLON.Vector3(
+                point.x * (this.objectDimensions.x / (2 * this.halfExtent)),
+                point.y * (this.objectDimensions.y / (2 * this.halfExtent)),
+                point.z * (this.objectDimensions.z / (2 * this.halfExtent))
+            ), this.objectRotationMatrix);
+            positions[offset] = this.center.x + local.x;
+            positions[offset + 1] = this.center.y + local.y;
+            positions[offset + 2] = this.center.z + local.z;
         });
         const indices = [];
         for (const face of section.faces) {

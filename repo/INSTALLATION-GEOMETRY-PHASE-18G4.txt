@@ -1,0 +1,64 @@
+SOMNIUM — PHASE 18G4 PLANE OBJECT EDITING
+
+FULL PROJECT INSTALLATION
+1. Download the full-project Phase 18G4 ZIP.
+2. Extract it into a clean project directory (or replace the previous project
+   files while preserving the archive's internal directory structure).
+3. Confirm index.html is at the project root.
+4. Start the local HTTP server from the directory containing index.html.
+5. Reload Somnium. A hard refresh is recommended; the Phase 18G4 cache-busting
+   identifier is new.
+
+PATCH INSTALLATION
+1. Extract the Phase 18G4 patch ZIP into the existing Phase 18G3 repair project
+   root.
+2. Allow included files to overwrite matching files.
+3. Hard-refresh the browser after refreshing the project files.
+
+IMPORTANT DATA NOTE
+Do not clear browser storage or delete the somnium-planes IndexedDB database.
+The migration is additive and runs once using the marker
+geometry-demo-plane-objects-v1. It preserves existing Plane, Anomaly, and
+user-authored object records; missing demo object IDs are added without
+replacing records already present.
+
+BROWSER TEST PLAN
+1. Open BUILD (B), then select the Planes tab.
+2. Select Poincaré Room. The Object selection list should initially contain
+   nine records: four primitives and five labels.
+3. Select each object from the list. Confirm its selected outline/gizmo appears;
+   also test selecting a pickable primitive by clicking it in the viewport.
+4. Test MOVE, ROTATE, and SCALE. Move/rotate/scale in Plane-local coordinates
+   and confirm the numeric XYZ fields update. Plane-object rotation has X/Y/Z
+   axes; the Building editor retains its existing yaw-only behavior.
+5. Change an object's name, color, visibility, position, rotation, or dimensions.
+   For labels, also change the text and display width. Confirm labels face the
+   camera by default; disable Face camera to enable their XYZ rotation controls.
+6. Add one of each supported type: Box, Sphere, Cylinder, Torus, Label, and
+   4D Hypercube. Try Duplicate and Delete.
+7. Click SAVE PLANE & OBJECTS, reload the page, and confirm saved object records
+   and transforms return.
+8. Delete one migrated Poincaré object, save, reload, and confirm the deleted
+   object does not reappear. This checks that a valid empty/edited object list
+   does not trigger the legacy fallback.
+9. Select 4D Room. The procedural 4D Hypercube record should be present. Edit
+   its spatial transform/size/color and save. In the live geometry demo, there
+   should be one animated tesseract rather than a duplicate editor overlay.
+10. Confirm Buildings and Anomalies tabs still work and existing anomaly
+    endpoints have not changed.
+
+KNOWN SCOPE LIMITS
+- Built-in runtime Plane geometry and ambient-center controls are read-only
+  pending atomic Plane relocation and anomaly-endpoint updates. Custom Planes can
+  be edited and saved with their frame-origin/tangent-axis mapping applied in the
+  3D editor projection, but they do not yet have independent
+  runtime Worlds or true 4D W-dependent object rendering.
+- Boundary/background properties are saved, but this phase does not implement
+  full world-level background application or 4D volume clipping.
+- Plane-frame movement carrying anomaly endpoints and contents together is
+  deferred to a later phase.
+- Main World procedural environment objects are not migrated in this phase.
+
+If a step fails, send the exact step number and browser console output. This
+package passed its automated suite, but the packager did not run a live
+Babylon/WebGL browser session.

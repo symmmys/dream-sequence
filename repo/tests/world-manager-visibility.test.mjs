@@ -89,7 +89,7 @@ test('application entry chain uses one cache-busting build identifier', function
     const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
     const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
     const scene = readFileSync(new URL('../src/scene/create-scene.js', import.meta.url), 'utf8');
-    const version = 'somnium-20261108-phase16d-anomaly-aperture-views-2';
+    const version = 'somnium-20261110-phase18o-active-w-slice-navigation-1';
 
     assert.ok(index.includes(`main.js?v=${version}`));
     assert.ok(main.includes(`create-scene.js?v=${version}`));

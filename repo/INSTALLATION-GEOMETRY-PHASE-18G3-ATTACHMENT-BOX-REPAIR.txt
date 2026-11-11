@@ -1,0 +1,24 @@
+SOMNIUM — PHASE 18G3 GIZMO ATTACHMENT AND BOX PREVIEW REPAIR
+
+FULL PROJECT INSTALLATION
+1. Download the full-project ZIP.
+2. Extract it into a clean project directory, preserving its internal folder structure.
+3. Ensure index.html is at the project root.
+4. Serve that root directory with your usual local HTTP server.
+5. Open/reload the local Somnium page. A hard refresh is recommended to clear previously cached JavaScript modules.
+
+PATCH INSTALLATION
+1. Extract the patch ZIP into the existing Somnium project root.
+2. Allow the included files to overwrite matching files.
+3. Hard-refresh the local page after restarting the HTTP server if necessary.
+
+BROWSER TEST
+1. Open BUILD (B), select the Buildings tab, and click ADD BOX BUILDING.
+2. Confirm that a filled translucent 2 x 2 x 2 box appears with a bright outline.
+3. Select MOVE and drag an axis handle; confirm the box moves and the numeric position fields change.
+4. Select ROTATE and drag the Y ring; confirm the box rotates and the rotation field changes. X/Z rotation is intentionally disabled until the Building model supports full 3-axis orientation.
+5. Select SCALE and drag each axis; confirm the filled box visibly changes size and Scale X/Y/Z update.
+6. Scale non-uniformly, return to ROTATE, and confirm the Babylon warning about rotation gizmos and non-uniform scaling is absent.
+7. Click PLACE BUILDING & START NEXT, then confirm that the committed box remains visible in the scene and is available in the building selector.
+
+If any step fails, send the browser console output and indicate the exact step. The automated suite passed, but this build has not been visually tested in a live browser/WebGL session by the packager.

@@ -4,7 +4,7 @@ import test from 'node:test';
 import { createGeometryDemoTopology } from '../src/demo/geometry-demo-topology.js';
 import { SliceTransitionTraversalController } from '../src/world/fields/geometry/slice-transition-traversal-controller.js';
 
-const BUILD_QUERY = 'somnium-20261108-phase16d-anomaly-aperture-views-2';
+const BUILD_QUERY = 'somnium-20261110-phase18o-active-w-slice-navigation-1';
 
 test('demo topology registers all three default slice-transition anomalies', function demoTopologyStartup() {
     const mainWorld = {
@@ -18,6 +18,14 @@ test('demo topology registers all three default slice-transition anomalies', fun
     assert.equal(demo.corridor.type, 'slice-transition');
     assert.equal(demo.hypercubeCorridor.type, 'slice-transition');
     assert.equal(demo.hypercubeMainCorridor.type, 'slice-transition');
+    assert.equal(demo.corridor.view.interiorBoundary, 'open-4d-cylinder');
+    assert.equal(demo.hypercubeCorridor.view.interiorBoundary, 'open-4d-cylinder');
+    assert.equal(demo.hypercubeMainCorridor.view.interiorBoundary, 'open-4d-cylinder');
+    for (const anomaly of [demo.corridor, demo.hypercubeCorridor, demo.hypercubeMainCorridor]) {
+        assert.equal(anomaly.view.previewSurface, 'spherical');
+        assert.equal(anomaly.view.showRim, false);
+    }
+    assert.deepEqual(demo.hypercubeMainCorridor.view.interiorBoundaryRadii, { source: 2.8, destination: 7.0 });
     assert.equal(demo.topology.getCorridor(demo.corridor.id).type, 'slice-transition');
     assert.equal(demo.topology.getCorridor(demo.hypercubeCorridor.id).type, 'slice-transition');
     assert.equal(demo.topology.getCorridor(demo.hypercubeMainCorridor.id).type, 'slice-transition');

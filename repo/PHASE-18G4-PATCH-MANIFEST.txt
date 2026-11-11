@@ -1,0 +1,23 @@
+SOMNIUM — PHASE 18G4 PATCH MANIFEST
+
+BASELINE
+  Apply this patch on top of the tested Phase 18G3 Gizmo Attachment and Box
+  Preview Repair project.
+
+INSTALL
+  Extract this ZIP into the project root (the directory containing index.html)
+  and allow the included files to overwrite matching files. Then hard-refresh
+  the browser.
+
+CONTENTS
+  This patch contains every new or modified project file needed for Phase 18G4,
+  including source modules, tests, documentation, and cache-busting references.
+
+REMOVALS
+  No application source files, user data files, or database files are removed.
+  One obsolete temporary installation-note file in the extracted Phase 18G3
+  baseline is absent from the Phase 18G4 project; it is harmless if left behind.
+
+DATA SAFETY
+  Do not clear browser storage. The Phase 18G4 object migration is additive and
+  preserves existing Plane, Anomaly, and user-authored object records.

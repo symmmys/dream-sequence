@@ -1,8 +1,8 @@
 
-import createScene from "./scene/create-scene.js?v=somnium-20261108-phase16c-anomaly-optics-2";
+import createScene from "./scene/create-scene.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1";
 
 async function main() {
-    console.info("[Main] Build: 2026-11-08-phase16c-anomaly-optics-2");
+    console.info("[Main] Build: 2026-11-09-phase17i-bidirectional-spherical-passage-1");
     console.log("[Main] Initializing Somnium...");
 
     const canvas = document.getElementById("renderCanvas");

@@ -167,7 +167,7 @@ test('ambient W movement evaluates routes that own the active Main World slice',
             calls.push({ position, direction, sliceId });
             return { movementScale: 0.8 };
         },
-        advanceAmbientInfluenceMovement(delta) { calls.push({ delta }); return true; },
+        advanceAmbientInfluenceMovement(delta, position) { calls.push({ delta, position }); return true; },
         setActive() {},
         dispose() {}
     };
@@ -179,6 +179,106 @@ test('ambient W movement evaluates routes that own the active Main World slice',
 
     assert.equal(network.advanceAmbientInfluenceMovement(0.1), true);
     assert.deepEqual(calls[0], { position: ambientPosition, direction: -1, sliceId: 'main' });
-    assert.deepEqual(calls[1], { delta: 0.1 });
+    assert.deepEqual(calls[1], { delta: 0.1, position: ambientPosition });
+    network.dispose();
+});
+
+
+test('network prefers the portal mapping whose visible mouth contains the player', function nearestPresentationRoute() {
+    const fallbackPosition = { x: 260, y: 2, z: -2, w: 80 };
+    const mappedPosition = { x: 18, y: 2.5, z: 0, w: 80 };
+    const makeRoute = (id, isNear, position) => ({
+        corridor: { id, source: { sliceId: 'hyper' }, destination: { sliceId: 'main' } },
+        worlds: new Map([['hyper', {}], ['main', {}]]),
+        currentSliceId: 'main',
+        isNearPresentationPortal() { return isNear; },
+        getAmbientPlayerPosition() { return position; },
+        setActive() {}, dispose() {}
+    });
+    const farRoute = makeRoute('far-mouth', false, fallbackPosition);
+    const nearRoute = makeRoute('near-mouth', true, mappedPosition);
+    const network = new CorridorTraversalNetwork({
+        topology: { getTraversableNeighbors() { return []; } },
+        controllers: [farRoute, nearRoute],
+        initialSliceId: 'main'
+    });
+    assert.deepEqual(network.getAmbientPlayerPosition(), mappedPosition);
+    network.dispose();
+});
+
+test('network can attach and detach a newly constructed runtime controller', function dynamicControllerLifecycle() {
+    const fixture = createFixture();
+    const dynamic = createController('dynamic-link', 'main', 'hyper');
+    fixture.network.addController(dynamic);
+    assert.equal(fixture.network.controllers.includes(dynamic), true);
+    assert.equal(dynamic.currentSliceId, 'hyper');
+    fixture.network.setActive(true);
+    assert.equal(dynamic.active, true);
+    assert.equal(fixture.network.removeController('dynamic-link'), true);
+    assert.equal(dynamic.disposed, true);
+    assert.equal(fixture.network.controllers.includes(dynamic), false);
+    assert.equal(fixture.network.removeController('dynamic-link'), false);
+    fixture.network.dispose();
+});
+
+test('network rejects duplicate runtime controller IDs without disturbing existing routes', function duplicateDynamicController() {
+    const fixture = createFixture();
+    assert.throws(() => fixture.network.addController(createController('hyper-poincare', 'hyper', 'poincare')),
+        /already exists/);
+    assert.equal(fixture.network.controllers.length, 2);
+    fixture.network.dispose();
+});
+
+test('new controllers are bound to the network slice-change callback', function dynamicControllerBinding() {
+    const fixture = createFixture();
+    const dynamic = createController('dynamic-bound', 'main', 'hyper');
+    fixture.network.addController(dynamic);
+    dynamic.onSliceChanged('main', { transitioning: false, corridorId: 'dynamic-bound' });
+    assert.equal(fixture.network.currentSliceId, 'main');
+    assert.equal(dynamic.currentSliceId, 'main');
+    assert.equal(fixture.changes.at(-1).sliceId, 'main');
+    fixture.network.dispose();
+});
+
+test('W playtest override moves a follow-mode player through a user Plane without an anomaly route', function forcedPlaneWMovement() {
+    const frame = {
+        origin: { x: 0, y: 0, z: 0, w: 0 },
+        axes: [
+            { x: 1, y: 0, z: 0, w: 0 },
+            { x: 0, y: 1, z: 0, w: 0 },
+            { x: 0, y: 0, z: 1, w: 0 }
+        ],
+        normal: { x: 0, y: 0, z: 0, w: 1 }
+    };
+    const world = { slice: { id: 'user-plane', frame }, wBounds: { min: -1, max: 1 } };
+    const player = {
+        sliceId: 'user-plane',
+        spatialPosition4D: { x: 0, y: 0, z: 0, w: 0 },
+        worldPosition: { x: 0, y: 0, z: 0 },
+        setWorldPosition(position) { this.worldPosition = { ...position }; }
+    };
+    const controller = {
+        corridor: { id: 'unrelated-link', source: { sliceId: 'other' }, destination: { sliceId: 'remote' } },
+        worlds: new Map([['user-plane', world]]),
+        currentSliceId: 'user-plane',
+        player,
+        camera: { wMovementEnabled: true },
+        options: { speed: 8 },
+        getMovementInput() { return { crossSectionW: 1, sprint: false }; },
+        getAmbientPlayerPosition() { return { ...player.spatialPosition4D }; },
+        getInfluenceMovementInfo() { return null; },
+        setActive() {},
+        dispose() {}
+    };
+    const network = new CorridorTraversalNetwork({
+        topology: { getTraversableNeighbors() { return []; } },
+        controllers: [controller],
+        initialSliceId: 'user-plane'
+    });
+    assert.equal(network.advanceAmbientInfluenceMovement(0.1), true);
+    assert.equal(player.spatialPosition4D.w, 0.8);
+    assert.equal(player.worldPosition.x, 0);
+    assert.equal(player.worldPosition.y, 0);
+    assert.equal(player.worldPosition.z, 0);
     network.dispose();
 });

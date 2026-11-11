@@ -1,0 +1,48 @@
+SOMNIUM — GEOMETRY PHASE 18D TEST RESULTS
+Build: somnium-20261109-phase18d-runtime-anomaly-integration-1
+
+AUTOMATED TEST SUITE
+Command:
+  node --experimental-default-type=module --test tests/*.test.mjs
+
+Result: PASS
+Tests: 343
+Passed: 343
+Failed: 0
+Skipped: 0
+
+SOURCE JAVASCRIPT SYNTAX
+- 133 source JavaScript files checked with Node's ESM syntax checker.
+- Result: PASS.
+
+TEST JAVASCRIPT SYNTAX
+- 38 test modules checked with Node's ESM syntax checker.
+- Result: PASS.
+
+RELATIVE MODULE REFERENCES
+- 222 relative import references checked after stripping browser query/hash cache suffixes.
+- Missing references: 0.
+- Result: PASS.
+
+CACHE-BUSTING CONSISTENCY
+- Stale Phase 18C cache identifiers in src/, index.html, and tests/: 0.
+- Phase 18D identifier occurrences: 78.
+
+KEY COVERAGE
+- Persistent endpoint edits convert into runtime endpoint positions and normalized orientations.
+- Runtime 4D anomaly bounds are recomputed from endpoint Plane frames and coordinates.
+- Disabled and unplaced persistent anomalies cannot become visible or traversable.
+- Persistent visibility, traversal, and bidirectionality flags are reflected by runtime topology.
+- The editor populates Plane selectors from persisted Plane records and live Plane bindings.
+- Missing built-in Plane registry records are repaired from the runtime demo definitions.
+- Successful editor saves call the live runtime bridge; deletion removes corresponding runtime resources.
+- Portal meshes are rebound, moved, and rotated when an anomaly definition changes.
+- Forward and reverse traversal handoff use the entry/exit mouth yaw difference.
+- Existing Phase 17I spherical passage presentation and the three original anomaly IDs are retained.
+- Legacy drag-to-draw room creation remains disabled.
+
+BROWSER / WEBGL
+No live browser/WebGL session was available in this build environment. IndexedDB hydration, portal mesh rebinding/re-projection, immediate editor-to-renderer updates, and traversal comfort require local browser verification.
+
+SCOPE
+The three built-in anomaly IDs are runtime-integrated. Newly created arbitrary anomaly records are persisted by the editor but are not dynamically registered as new live portal/controller pairs in this phase.

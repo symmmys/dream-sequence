@@ -1,6 +1,6 @@
 /** Provides tesseract topology and true 3D hyperplane sections. */
 
-import { rotate4 } from './spatial-4d.js?v=somnium-20261108-phase16c-anomaly-optics-2';
+import { rotate4 } from './spatial-4d.js?v=somnium-20261109-phase17i-bidirectional-spherical-passage-1';
 
 const AXES = ['x', 'y', 'z', 'w'];
 const FACET_BITS = [1, 2, 4, 8];

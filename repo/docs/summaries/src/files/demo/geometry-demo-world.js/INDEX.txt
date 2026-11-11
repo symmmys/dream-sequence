@@ -3,10 +3,10 @@ SOMNIUM — INDIVIDUAL SOURCE FILE INDEX
 
 Source file: src/demo/geometry-demo-world.js
 Source directory: src/
-Generated: 2026-11-09T03:15:29
-Total source lines: 970
+Generated: 2026-11-09T22:26:24
+Total source lines: 1935
 Maximum chunk size: 300 lines
-Number of parts: 4
+Number of parts: 7
 
 SOURCE PARTS
 ----------------------------------------------------------------
@@ -23,8 +23,20 @@ Original lines: 601-900
 Lines in part: 300
 
 Part: PART-004.txt
-Original lines: 901-970
-Lines in part: 70
+Original lines: 901-1200
+Lines in part: 300
+
+Part: PART-005.txt
+Original lines: 1201-1500
+Lines in part: 300
+
+Part: PART-006.txt
+Original lines: 1501-1800
+Lines in part: 300
+
+Part: PART-007.txt
+Original lines: 1801-1935
+Lines in part: 135
 
 READING INSTRUCTIONS
 ----------------------------------------------------------------

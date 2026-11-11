@@ -1,0 +1,28 @@
+SOMNIUM — GEOMETRY PHASE 18A TEST RESULTS
+Build: somnium-20261109-phase18b-tabbed-anomaly-editor-1
+Baseline: Phase 17I — Bidirectional Spherical Passage
+
+FULL AUTOMATED REGRESSION SUITE
+Command: node --experimental-default-type=module --test tests/*.test.mjs
+Result: 327 passed, 0 failed.
+Baseline before changes: 322 passed, 0 failed.
+New tests: 5 passed, 0 failed.
+
+NEW COVERAGE
+- Initial Plane registry contains Poincare Room, 4D Room, and Main World under stable existing IDs.
+- Plane registry rejects duplicate IDs and unknown lookups and clones returned records.
+- Plane registry JSON round trip preserves identity.
+- Three existing topology anomalies convert to persistent definitions while retaining original IDs and endpoint Plane IDs.
+- Persistent anomaly normalization retains endpoint orientation defaults and Phase 17I passagePresentation values.
+- Plane/anomaly persistence uses the separate `somnium-planes` database with `planes` and `anomalies` stores, distinct from `somnium-worlds`.
+
+IMPLEMENTATION CHECKS
+- Plane/anomaly bootstrap is invoked during GeometryDemoWorld startup.
+- Bootstrap inserts missing records only and uses a one-time marker; it does not overwrite existing records.
+- Existing WorldState schema and `somnium-worlds` persistence code are unchanged.
+- Application module cache-busting identifier advanced to the Phase 18A build.
+
+LIMITATIONS
+- Node test environment does not provide IndexedDB; actual browser IndexedDB bootstrap/write/reload behavior still requires browser validation.
+- No live browser/WebGL session was available. The new persistence bootstrap is wired into browser startup but has not been manually inspected in a browser in this environment.
+- The Anomalies tab, placement workflow, and runtime reconstruction from saved records are not part of Phase 18A; they remain subsequent milestones.

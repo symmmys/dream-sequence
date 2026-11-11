@@ -65,7 +65,7 @@ function createFixture(options = {}) {
         source,
         destination,
         initialSliceId: options.initialSliceId ?? sourceSlice.id,
-        traversal: { speed: 4, sprintSpeed: 6, entitySpeed: 4 },
+        traversal: { speed: 4, sprintSpeed: 6, entitySpeed: 4, ...options.traversal },
         onSliceChanged(sliceId, state) { changes.push({ sliceId, state }); }
     });
     controller.setActive(true);
@@ -125,6 +125,65 @@ function createCamera() {
         clearRenderAnchor() { this.anchor = null; }
     };
 }
+
+test('presentation mouths rebase distant Main World coordinates onto compact canonical anomaly endpoints', function presentationEndpointRebase() {
+    const fixture = createFixture({
+        playerPosition: { x: 260, y: 1, z: -2 },
+        traversal: {
+            triggerDistanceBySlice: { 'slice-b': 30 },
+            presentationEndpointsBySlice: {
+                'slice-a': { x: 260, y: 35, z: -2 },
+                'slice-b': { x: 260, y: 35, z: -2 }
+            }
+        }
+    });
+    try {
+        fixture.destination.terrain.min = { x: -500, y: -10, z: -500 };
+        fixture.destination.terrain.max = { x: 500, y: 20, z: 500 };
+        fixture.controller.currentSliceId = 'slice-b';
+        fixture.player.sliceId = 'slice-b';
+        fixture.player.worldPosition = { x: 260, y: 1, z: -2 };
+        const physical = fixture.controller.getAmbientPlayerPosition();
+        assert.deepEqual(physical, { x: 0, y: 0, z: 0, w: 10 });
+        assert.equal(fixture.controller.findEntry()?.destinationSliceId, 'slice-a');
+        assert.equal(fixture.controller.getEntryDiagnostic().reason, 'READY');
+        // Exercise the same public path used by the live network update: the
+        // displayed Main World portal must be a valid entry point, not merely
+        // a diagnostic proximity match.
+        assert.equal(fixture.controller.tryBeginTransit(), true);
+        assert.equal(fixture.controller.getState().state, 'transit');
+        assert.equal(fixture.controller.getState().direction, -1);
+
+        const arrival = fixture.controller.createArrivalPosition(
+            fixture.destination,
+            sliceToAmbient(fixture.destination.slice.frame, { x: 0, y: 0, z: 0 }),
+            fixture.source
+        );
+        assert.deepEqual(arrival, { x: 260, y: 1, z: -2 });
+    } finally {
+        cleanup(fixture);
+    }
+});
+
+test('presentation mapping preserves the canonical source endpoint and only rebases within its approach radius', function presentationMappingIsLocal() {
+    const fixture = createFixture({
+        playerPosition: { x: 260, y: 0, z: -2 },
+        traversal: {
+            triggerDistanceBySlice: { 'slice-a': 30 },
+            presentationEndpointsBySlice: { 'slice-a': { x: 260, y: 35, z: -2 } }
+        }
+    });
+    try {
+        assert.deepEqual(fixture.controller.getPhysicalEndpointLocalPosition(
+            fixture.source, { x: 260, y: 0, z: -2 }
+        ), { x: 0, y: 0, z: 0 });
+        assert.deepEqual(fixture.controller.getPhysicalEndpointLocalPosition(
+            fixture.source, { x: 320, y: 0, z: -2 }
+        ), { x: 320, y: 0, z: -2 });
+    } finally {
+        cleanup(fixture);
+    }
+});
 
 function enter(fixture) {
     fixture.controller.update(0);
@@ -562,3 +621,35 @@ test('destination handoff clamps arrival coordinates before entering a bounded P
         cleanup(fixture);
     }
 });
+
+
+test('once inside a slice-transition anomaly, full W traversal is not stalled by zero ambient freedom', function transitIgnoresAmbientFreedom() {
+    const fixture = createFixture({ anomaly: { influence: { maxWMovementScale: 0 } } });
+    try {
+        enter(fixture);
+        fixture.movement.input = { forward: 0, strafe: 0, vertical: 0, crossSectionW: 1, turn: 0, sprint: false };
+        for (let index = 0; index < 40 && fixture.controller.state === 'transit'; index++) {
+            fixture.controller.update(0.1);
+        }
+        assert.equal(fixture.controller.state, 'idle');
+        assert.equal(fixture.controller.currentSliceId, 'slice-b');
+        assert.equal(fixture.player.sliceId, 'slice-b');
+    } finally {
+        cleanup(fixture);
+    }
+});
+
+test('the W playtest override restores full ambient movement when anomaly freedom is zero', function forceWMovementIgnoresFreedom() {
+    const fixture = createFixture({ anomaly: { influence: { maxWMovementScale: 0 } } });
+    try {
+        const position = fixture.controller.getAmbientPlayerPosition();
+        assert.equal(fixture.controller.getInfluenceMovementInfo(position, 1), null);
+        const forced = fixture.controller.getInfluenceMovementInfo(position, 1, fixture.source.slice.id, { ignoreFreedom: true });
+        assert.equal(forced.movementScale, 1);
+        assert.equal(forced.freedomOverride, true);
+    } finally {
+        cleanup(fixture);
+    }
+});
+
+

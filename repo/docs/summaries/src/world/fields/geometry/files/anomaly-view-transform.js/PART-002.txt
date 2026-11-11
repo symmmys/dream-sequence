@@ -1,0 +1,11 @@
+function positiveOption(value, fallback) {
+    return value === undefined ? fallback : Number.isFinite(value) && value > 0
+        ? value : (() => { throw new RangeError('Anomaly view distance must be positive and finite.'); })();
+}
+
+export {
+    calculateAnomalyApertureScale,
+    euclidean4DApertureSectionRadius,
+    mapAnomalyCameraPose,
+    resolveAnomalyViewCenterNormalOffset
+};
